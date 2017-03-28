@@ -50,8 +50,9 @@ void game(WindowData * window_data, Keyboard * keyboard, GraphicsBuffer * graphi
 void buffer_title_block() {
 	VertexBuffer vb;
 	IndexBuffer ib;
-	std::vector<String *> texture_ids;
-	texture_ids.push_back(new String("title_screen_logo.png"));
+	std::vector<char *> texture_ids;
+	texture_ids.push_back("title_screen_logo.png");
+
 	m_graphics_buffer->texture_ids.push_back(texture_ids);
 	Vector2f center = {0.0f, 0.0f};
 	buffer_quad_centered_at(center, square_size, 0.0f, &vb, &ib);

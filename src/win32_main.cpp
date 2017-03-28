@@ -4,7 +4,7 @@ struct Texture {
 	int width;
 	int height;
 	int bytes_per_pixel;
-	String name;
+	char * name;
 	ID3D11ShaderResourceView * srv;
 	ID3D11SamplerState * sampler_state;
 };
@@ -327,7 +327,7 @@ void draw_buffer(int buffer_index) {
 
 	VertexBuffer * vb = &graphics_buffer.vertex_buffers[buffer_index];
 	IndexBuffer * ib = &graphics_buffer.index_buffers[buffer_index];
-	std::vector<String *> texture_ids = graphics_buffer.texture_ids[buffer_index];
+	std::vector<char *> texture_ids = graphics_buffer.texture_ids[buffer_index];
 
 	// Update vertex buffer
 	D3D11_MAPPED_SUBRESOURCE resource = {};
@@ -349,19 +349,16 @@ void draw_buffer(int buffer_index) {
 		// Find texture
 		int texture_index = -1;
 		for(int j = 0; j<textures.size(); j++) {
-			if(*texture_ids[i] == textures[j]->name) {
+			if(strcmp(texture_ids[i], textures[j]->name) == 0) {
 				texture_index = j;
 				break;
 			}
 		}
 		// @TODO Check for duplicates
 		if(texture_index == -1) {
-			char * zeroed_id = texture_ids[i]->zero();
-			log_print("draw_buffer", "Unable to find texture %s", zeroed_id);
-			free(zeroed_id);
+			log_print("draw_buffer", "Unable to find texture %s", texture_ids[i]);
 		} else {
 			texture_buffer.push_back(textures[texture_index]->srv);
-			delete texture_ids[i]; // Free texture id data
 		}
 	}
 

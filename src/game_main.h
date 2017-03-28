@@ -12,62 +12,6 @@
 
 #define assert(condition) if(!condition) { *(int *)0 = 0; }
 
-
-// Our String struct implementation, not 0 terminated and contains a length member.
-// Still has a lot of operator overloads to implement, will add them as they become needed.
-struct String {
-	char * data;
-	int length = 0;
-
-	String() { }
-	String(char string[]) {	
-		this->length = strlen(string);
-		if (this->length > 0) {
-			this->data = (char *) malloc(this->length);
-			memcpy(this->data, string, this->length);
-		}
-	}
-	~String() {
-		if (this->length > 0) {
-			free(this->data);
-		}
-	}
-
-	// Convert to 0-terminated string
-	char * zero() {
-		int zeroed_length = this->length + 1;
-		char * zeroed_data = (char *) malloc(zeroed_length);
-		memcpy(zeroed_data, this->data, zeroed_length);
-		zeroed_data[zeroed_length-1] = '\0';
-		return zeroed_data;
-	}
-
-	// Operator overloads
-	bool operator ==(String &b) {
-		if(this->length != b.length) {
-			return false;
-		} else {
-			for(int i=0; i<this->length; i++) {
-				if(this->data[i] != b.data[i]) {
-					return false;
-				}
-			}
-		}
-		return true;
-	}
-
-	void operator=(char b[]) {
-		if (this->length > 0) {
-			free(this->data);
-		}
-		this->length = strlen(b);
-		if (this->length > 0) {
-			this->data = (char *) malloc(this->length);
-			memcpy(this->data, b, this->length);
-		}
-	}
-};
-
 struct Vector2f {
 	Vector2f(float x, float y) {
 		this->x = x;
@@ -121,7 +65,7 @@ struct IndexBuffer {
 struct GraphicsBuffer {
 	std::vector<VertexBuffer> vertex_buffers;
 	std::vector<IndexBuffer> index_buffers;
-	std::vector<std::vector<String *>> texture_ids;
+	std::vector<std::vector<char *>> texture_ids;
 };
 
 struct Keyboard {
