@@ -3,6 +3,18 @@
 #include <stdio.h>
 #include <vector>
 
+
+// Macros
+#define log_print(category, format, ...)					\
+	char message [2048];									\
+	sprintf(message, format, __VA_ARGS__);					\
+	printf("[%s]: %s\n", category, message, __VA_ARGS__);	\
+
+#define assert(condition) if(!condition) { *(int *)0 = 0; }
+
+
+// Our String struct implementation, not 0 terminated and contains a length member.
+// Still has a lot of operator overloads to implement, will add them as they become needed.
 struct String {
 	char * data;
 	int length = 0;
@@ -21,6 +33,15 @@ struct String {
 		}
 	}
 
+	// Convert to 0-terminated string
+	char * zero() {
+		int zeroed_length = this->length + 1;
+		char * zeroed_data = (char *) malloc(zeroed_length);
+		memcpy(zeroed_data, this->data, zeroed_length);
+		zeroed_data[zeroed_length-1] = '\0';
+		return zeroed_data;
+	}
+
 	// Operator overloads
 	bool operator ==(String &b) {
 		if(this->length != b.length) {
@@ -32,7 +53,6 @@ struct String {
 				}
 			}
 		}
-
 		return true;
 	}
 
@@ -46,7 +66,6 @@ struct String {
 			memcpy(this->data, b, this->length);
 		}
 	}
-
 };
 
 struct Vector2f {
@@ -106,10 +125,10 @@ struct GraphicsBuffer {
 };
 
 struct Keyboard {
-	bool key_left = false;
-	bool key_right = false;
-	bool key_up = false;
-	bool key_down = false;
+	bool key_left 	= false;
+	bool key_right 	= false;
+	bool key_up 	= false;
+	bool key_down 	= false;
 };
 
 struct WindowData {

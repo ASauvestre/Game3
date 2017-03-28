@@ -348,16 +348,21 @@ void draw_buffer(int buffer_index) {
 	for(int i = 0; i<texture_ids.size(); i++) {
 		// Find texture
 		int texture_index = -1;
-		for(int j = 0; i<textures.size(); j++) {
+		for(int j = 0; j<textures.size(); j++) {
 			if(*texture_ids[i] == textures[j]->name) {
 				texture_index = j;
 				break;
 			}
 		}
-		// @TODO Assert texture is not null
 		// @TODO Check for duplicates
-		texture_buffer.push_back(textures[texture_index]->srv);
-		delete texture_ids[i]; // Free texture id data
+		if(texture_index == -1) {
+			char * zeroed_id = texture_ids[i]->zero();
+			log_print("draw_buffer", "Unable to find texture %s", zeroed_id);
+			free(zeroed_id);
+		} else {
+			texture_buffer.push_back(textures[texture_index]->srv);
+			delete texture_ids[i]; // Free texture id data
+		}
 	}
 
 	d3d_dc->PSSetShaderResources(0, texture_buffer.size(), &texture_buffer[0]);
@@ -430,11 +435,11 @@ void create_texture(char name[]) {
     d3d_texture->Release();
 
 	Texture * texture = new Texture();
-			texture->width 			= x;
+			texture->width 				= x;
 			texture->height 			= y;
-			texture->bytes_per_pixel = n;
-			texture->srv 			= srv;
-			texture->sampler_state 	= default_sampler_state;
+			texture->bytes_per_pixel 	= n;
+			texture->srv 				= srv;
+			texture->sampler_state 		= default_sampler_state;
 
 	texture->name = name;
 
