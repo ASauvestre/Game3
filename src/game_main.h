@@ -13,8 +13,8 @@
 #define assert(condition) if(!condition) { *(int *)0 = 0; }
 
 
-const int TILES_PER_ROW		= 16;
-const int ROWS_PER_SCREEN	= 9;
+const int TILES_PER_ROW		= 32;
+const int ROWS_PER_SCREEN	= 18;
 const int TILES_PER_SCREEN	= TILES_PER_ROW * ROWS_PER_SCREEN;
 
 struct Tile {

@@ -45,8 +45,8 @@ static Keyboard keyboard = {};
 static WindowData window_data = {};
 static GraphicsBuffer graphics_buffer;
 
-const int MAX_VERTEX_BUFFER_SIZE 	= 1024;
-const int MAX_INDEX_BUFFER_SIZE 	= 1024;
+const int MAX_VERTEX_BUFFER_SIZE 	= 4096;
+const int MAX_INDEX_BUFFER_SIZE 	= 4096;
 
 void update_window_events() {
 	MSG message;

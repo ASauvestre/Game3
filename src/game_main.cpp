@@ -50,6 +50,7 @@ void game(WindowData * window_data, Keyboard * keyboard, GraphicsBuffer * graphi
 
 	TileScreen current_tile_screen;
 
+	// @Todo: Make this handle ratio different from screen ratio
 	for(int i=0; i<TILES_PER_SCREEN; i++) {
 		Tile tile;
 		tile.texture = "grass.png";
