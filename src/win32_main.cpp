@@ -45,8 +45,8 @@ static Keyboard keyboard = {};
 static WindowData window_data = {};
 static GraphicsBuffer graphics_buffer;
 
-const int MAX_VERTEX_BUFFER_SIZE 	= 256;
-const int MAX_INDEX_BUFFER_SIZE 	= 256;
+const int MAX_VERTEX_BUFFER_SIZE 	= 1024;
+const int MAX_INDEX_BUFFER_SIZE 	= 1024;
 
 void update_window_events() {
 	MSG message;
@@ -332,8 +332,7 @@ void draw_buffer(int buffer_index) {
 	// Update vertex buffer
 	D3D11_MAPPED_SUBRESOURCE resource = {};
 	d3d_dc->Map(d3d_vertex_buffer_interface, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
-	memcpy(resource.pData, &vb->vertices[0],
-		   sizeof(Vertex) * vb->vertices.size());
+	memcpy(resource.pData, &vb->vertices[0], sizeof(Vertex) * vb->vertices.size());
 	d3d_dc->Unmap(d3d_vertex_buffer_interface, 0);
 
 	// Update index buffer
@@ -362,7 +361,7 @@ void draw_buffer(int buffer_index) {
 		}
 	}
 
-	d3d_dc->PSSetShaderResources(0, texture_buffer.size(), &texture_buffer[0]);
+	d3d_dc->PSSetShaderResources(0, 1, &texture_buffer[0]);
 	d3d_dc->PSSetSamplers(0, 1, &default_sampler_state);
 
 	d3d_dc->DrawIndexed(graphics_buffer.index_buffers[buffer_index].indices.size(), 0, 0);
@@ -395,34 +394,41 @@ void create_texture(char name[]) {
 
 	char path[256];
 	snprintf(path, 256, "textures/%s", name);
+	
 	int x,y,n;
-	texture_data.pSysMem 			= stbi_load(path, &x, &y, &n, 0);
-    texture_data.SysMemPitch 		= x*n;
-    texture_data.SysMemSlicePitch 	= x*y*n;
+	texture_data.pSysMem 			= stbi_load(path, &x, &y, &n, 4);
 
 	if(texture_data.pSysMem == NULL) {
-		printf("Failed to load texture");
+		log_print("create_texture", "Failed to load texture %s", name);
 		return;
 	}
 
-	D3D11_TEXTURE2D_DESC 	texture_desc;
-							texture_desc.Width 				= x;
-							texture_desc.Height 			= y;
-							texture_desc.MipLevels 			= 1;
-							texture_desc.ArraySize 			= 1;
-							texture_desc.Format 			= DXGI_FORMAT_R8G8B8A8_UNORM; // @Incomplete Assuming 32-bit depth for all textures
-							texture_desc.SampleDesc.Count 	= 1;
-							texture_desc.SampleDesc.Quality = 0;
-							texture_desc.Usage 				= D3D11_USAGE_DEFAULT;
-							texture_desc.BindFlags 			= D3D11_BIND_SHADER_RESOURCE;
-							texture_desc.CPUAccessFlags 	= 0;
-							texture_desc.MiscFlags 			= 0;
+	if(n != 4) {
+		log_print("create_texture", "Loaded texture %s, but it has %d bit depth, we prefer using 32 bit depth textures", name, n*8);
+		n = 4;
+	}
+
+    texture_data.SysMemPitch 		= x*n;
+    texture_data.SysMemSlicePitch 	= x*y*n;
+
+	D3D11_TEXTURE2D_DESC texture_desc;
+						 texture_desc.Width 				= x;
+						 texture_desc.Height 				= y;
+						 texture_desc.MipLevels 			= 1;
+						 texture_desc.ArraySize 			= 1;
+						 texture_desc.Format 				= DXGI_FORMAT_R8G8B8A8_UNORM;
+						 texture_desc.SampleDesc.Count 		= 1;
+						 texture_desc.SampleDesc.Quality 	= 0;
+						 texture_desc.Usage 				= D3D11_USAGE_DEFAULT;
+						 texture_desc.BindFlags 			= D3D11_BIND_SHADER_RESOURCE;
+						 texture_desc.CPUAccessFlags 		= 0;
+						 texture_desc.MiscFlags 			= 0;
 
 	ID3D11Texture2D * d3d_texture;
     d3d_device->CreateTexture2D(&texture_desc, &texture_data, &d3d_texture);
 
     D3D11_SHADER_RESOURCE_VIEW_DESC srv_desc;
-    								srv_desc.Format 					= DXGI_FORMAT_R8G8B8A8_UNORM; // @Incomplete Assuming 32-bit depth for all textures
+    								srv_desc.Format 					= DXGI_FORMAT_R8G8B8A8_UNORM;
     								srv_desc.ViewDimension 				= D3D11_SRV_DIMENSION_TEXTURE2D;
 									srv_desc.Texture2D.MostDetailedMip 	= 0;
     								srv_desc.Texture2D.MipLevels 		= 1;
@@ -432,11 +438,11 @@ void create_texture(char name[]) {
     d3d_texture->Release();
 
 	Texture * texture = new Texture();
-			texture->width 				= x;
-			texture->height 			= y;
-			texture->bytes_per_pixel 	= n;
-			texture->srv 				= srv;
-			texture->sampler_state 		= default_sampler_state;
+			  texture->width 			= x;
+			  texture->height 			= y;
+			  texture->bytes_per_pixel 	= n;
+			  texture->srv 				= srv;
+			  texture->sampler_state 	= default_sampler_state;
 
 	texture->name = name;
 
@@ -445,6 +451,7 @@ void create_texture(char name[]) {
 
 void init_textures() {
 	create_texture("title_screen_logo.png");
+	create_texture("grass.png");
 }
 
 void main() {
@@ -462,6 +469,7 @@ void main() {
 	float frame_time = 0.0f;
 	LARGE_INTEGER start_time, end_time;
 	LARGE_INTEGER frequency;
+
 	while(!should_quit) {
 		QueryPerformanceFrequency(&frequency);
 		QueryPerformanceCounter(&start_time);
