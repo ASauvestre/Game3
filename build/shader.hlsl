@@ -1,6 +1,10 @@
 Texture2DArray m_texture_array;
 SamplerState m_sampler_state;
 
+cbuffer vs_buffer : register(b0) {
+	int4 texture_index_map[512]; // Max number of textures
+};
+
 struct VS_OUTPUT 
 {
 	float4 pos : SV_POSITION;
@@ -15,7 +19,7 @@ VS_OUTPUT VS(float4 input_pos : POSITION, float2 input_tex_coord : TEXCOORD, flo
 
 	output.pos = input_pos;
 	output.tex_coord = input_tex_coord;
-	output.texid = input_texid;
+	output.texid = texture_index_map[input_texid/4][input_texid%4];
 
 	return output;
 }

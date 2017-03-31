@@ -1,12 +1,16 @@
 #include "win32_main.h"
 
 struct Texture {
+	char * name;
+
 	int width;
 	int height;
 	int bytes_per_pixel;
-	char * name;
+	
 	D3D11_SUBRESOURCE_DATA data;
-	ID3D11SamplerState * sampler_state;
+
+	int index_in_array;
+	// ID3D11SamplerState * sampler_state;
 };
 
 static HWND handle;
@@ -40,14 +44,23 @@ static ID3D11SamplerState * default_sampler_state;
 
 static std::vector<Texture*> textures;
 
+static ID3D11Texture2D * d3d_texture_array;
+static ID3D11ShaderResourceView * d3d_texture_array_srv;
+static ID3D11Buffer * d3d_texture_index_map_buffer;
+
 static bool should_quit = false;
 
 static Keyboard keyboard = {};
 static WindowData window_data = {};
 static GraphicsBuffer graphics_buffer;
 
-const int MAX_VERTEX_BUFFER_SIZE 	= 4096;
-const int MAX_INDEX_BUFFER_SIZE 	= 4096;
+const int MAX_VERTEX_BUFFER_SIZE 	 = 4096;
+const int MAX_INDEX_BUFFER_SIZE 	 = 4096;
+const int MAX_TEXTURE_INDEX_MAP_SIZE = 2048;
+
+// Perf counters
+LARGE_INTEGER start_time, end_time;
+LARGE_INTEGER frequency;
 
 void update_window_events() {
 	MSG message;
@@ -212,7 +225,7 @@ void init_d3d() {
 					buffer_desc.ScanlineOrdering 		= DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
 					buffer_desc.Scaling 				= DXGI_MODE_SCALING_UNSPECIFIED;
 
-	DXGI_SWAP_CHAIN_DESC 	swap_chain_desc = {}; 
+	DXGI_SWAP_CHAIN_DESC 	swap_chain_desc = {};
 							swap_chain_desc.BufferDesc 			= buffer_desc;
 							swap_chain_desc.SampleDesc.Count 	= 1;
 							swap_chain_desc.SampleDesc.Quality 	= 0;
@@ -221,6 +234,7 @@ void init_d3d() {
 							swap_chain_desc.OutputWindow 		= handle;
 							swap_chain_desc.Windowed 			= true;
 							swap_chain_desc.SwapEffect 			= DXGI_SWAP_EFFECT_DISCARD;
+							swap_chain_desc.Flags 				= 0;
 
 	error_code = D3D11CreateDeviceAndSwapChain(	NULL, D3D_DRIVER_TYPE_HARDWARE, NULL, 0, NULL, 0, D3D11_SDK_VERSION, 
 												&swap_chain_desc, &swap_chain, &d3d_device, NULL, &d3d_dc);
@@ -322,10 +336,21 @@ void init_d3d() {
 
 	d3d_device->CreateSamplerState(&sampler_desc, &default_sampler_state);
 
+	// Texture index map buffer
+	D3D11_BUFFER_DESC texture_map_index_buffer_desc;
+	texture_map_index_buffer_desc.ByteWidth 			= sizeof(int) * MAX_TEXTURE_INDEX_MAP_SIZE;
+	texture_map_index_buffer_desc.Usage 				= D3D11_USAGE_DYNAMIC;
+	texture_map_index_buffer_desc.BindFlags 			= D3D11_BIND_CONSTANT_BUFFER;
+	texture_map_index_buffer_desc.CPUAccessFlags 		= D3D11_CPU_ACCESS_WRITE;
+	texture_map_index_buffer_desc.MiscFlags 			= 0;
+	texture_map_index_buffer_desc.StructureByteStride 	= 0;
+
+	d3d_device->CreateBuffer( &texture_map_index_buffer_desc, NULL, &d3d_texture_index_map_buffer );
+
 }
 
 void draw_buffer(int buffer_index) {
-
+	
 	VertexBuffer * vb = &graphics_buffer.vertex_buffers[buffer_index];
 	IndexBuffer * ib = &graphics_buffer.index_buffers[buffer_index];
 	std::vector<char *> texture_ids = graphics_buffer.texture_ids[buffer_index];
@@ -339,50 +364,100 @@ void draw_buffer(int buffer_index) {
 	// Update index buffer
 	resource = {};
 	d3d_dc->Map(d3d_index_buffer_interface, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
-	memcpy(resource.pData, &ib->indices[0],
-		   sizeof( int ) *  ib->indices.size());
+	memcpy(resource.pData, &ib->indices[0], sizeof( int ) *  ib->indices.size());
 	d3d_dc->Unmap(d3d_index_buffer_interface, 0);
 
-
-	// Bind Textures
-	std::vector<D3D11_SUBRESOURCE_DATA> texture_buffer;
+	// Create texture index map
+	int texture_index_map[MAX_TEXTURE_INDEX_MAP_SIZE];
 	for(int i = 0; i<texture_ids.size(); i++) {
 		// Find texture in the catalog
 		int texture_index = -1;
 		for(int j = 0; j<textures.size(); j++) {
 			if(strcmp(texture_ids[i], textures[j]->name) == 0) {
-				texture_index = j;
+				texture_index = textures[j]->index_in_array;
 				break;
 			}
 		}
-		// @TODO Check for duplicates
-		if(texture_index == -1) {
-			log_print("draw_buffer", "Unable to find texture %s", texture_ids[i]);
-		} else {
-			texture_buffer.push_back(textures[texture_index]->data);
-		}
+		if(texture_index == -1) { log_print("draw_buffer", "Unable to find texture %s", texture_ids[i]); }
+		
+		texture_index_map[i] = texture_index;
 	}
 
-	// Add textures to a Texture2DArray
-	//
-	// @Incomplete We cannot have more than 2048 textures per Array, if the buffer 
-	// ends up being bigger, split the textures into multiple arrays and fixup the Vertex texture ids.
-	//
-	// @Incomplete !!!! This also only supports one texture size per Array.
-	// Maybe sort the texure buffer by size and then split the textures into arrays ?
-	//
-	// @Incomplete Only 128 ressources can be bound to the shader at once, if we have more, split the draw call.
-	// 
-	// @Speed Creating a new texture every frame is very expensive, find another way (have multiple fixed texture size arrays ready ?, 
-	// create all the arrays when the load the textures and pass everything to the shader every frame ? 
-	// (max number of textures without split would be about 128*2048 = 262144))
-	//
+	// Update texture index map buffer
+	resource = {};
+	d3d_dc->Map(d3d_texture_index_map_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
+	memcpy(resource.pData, &texture_index_map[0], sizeof( int ) *  MAX_TEXTURE_INDEX_MAP_SIZE);
+	d3d_dc->Unmap(d3d_texture_index_map_buffer, 0);
 
+	d3d_dc->VSSetConstantBuffers( 0, 1, &d3d_texture_index_map_buffer );
+
+	d3d_dc->PSSetShaderResources(0, 1, &d3d_texture_array_srv);
+	d3d_dc->PSSetSamplers(0, 1, &default_sampler_state);
+
+	
+	d3d_dc->DrawIndexed(graphics_buffer.index_buffers[buffer_index].indices.size(), 0, 0);
+}
+
+void draw_frame() {
+	
+	// Clear view
+	float color_array[4] = {window_data.background_color.r, window_data.background_color.g, 
+							window_data.background_color.b, window_data.background_color.a};
+
+	d3d_dc->ClearRenderTargetView(render_target_view, color_array);
+	d3d_dc->ClearDepthStencilView(depth_stencil_view, D3D11_CLEAR_DEPTH|D3D11_CLEAR_STENCIL, 1.0f, 0);
+	
+
+	for(int i = 0; i < graphics_buffer.vertex_buffers.size(); i++) {
+		// Draw buffer
+		draw_buffer(i);
+
+	}
+	swap_chain->Present(0, 0);
+
+	// Clear buffer;
+	graphics_buffer.vertex_buffers.clear();
+	graphics_buffer.index_buffers.clear();
+	graphics_buffer.texture_ids.clear();
+	
+
+
+}
+
+void do_load_texture(Texture * texture) {
+	D3D11_SUBRESOURCE_DATA texture_data = {};
+
+	char path[512];
+	snprintf(path, 512, "textures/%s", texture->name);
+	
+	int x,y,n;
+	texture_data.pSysMem = stbi_load(path, &x, &y, &n, 4);
+
+	if(texture_data.pSysMem == NULL) {
+		log_print("do_load_texture", "Failed to load texture \"%s\"", texture->name);
+		return;
+	}
+
+	if(n != 4) {
+		log_print("do_load_texture", "Loaded texture \"%s\", but it has %d bit depth, we prefer using 32 bit depth textures", texture->name, n*8);
+		n = 4;
+	}
+
+    texture_data.SysMemPitch 		= x * n;
+    texture_data.SysMemSlicePitch 	= texture_data.SysMemPitch * y;
+
+    texture->data 				= texture_data;
+    texture->width 				= x;
+    texture->height 			= y;
+    texture->bytes_per_pixel 	= n;
+}
+
+void bind_textures_to_srv() {
 	D3D11_TEXTURE2D_DESC texture_desc;
-						 texture_desc.Width 				= 256; // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-						 texture_desc.Height 				= 256; // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+						 texture_desc.Width 				= 256; // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! @Incomplete 
+						 texture_desc.Height 				= 256; // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! @Incomplete
 						 texture_desc.MipLevels 			= 1;
-						 texture_desc.ArraySize 			= texture_buffer.size();
+						 texture_desc.ArraySize 			= textures.size();
 						 texture_desc.Format 				= DXGI_FORMAT_R8G8B8A8_UNORM;
 						 texture_desc.SampleDesc.Count 		= 1;
 						 texture_desc.SampleDesc.Quality 	= 0;
@@ -391,8 +466,15 @@ void draw_buffer(int buffer_index) {
 						 texture_desc.CPUAccessFlags 		= 0;
 						 texture_desc.MiscFlags 			= 0;
 
-	ID3D11Texture2D * d3d_texture_array;
-    d3d_device->CreateTexture2D(&texture_desc, &texture_buffer[0], &d3d_texture_array);
+	std::vector<D3D11_SUBRESOURCE_DATA> texture_data_array;
+
+	for(int i=0; i<textures.size(); i++) {
+		do_load_texture(textures[i]);
+		textures[i]->index_in_array = i;
+		texture_data_array.push_back(textures[i]->data);
+	}
+
+    d3d_device->CreateTexture2D(&texture_desc, &texture_data_array[0], &d3d_texture_array);
 
     D3D11_SHADER_RESOURCE_VIEW_DESC srv_desc;
     								srv_desc.Format 						= DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -402,105 +484,23 @@ void draw_buffer(int buffer_index) {
     								srv_desc.Texture2DArray.FirstArraySlice = 0;
     								srv_desc.Texture2DArray.ArraySize 		= texture_desc.ArraySize;
 
-    ID3D11ShaderResourceView * srv;
-    d3d_device->CreateShaderResourceView(d3d_texture_array, &srv_desc, &srv);
+    d3d_device->CreateShaderResourceView(d3d_texture_array, &srv_desc, &d3d_texture_array_srv);
 
-	d3d_dc->PSSetShaderResources(0, 1, &srv);
-	d3d_dc->PSSetSamplers(0, 1, &default_sampler_state);
-
-	d3d_dc->DrawIndexed(graphics_buffer.index_buffers[buffer_index].indices.size(), 0, 0);
-
-	d3d_texture_array->Release();
-	srv->Release();
 }
 
-void draw_frame() {
-	// Clear view
-	float color_array[4] = {window_data.background_color.r, window_data.background_color.g, 
-							window_data.background_color.b, window_data.background_color.a};
-
-	d3d_dc->ClearRenderTargetView(render_target_view, color_array);
-	d3d_dc->ClearDepthStencilView(depth_stencil_view, D3D11_CLEAR_DEPTH|D3D11_CLEAR_STENCIL, 1.0f, 0);
-
-	for(int i = 0; i < graphics_buffer.vertex_buffers.size(); i++) {
-		// Draw buffer
-		draw_buffer(i);
-	}
-
-	swap_chain->Present(0, 0);
-
-	// Clear buffer;
-	graphics_buffer.vertex_buffers.clear();
-	graphics_buffer.index_buffers.clear();
-	graphics_buffer.texture_ids.clear();
-}
-
-void create_texture(char name[]) {
-	// SRV
-	D3D11_SUBRESOURCE_DATA texture_data = {};
-
-	char path[256];
-	snprintf(path, 256, "textures/%s", name);
-	
-	int x,y,n;
-	texture_data.pSysMem 			= stbi_load(path, &x, &y, &n, 4);
-
-	if(texture_data.pSysMem == NULL) {
-		log_print("create_texture", "Failed to load texture \"%s\"", name);
-		return;
-	}
-
-	if(n != 4) {
-		log_print("create_texture", "Loaded texture \"%s\", but it has %d bit depth, we prefer using 32 bit depth textures", name, n*8);
-		n = 4;
-	}
-
-    texture_data.SysMemPitch 		= x * n;
-    texture_data.SysMemSlicePitch 	= texture_data.SysMemPitch * y;
-
-
-	D3D11_TEXTURE2D_DESC texture_desc;
-						 texture_desc.Width 				= x;
-						 texture_desc.Height 				= y;
-						 texture_desc.MipLevels 			= 1;
-						 texture_desc.ArraySize 			= 1;
-						 texture_desc.Format 				= DXGI_FORMAT_R8G8B8A8_UNORM;
-						 texture_desc.SampleDesc.Count 		= 1;
-						 texture_desc.SampleDesc.Quality 	= 0;
-						 texture_desc.Usage 				= D3D11_USAGE_DEFAULT;
-						 texture_desc.BindFlags 			= D3D11_BIND_SHADER_RESOURCE;
-						 texture_desc.CPUAccessFlags 		= 0;
-						 texture_desc.MiscFlags 			= 0;
-
-	ID3D11Texture2D * d3d_texture;
-    d3d_device->CreateTexture2D(&texture_desc, &texture_data, &d3d_texture);
-
-    D3D11_SHADER_RESOURCE_VIEW_DESC srv_desc;
-    								srv_desc.Format 					= DXGI_FORMAT_R8G8B8A8_UNORM;
-    								srv_desc.ViewDimension 				= D3D11_SRV_DIMENSION_TEXTURE2D;
-									srv_desc.Texture2D.MostDetailedMip 	= 0;
-    								srv_desc.Texture2D.MipLevels 		= 1;
-
-    ID3D11ShaderResourceView * srv;
-    d3d_device->CreateShaderResourceView(d3d_texture, &srv_desc, &srv);
-    d3d_texture->Release();
-
+void add_texture_to_load_queue(char * name) {
 	Texture * texture = new Texture();
-	texture->width 				= x;
-	texture->height 			= y;
-	texture->bytes_per_pixel 	= n;
-	texture->data 				= texture_data;
-	texture->sampler_state 		= default_sampler_state;
 	texture->name = name;
 
-	textures.push_back(texture);
-
+	textures.push_back(texture);	
 }
 
 void init_textures() {
-	create_texture("title_screen_logo.png");
-	create_texture("grass.png");
-	create_texture("dirt.png");
+	add_texture_to_load_queue("title_screen_logo.png");
+	add_texture_to_load_queue("grass.png");
+	add_texture_to_load_queue("dirt.png");
+
+	bind_textures_to_srv();
 }
 
 void main() {
@@ -514,20 +514,20 @@ void main() {
 
 	init_textures();
 
-	RECT rc;
 	float frame_time = 0.0f;
-	LARGE_INTEGER start_time, end_time;
-	LARGE_INTEGER frequency;
+
 
 	while(!should_quit) {
-		QueryPerformanceFrequency(&frequency);
-		QueryPerformanceCounter(&start_time);
+		// QueryPerformanceFrequency(&frequency);
+		// QueryPerformanceCounter(&start_time);
 
 		update_window_events();
 		game(&window_data, &keyboard, &graphics_buffer);
 		draw_frame();
-
-		QueryPerformanceCounter(&end_time);
-		frame_time = ((float)(end_time.QuadPart - start_time.QuadPart)*1000/(float)frequency.QuadPart);
+		
+		// QueryPerformanceCounter(&end_time);
+		
+		// frame_time = ((float)(end_time.QuadPart - start_time.QuadPart)*1000/(float)frequency.QuadPart);
+		// log_print("perf_counter", "Total frame time is %f", frame_time);
 	}
 }

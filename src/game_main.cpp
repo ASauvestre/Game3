@@ -99,8 +99,6 @@ void buffer_tiles(TileScreen * tile_screen) {
 		Vertex v4 = {tile_width * (tile.local_x + 1), tile_height * (tile.local_y + 0), 0.0f, 1.0f, 0.0f, texture_depth};
 
 		buffer_quad_gl(v1, v2, v3, v4, &vb, &ib);
-
-
 		
 	}
 
