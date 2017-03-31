@@ -56,7 +56,7 @@ void game(WindowData * window_data, Keyboard * keyboard, GraphicsBuffer * graphi
 		tile.local_x = i % TILES_PER_ROW;
 		tile.local_y = i / TILES_PER_ROW;
 
-		if(tile.local_x % 2 == 1) {
+		if(tile.local_x % 2 == 1 && tile.local_y % 2 == 1) {
 			tile.texture = "dirt.png";
 		}
 
@@ -80,7 +80,18 @@ void buffer_tiles(TileScreen * tile_screen) {
 		float tile_width = 1.0f/TILES_PER_ROW;
 		float tile_height = 1.0f/ROWS_PER_SCREEN; // @Incomplete, handle aspect ratios
 
-		float texture_depth = i;
+		float texture_depth = texture_ids.size();
+
+		bool texture_already_in_buffer = false;
+		for(int j = 0; j<texture_ids.size(); j++) {
+			char * id = texture_ids[j];
+			if(strcmp(id, tile.texture) == 0) {
+				texture_already_in_buffer = true;
+				texture_depth = j;
+
+			}
+		}
+		if (!texture_already_in_buffer) texture_ids.push_back(tile.texture);
 
 		Vertex v1 = {tile_width * (tile.local_x + 0), tile_height * (tile.local_y + 0), 0.0f, 0.0f, 0.0f, texture_depth};
 		Vertex v2 = {tile_width * (tile.local_x + 1), tile_height * (tile.local_y + 1), 0.0f, 1.0f, 1.0f, texture_depth};
@@ -89,7 +100,8 @@ void buffer_tiles(TileScreen * tile_screen) {
 
 		buffer_quad_gl(v1, v2, v3, v4, &vb, &ib);
 
-		texture_ids.push_back(tile.texture);
+
+		
 	}
 
 	m_graphics_buffer->texture_ids.push_back(texture_ids);

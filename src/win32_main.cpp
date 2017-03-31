@@ -373,9 +373,14 @@ void draw_buffer(int buffer_index) {
 	//
 	// @Incomplete Only 128 ressources can be bound to the shader at once, if we have more, split the draw call.
 	// 
+	// @Speed Creating a new texture every frame is very expensive, find another way (have multiple fixed texture size arrays ready ?, 
+	// create all the arrays when the load the textures and pass everything to the shader every frame ? 
+	// (max number of textures without split would be about 128*2048 = 262144))
+	//
+
 	D3D11_TEXTURE2D_DESC texture_desc;
-						 texture_desc.Width 				= 64; // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-						 texture_desc.Height 				= 64; // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+						 texture_desc.Width 				= 256; // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+						 texture_desc.Height 				= 256; // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 						 texture_desc.MipLevels 			= 1;
 						 texture_desc.ArraySize 			= texture_buffer.size();
 						 texture_desc.Format 				= DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -399,7 +404,7 @@ void draw_buffer(int buffer_index) {
 
     ID3D11ShaderResourceView * srv;
     d3d_device->CreateShaderResourceView(d3d_texture_array, &srv_desc, &srv);
-    
+
 	d3d_dc->PSSetShaderResources(0, 1, &srv);
 	d3d_dc->PSSetSamplers(0, 1, &default_sampler_state);
 
@@ -453,7 +458,7 @@ void create_texture(char name[]) {
     texture_data.SysMemPitch 		= x * n;
     texture_data.SysMemSlicePitch 	= texture_data.SysMemPitch * y;
 
-/*
+
 	D3D11_TEXTURE2D_DESC texture_desc;
 						 texture_desc.Width 				= x;
 						 texture_desc.Height 				= y;
@@ -479,7 +484,7 @@ void create_texture(char name[]) {
     ID3D11ShaderResourceView * srv;
     d3d_device->CreateShaderResourceView(d3d_texture, &srv_desc, &srv);
     d3d_texture->Release();
-*/
+
 	Texture * texture = new Texture();
 	texture->width 				= x;
 	texture->height 			= y;
@@ -499,8 +504,8 @@ void init_textures() {
 }
 
 void main() {
-	window_data.width 	= 1600;
-	window_data.height 	= 900;
+	window_data.width 	= 1920;
+	window_data.height 	= 1080;
 
 	char * window_name = "Game3";
 
