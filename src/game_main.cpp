@@ -50,15 +50,14 @@ void game(WindowData * window_data, Keyboard * keyboard, GraphicsBuffer * graphi
 
 	TileScreen current_tile_screen;
 
-	// @Todo: Make this handle ratio different from screen ratio
 	for(int i=0; i<TILES_PER_SCREEN; i++) {
 		Tile tile;
 		tile.texture = "grass.png";
 		tile.local_x = i % TILES_PER_ROW;
 		tile.local_y = i / TILES_PER_ROW;
 
-		if(tile.local_x % 2 == 0 && tile.local_y % 2 == 0) {
-			// tile.texture = "title_screen_logo.png";
+		if(tile.local_x % 2 == 1) {
+			tile.texture = "dirt.png";
 		}
 
 		current_tile_screen.tiles[i] = tile;
@@ -79,12 +78,14 @@ void buffer_tiles(TileScreen * tile_screen) {
 		Tile tile = tile_screen->tiles[i];
 
 		float tile_width = 1.0f/TILES_PER_ROW;
-		float tile_height = 1.0f/ROWS_PER_SCREEN;
+		float tile_height = 1.0f/ROWS_PER_SCREEN; // @Incomplete, handle aspect ratios
 
-		Vertex v1 = {tile_width * (tile.local_x + 0), tile_height * (tile.local_y + 0), 0.0f, 0.0f, 0.0f};
-		Vertex v2 = {tile_width * (tile.local_x + 1), tile_height * (tile.local_y + 1), 0.0f, 1.0f, 1.0f};
-		Vertex v3 = {tile_width * (tile.local_x + 0), tile_height * (tile.local_y + 1), 0.0f, 0.0f, 1.0f};
-		Vertex v4 = {tile_width * (tile.local_x + 1), tile_height * (tile.local_y + 0), 0.0f, 1.0f, 0.0f};
+		float texture_depth = i;
+
+		Vertex v1 = {tile_width * (tile.local_x + 0), tile_height * (tile.local_y + 0), 0.0f, 0.0f, 0.0f, texture_depth};
+		Vertex v2 = {tile_width * (tile.local_x + 1), tile_height * (tile.local_y + 1), 0.0f, 1.0f, 1.0f, texture_depth};
+		Vertex v3 = {tile_width * (tile.local_x + 0), tile_height * (tile.local_y + 1), 0.0f, 0.0f, 1.0f, texture_depth};
+		Vertex v4 = {tile_width * (tile.local_x + 1), tile_height * (tile.local_y + 0), 0.0f, 1.0f, 0.0f, texture_depth};
 
 		buffer_quad_gl(v1, v2, v3, v4, &vb, &ib);
 
@@ -105,8 +106,6 @@ void buffer_title_block() {
 	m_graphics_buffer->texture_ids.push_back(texture_ids);
 
 	buffer_quad_centered_at(square_size, 0.0f, &vb, &ib);
-
-
 }
 
 void buffer_quad_centered_at(float radius, float depth, VertexBuffer * vb, IndexBuffer * ib) {

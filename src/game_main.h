@@ -12,10 +12,24 @@
 
 #define assert(condition) if(!condition) { *(int *)0 = 0; }
 
-
+// Constants
 const int TILES_PER_ROW		= 32;
 const int ROWS_PER_SCREEN	= 18;
 const int TILES_PER_SCREEN	= TILES_PER_ROW * ROWS_PER_SCREEN;
+
+// Structs
+struct Tile;
+struct TileScreen;
+struct Vector2f;
+struct Vector3f;
+struct Color4f;
+struct Vertex;
+struct VertexBuffer;
+struct IndexBuffer;
+struct GraphicsBuffer;
+struct Keyboard;
+struct WindowData;
+
 
 struct Tile {
 	char * texture;
@@ -64,8 +78,11 @@ struct Color4f {
 struct Vertex {
 	Vertex(	float x, float y, float z, float u, float v) 
 			: position(x,y,z), tex_coord(u, v) {}
+	Vertex(	float x, float y, float z, float u, float v, float texid) 
+			: position(x,y,z), tex_coord(u, v),  texture_depth(texid) {}
 	Vector3f position;
 	Vector2f tex_coord;
+	float texture_depth;
 };
 
 struct VertexBuffer {

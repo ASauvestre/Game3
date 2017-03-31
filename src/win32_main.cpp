@@ -5,7 +5,7 @@ struct Texture {
 	int height;
 	int bytes_per_pixel;
 	char * name;
-	ID3D11ShaderResourceView * srv;
+	D3D11_SUBRESOURCE_DATA data;
 	ID3D11SamplerState * sampler_state;
 };
 
@@ -32,7 +32,8 @@ static ID3DBlob * PS_bytecode;
 static ID3D11InputLayout * vertex_layout;
 static D3D11_INPUT_ELEMENT_DESC layout_desc[] = {
 	{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },  
-    { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },  
+    { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }, 
+    { "TEXID",    0, DXGI_FORMAT_R32_UINT,        0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }, 
 };
 
 static ID3D11SamplerState * default_sampler_state;
@@ -342,10 +343,11 @@ void draw_buffer(int buffer_index) {
 		   sizeof( int ) *  ib->indices.size());
 	d3d_dc->Unmap(d3d_index_buffer_interface, 0);
 
+
 	// Bind Textures
-	std::vector<ID3D11ShaderResourceView *> texture_buffer;
+	std::vector<D3D11_SUBRESOURCE_DATA> texture_buffer;
 	for(int i = 0; i<texture_ids.size(); i++) {
-		// Find texture
+		// Find texture in the catalog
 		int texture_index = -1;
 		for(int j = 0; j<textures.size(); j++) {
 			if(strcmp(texture_ids[i], textures[j]->name) == 0) {
@@ -357,14 +359,54 @@ void draw_buffer(int buffer_index) {
 		if(texture_index == -1) {
 			log_print("draw_buffer", "Unable to find texture %s", texture_ids[i]);
 		} else {
-			texture_buffer.push_back(textures[texture_index]->srv);
+			texture_buffer.push_back(textures[texture_index]->data);
 		}
 	}
 
-	d3d_dc->PSSetShaderResources(0, 1, &texture_buffer[0]);
+	// Add textures to a Texture2DArray
+	//
+	// @Incomplete We cannot have more than 2048 textures per Array, if the buffer 
+	// ends up being bigger, split the textures into multiple arrays and fixup the Vertex texture ids.
+	//
+	// @Incomplete !!!! This also only supports one texture size per Array.
+	// Maybe sort the texure buffer by size and then split the textures into arrays ?
+	//
+	// @Incomplete Only 128 ressources can be bound to the shader at once, if we have more, split the draw call.
+	// 
+	D3D11_TEXTURE2D_DESC texture_desc;
+						 texture_desc.Width 				= 64; // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+						 texture_desc.Height 				= 64; // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+						 texture_desc.MipLevels 			= 1;
+						 texture_desc.ArraySize 			= texture_buffer.size();
+						 texture_desc.Format 				= DXGI_FORMAT_R8G8B8A8_UNORM;
+						 texture_desc.SampleDesc.Count 		= 1;
+						 texture_desc.SampleDesc.Quality 	= 0;
+						 texture_desc.Usage 				= D3D11_USAGE_DEFAULT;
+						 texture_desc.BindFlags 			= D3D11_BIND_SHADER_RESOURCE;
+						 texture_desc.CPUAccessFlags 		= 0;
+						 texture_desc.MiscFlags 			= 0;
+
+	ID3D11Texture2D * d3d_texture_array;
+    d3d_device->CreateTexture2D(&texture_desc, &texture_buffer[0], &d3d_texture_array);
+
+    D3D11_SHADER_RESOURCE_VIEW_DESC srv_desc;
+    								srv_desc.Format 						= DXGI_FORMAT_R8G8B8A8_UNORM;
+    								srv_desc.ViewDimension 					= D3D11_SRV_DIMENSION_TEXTURE2DARRAY;
+									srv_desc.Texture2DArray.MostDetailedMip = 0;
+    								srv_desc.Texture2DArray.MipLevels 		= 1;
+    								srv_desc.Texture2DArray.FirstArraySlice = 0;
+    								srv_desc.Texture2DArray.ArraySize 		= texture_desc.ArraySize;
+
+    ID3D11ShaderResourceView * srv;
+    d3d_device->CreateShaderResourceView(d3d_texture_array, &srv_desc, &srv);
+    
+	d3d_dc->PSSetShaderResources(0, 1, &srv);
 	d3d_dc->PSSetSamplers(0, 1, &default_sampler_state);
 
 	d3d_dc->DrawIndexed(graphics_buffer.index_buffers[buffer_index].indices.size(), 0, 0);
+
+	d3d_texture_array->Release();
+	srv->Release();
 }
 
 void draw_frame() {
@@ -399,18 +441,19 @@ void create_texture(char name[]) {
 	texture_data.pSysMem 			= stbi_load(path, &x, &y, &n, 4);
 
 	if(texture_data.pSysMem == NULL) {
-		log_print("create_texture", "Failed to load texture %s", name);
+		log_print("create_texture", "Failed to load texture \"%s\"", name);
 		return;
 	}
 
 	if(n != 4) {
-		log_print("create_texture", "Loaded texture %s, but it has %d bit depth, we prefer using 32 bit depth textures", name, n*8);
+		log_print("create_texture", "Loaded texture \"%s\", but it has %d bit depth, we prefer using 32 bit depth textures", name, n*8);
 		n = 4;
 	}
 
-    texture_data.SysMemPitch 		= x*n;
-    texture_data.SysMemSlicePitch 	= x*y*n;
+    texture_data.SysMemPitch 		= x * n;
+    texture_data.SysMemSlicePitch 	= texture_data.SysMemPitch * y;
 
+/*
 	D3D11_TEXTURE2D_DESC texture_desc;
 						 texture_desc.Width 				= x;
 						 texture_desc.Height 				= y;
@@ -436,22 +479,23 @@ void create_texture(char name[]) {
     ID3D11ShaderResourceView * srv;
     d3d_device->CreateShaderResourceView(d3d_texture, &srv_desc, &srv);
     d3d_texture->Release();
-
+*/
 	Texture * texture = new Texture();
-			  texture->width 			= x;
-			  texture->height 			= y;
-			  texture->bytes_per_pixel 	= n;
-			  texture->srv 				= srv;
-			  texture->sampler_state 	= default_sampler_state;
-
+	texture->width 				= x;
+	texture->height 			= y;
+	texture->bytes_per_pixel 	= n;
+	texture->data 				= texture_data;
+	texture->sampler_state 		= default_sampler_state;
 	texture->name = name;
 
 	textures.push_back(texture);
+
 }
 
 void init_textures() {
 	create_texture("title_screen_logo.png");
 	create_texture("grass.png");
+	create_texture("dirt.png");
 }
 
 void main() {
