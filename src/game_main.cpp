@@ -6,6 +6,7 @@ enum GameMode {
 };
 
 static GraphicsBuffer * m_graphics_buffer;
+static WindowData     * m_window_data;
 
 static float square_size = 0.5f;
 
@@ -15,6 +16,7 @@ struct Entity {
 	Vector2f velocity;
 	char * texture;
 	bool is_player;
+	float radius;
 };
 
 Entity player;
@@ -27,11 +29,13 @@ void init_game() {
 	player.position.y = 0;
 	player.texture = "megaperson.png";
 	player.is_player = true;
+	player.radius = tile_width*1.1;
 }
 
 void game(WindowData * window_data, Keyboard * keyboard, GraphicsBuffer * graphics_buffer) {
 
 	m_graphics_buffer = graphics_buffer;
+	m_window_data = window_data;
 
 	// Color4f * current_color = &window_data->background_color;
 	// current_color->r = (current_color->r + 0.0001f);
@@ -105,7 +109,12 @@ void buffer_player() {
 	Vertex v3 = {tile_width * (player.position.x - 1.0f), tile_height * (player.position.y - 1.0f), 0.0f, 0.0f, 1.0f, 0};
 	Vertex v4 = {tile_width * (player.position.x + 1.0f), tile_height * (player.position.y + 1.0f), 0.0f, 1.0f, 0.0f, 0};
 
-	buffer_quad(v1, v2, v3, v4, &vb, &ib);
+	// buffer_quad(v1, v2, v3, v4, &vb, &ib);
+	Vector2f position;
+	position.x = player.position.x * tile_width;
+	position.y = player.position.y * tile_height;
+
+	buffer_quad_centered_at(position, player.radius, 0.0f, &vb, &ib);
 
 	std::vector<char *> texture_ids;	
 	texture_ids.push_back(player.texture);	
@@ -168,10 +177,10 @@ void buffer_quad_centered_at(float radius, float depth, VertexBuffer * vb, Index
 }
 
 void buffer_quad_centered_at(Vector2f center, float radius, float depth, VertexBuffer * vb, IndexBuffer * ib) {
-	Vertex v1 = {center.x - radius, center.y + radius, depth, 0.0f, 0.0f};
-	Vertex v2 = {center.x + radius, center.y - radius, depth, 1.0f, 1.0f};
-	Vertex v3 = {center.x - radius, center.y - radius, depth, 0.0f, 1.0f};
-	Vertex v4 = {center.x + radius, center.y + radius, depth, 1.0f, 0.0f};
+	Vertex v1 = {center.x - radius, center.y + radius*m_window_data->aspect_ratio, depth, 0.0f, 0.0f, 0};
+	Vertex v2 = {center.x + radius, center.y - radius*m_window_data->aspect_ratio, depth, 1.0f, 1.0f, 0};
+	Vertex v3 = {center.x - radius, center.y - radius*m_window_data->aspect_ratio, depth, 0.0f, 1.0f, 0};
+	Vertex v4 = {center.x + radius, center.y + radius*m_window_data->aspect_ratio, depth, 1.0f, 0.0f, 0};
 
 	buffer_quad(v1, v2, v3, v4, vb, ib);
 }

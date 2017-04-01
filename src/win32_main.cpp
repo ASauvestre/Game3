@@ -527,7 +527,7 @@ void init_textures() {
 void main() {
 	window_data.width 	= 1920;
 	window_data.height 	= 1080;
-
+	window_data.aspect_ratio = (float) window_data.width/window_data.height;
 	char * window_name = "Game3";
 
 	create_window(window_data.width, window_data.height, window_name);

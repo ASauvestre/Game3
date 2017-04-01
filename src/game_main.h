@@ -53,7 +53,8 @@ struct Vector2 {
 
 struct Vector2f {
 	
-	Vector2f() {};
+	Vector2f() {}
+	;
 	Vector2f(float x, float y) {
 		this->x = x;
 		this->y = y;
@@ -121,6 +122,7 @@ struct Keyboard {
 struct WindowData {
 	int width;
 	int height;
+	float aspect_ratio;
 	Color4f background_color;
 };
 void init_game();
