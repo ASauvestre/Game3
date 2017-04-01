@@ -9,6 +9,26 @@ static GraphicsBuffer * m_graphics_buffer;
 
 static float square_size = 0.5f;
 
+struct Entity {
+	Entity() {}
+	Vector2f position;
+	Vector2f velocity;
+	char * texture;
+	bool is_player;
+};
+
+Entity player;
+
+float tile_width = 1.0f/TILES_PER_ROW;
+float tile_height = 1.0f/ROWS_PER_SCREEN; // @Incomplete, handle aspect ratios
+
+void init_game() {
+	player.position.x = 0;
+	player.position.y = 0;
+	player.texture = "megaperson.png";
+	player.is_player = true;
+}
+
 void game(WindowData * window_data, Keyboard * keyboard, GraphicsBuffer * graphics_buffer) {
 
 	m_graphics_buffer = graphics_buffer;
@@ -48,6 +68,11 @@ void game(WindowData * window_data, Keyboard * keyboard, GraphicsBuffer * graphi
 	// Vector2f offset_point = {0.3f, -0.1f};
 	// buffer_quad_centered_at(offset_point, square_size/2, 0.2f);
 
+	if(keyboard->key_left) 	player.position.x -= 0.05f;
+	if(keyboard->key_right)	player.position.x += 0.05f;
+	if(keyboard->key_up)	player.position.y += 0.05f;
+	if(keyboard->key_down) 	player.position.y -= 0.05f;
+
 	TileScreen current_tile_screen;
 
 	for(int i=0; i<TILES_PER_SCREEN; i++) {
@@ -64,8 +89,30 @@ void game(WindowData * window_data, Keyboard * keyboard, GraphicsBuffer * graphi
 
 	}
 
+	// We must draw in the inverse order of depth.
+	// @Incomplete What about when a player moves behind a tree ?
+	// Move the z check to the draw site ?
 	buffer_tiles(&current_tile_screen);
+	buffer_player();		
+}
 
+void buffer_player() {
+	VertexBuffer vb;
+	IndexBuffer ib;
+
+	Vertex v1 = {tile_width * (player.position.x - 1.0f), tile_height * (player.position.y + 1.0f), 0.0f, 0.0f, 0.0f, 0};
+	Vertex v2 = {tile_width * (player.position.x + 1.0f), tile_height * (player.position.y - 1.0f), 0.0f, 1.0f, 1.0f, 0};
+	Vertex v3 = {tile_width * (player.position.x - 1.0f), tile_height * (player.position.y - 1.0f), 0.0f, 0.0f, 1.0f, 0};
+	Vertex v4 = {tile_width * (player.position.x + 1.0f), tile_height * (player.position.y + 1.0f), 0.0f, 1.0f, 0.0f, 0};
+
+	buffer_quad(v1, v2, v3, v4, &vb, &ib);
+
+	std::vector<char *> texture_ids;	
+	texture_ids.push_back(player.texture);	
+	m_graphics_buffer->texture_ids.push_back(texture_ids);
+
+	m_graphics_buffer->vertex_buffers.push_back(vb);
+	m_graphics_buffer->index_buffers.push_back(ib);
 }
 
 void buffer_tiles(TileScreen * tile_screen) {
@@ -76,9 +123,6 @@ void buffer_tiles(TileScreen * tile_screen) {
 
 	for(int i=0; i<TILES_PER_SCREEN; i++) {
 		Tile tile = tile_screen->tiles[i];
-
-		float tile_width = 1.0f/TILES_PER_ROW;
-		float tile_height = 1.0f/ROWS_PER_SCREEN; // @Incomplete, handle aspect ratios
 
 		float texture_depth = texture_ids.size();
 
@@ -93,10 +137,10 @@ void buffer_tiles(TileScreen * tile_screen) {
 		}
 		if (!texture_already_in_buffer) texture_ids.push_back(tile.texture);
 
-		Vertex v1 = {tile_width * (tile.local_x + 0), tile_height * (tile.local_y + 0), 0.0f, 0.0f, 0.0f, texture_depth};
-		Vertex v2 = {tile_width * (tile.local_x + 1), tile_height * (tile.local_y + 1), 0.0f, 1.0f, 1.0f, texture_depth};
-		Vertex v3 = {tile_width * (tile.local_x + 0), tile_height * (tile.local_y + 1), 0.0f, 0.0f, 1.0f, texture_depth};
-		Vertex v4 = {tile_width * (tile.local_x + 1), tile_height * (tile.local_y + 0), 0.0f, 1.0f, 0.0f, texture_depth};
+		Vertex v1 = {tile_width * (tile.local_x + 0), tile_height * (tile.local_y + 0), 0.9f, 0.0f, 0.0f, texture_depth};
+		Vertex v2 = {tile_width * (tile.local_x + 1), tile_height * (tile.local_y + 1), 0.9f, 1.0f, 1.0f, texture_depth};
+		Vertex v3 = {tile_width * (tile.local_x + 0), tile_height * (tile.local_y + 1), 0.9f, 0.0f, 1.0f, texture_depth};
+		Vertex v4 = {tile_width * (tile.local_x + 1), tile_height * (tile.local_y + 0), 0.9f, 1.0f, 0.0f, texture_depth};
 
 		buffer_quad_gl(v1, v2, v3, v4, &vb, &ib);
 		

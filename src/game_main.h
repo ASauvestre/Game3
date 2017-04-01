@@ -41,7 +41,19 @@ struct TileScreen {
 	Tile tiles[TILES_PER_SCREEN];
 };
 
+struct Vector2 {
+	Vector2() {}
+	Vector2(int x, int y) {
+		this->x = x;
+		this->y = y;
+	}
+	int x;
+	int y;
+};
+
 struct Vector2f {
+	
+	Vector2f() {};
 	Vector2f(float x, float y) {
 		this->x = x;
 		this->y = y;
@@ -111,8 +123,11 @@ struct WindowData {
 	int height;
 	Color4f background_color;
 };
+void init_game();
 
 void game(WindowData * window_data, Keyboard * keyboard, GraphicsBuffer * graphics_buffer);
+
+void buffer_player();
 
 void buffer_tiles(TileScreen * tile_screen);
 

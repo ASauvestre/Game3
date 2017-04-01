@@ -36,8 +36,8 @@ static ID3DBlob * PS_bytecode;
 static ID3D11InputLayout * vertex_layout;
 static D3D11_INPUT_ELEMENT_DESC layout_desc[] = {
 	{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },  
-    { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }, 
-    { "TEXID",    0, DXGI_FORMAT_R32_UINT,        0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }, 
+	{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }, 
+	{ "TEXID",    0, DXGI_FORMAT_R32_UINT,        0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }, 
 };
 
 static ID3D11SamplerState * default_sampler_state;
@@ -47,6 +47,8 @@ static std::vector<Texture*> textures;
 static ID3D11Texture2D * d3d_texture_array;
 static ID3D11ShaderResourceView * d3d_texture_array_srv;
 static ID3D11Buffer * d3d_texture_index_map_buffer;
+
+static ID3D11BlendState* transparent_blend_state;
 
 static bool should_quit = false;
 
@@ -347,6 +349,26 @@ void init_d3d() {
 
 	d3d_device->CreateBuffer( &texture_map_index_buffer_desc, NULL, &d3d_texture_index_map_buffer );
 
+	// Blending	
+	D3D11_RENDER_TARGET_BLEND_DESC render_target_blend_desc;
+
+	render_target_blend_desc.BlendEnable 			= true;
+	render_target_blend_desc.SrcBlend 				= D3D11_BLEND_SRC_ALPHA;
+	render_target_blend_desc.DestBlend 				= D3D11_BLEND_INV_SRC_ALPHA;
+	render_target_blend_desc.BlendOp 				= D3D11_BLEND_OP_ADD;
+	render_target_blend_desc.SrcBlendAlpha 			= D3D11_BLEND_ONE;
+	render_target_blend_desc.DestBlendAlpha 		= D3D11_BLEND_ZERO;
+	render_target_blend_desc.BlendOpAlpha 			= D3D11_BLEND_OP_ADD;
+	render_target_blend_desc.RenderTargetWriteMask 	= D3D11_COLOR_WRITE_ENABLE_ALL;
+
+	D3D11_BLEND_DESC blend_desc;
+	blend_desc.AlphaToCoverageEnable 	= false;
+	blend_desc.IndependentBlendEnable 	= false;
+	blend_desc.RenderTarget[0]			= render_target_blend_desc;
+
+	d3d_device->CreateBlendState(&blend_desc, &transparent_blend_state);
+
+	d3d_dc->OMSetBlendState(transparent_blend_state, NULL, 0xffffffff);
 }
 
 void draw_buffer(int buffer_index) {
@@ -401,8 +423,7 @@ void draw_buffer(int buffer_index) {
 void draw_frame() {
 	
 	// Clear view
-	float color_array[4] = {window_data.background_color.r, window_data.background_color.g, 
-							window_data.background_color.b, window_data.background_color.a};
+	float color_array[4] = {1.0f, 1.0f, 1.0f, 1.0f};
 
 	d3d_dc->ClearRenderTargetView(render_target_view, color_array);
 	d3d_dc->ClearDepthStencilView(depth_stencil_view, D3D11_CLEAR_DEPTH|D3D11_CLEAR_STENCIL, 1.0f, 0);
@@ -443,13 +464,13 @@ void do_load_texture(Texture * texture) {
 		n = 4;
 	}
 
-    texture_data.SysMemPitch 		= x * n;
-    texture_data.SysMemSlicePitch 	= texture_data.SysMemPitch * y;
+	texture_data.SysMemPitch 		= x * n;
+	texture_data.SysMemSlicePitch 	= texture_data.SysMemPitch * y;
 
-    texture->data 				= texture_data;
-    texture->width 				= x;
-    texture->height 			= y;
-    texture->bytes_per_pixel 	= n;
+	texture->data 				= texture_data;
+	texture->width 				= x;
+	texture->height 			= y;
+	texture->bytes_per_pixel 	= n;
 }
 
 void bind_textures_to_srv() {
@@ -474,17 +495,17 @@ void bind_textures_to_srv() {
 		texture_data_array.push_back(textures[i]->data);
 	}
 
-    d3d_device->CreateTexture2D(&texture_desc, &texture_data_array[0], &d3d_texture_array);
+	d3d_device->CreateTexture2D(&texture_desc, &texture_data_array[0], &d3d_texture_array);
 
-    D3D11_SHADER_RESOURCE_VIEW_DESC srv_desc;
-    								srv_desc.Format 						= DXGI_FORMAT_R8G8B8A8_UNORM;
-    								srv_desc.ViewDimension 					= D3D11_SRV_DIMENSION_TEXTURE2DARRAY;
+	D3D11_SHADER_RESOURCE_VIEW_DESC srv_desc;
+									srv_desc.Format 						= DXGI_FORMAT_R8G8B8A8_UNORM;
+									srv_desc.ViewDimension 					= D3D11_SRV_DIMENSION_TEXTURE2DARRAY;
 									srv_desc.Texture2DArray.MostDetailedMip = 0;
-    								srv_desc.Texture2DArray.MipLevels 		= 1;
-    								srv_desc.Texture2DArray.FirstArraySlice = 0;
-    								srv_desc.Texture2DArray.ArraySize 		= texture_desc.ArraySize;
+									srv_desc.Texture2DArray.MipLevels 		= 1;
+									srv_desc.Texture2DArray.FirstArraySlice = 0;
+									srv_desc.Texture2DArray.ArraySize 		= texture_desc.ArraySize;
 
-    d3d_device->CreateShaderResourceView(d3d_texture_array, &srv_desc, &d3d_texture_array_srv);
+	d3d_device->CreateShaderResourceView(d3d_texture_array, &srv_desc, &d3d_texture_array_srv);
 
 }
 
@@ -499,7 +520,7 @@ void init_textures() {
 	add_texture_to_load_queue("title_screen_logo.png");
 	add_texture_to_load_queue("grass.png");
 	add_texture_to_load_queue("dirt.png");
-
+	add_texture_to_load_queue("megaperson.png");
 	bind_textures_to_srv();
 }
 
@@ -510,9 +531,12 @@ void main() {
 	char * window_name = "Game3";
 
 	create_window(window_data.width, window_data.height, window_name);
+
 	init_d3d();
 
 	init_textures();
+
+	init_game();
 
 	float frame_time = 0.0f;
 
@@ -524,7 +548,7 @@ void main() {
 		update_window_events();
 		game(&window_data, &keyboard, &graphics_buffer);
 		draw_frame();
-		
+
 		// QueryPerformanceCounter(&end_time);
 		
 		// frame_time = ((float)(end_time.QuadPart - start_time.QuadPart)*1000/(float)frequency.QuadPart);
