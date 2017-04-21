@@ -117,6 +117,9 @@ struct Keyboard {
 	bool key_right 	= false;
 	bool key_up 	= false;
 	bool key_down 	= false;
+
+	bool key_shift 	= false;
+	bool key_space 	= false;
 };
 
 struct WindowData {
@@ -127,7 +130,7 @@ struct WindowData {
 };
 void init_game();
 
-void game(WindowData * window_data, Keyboard * keyboard, GraphicsBuffer * graphics_buffer);
+void game(WindowData * window_data, Keyboard * keyboard, GraphicsBuffer * graphics_buffer, float dt);
 
 void buffer_player();
 
@@ -140,4 +143,4 @@ void buffer_quad(Vertex v1, Vertex v2, Vertex v3, Vertex v4, VertexBuffer * vb, 
 void buffer_quad_centered_at(Vector2f center, float radius, float depth, VertexBuffer * vb, IndexBuffer * ib);
 void buffer_quad_centered_at(float radius, float depth, VertexBuffer * vb, IndexBuffer * ib);
 
-void buffer_quad_gl(Vertex v1, Vertex v2, Vertex v3, Vertex v4, VertexBuffer * vb, IndexBuffer * ib);
+void convert_top_left_coords_to_centered(Vertex * v1, Vertex * v2, Vertex * v3, Vertex * v4);

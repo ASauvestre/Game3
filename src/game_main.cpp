@@ -32,7 +32,7 @@ void init_game() {
 	player.radius = tile_width*1.1;
 }
 
-void game(WindowData * window_data, Keyboard * keyboard, GraphicsBuffer * graphics_buffer) {
+void game(WindowData * window_data, Keyboard * keyboard, GraphicsBuffer * graphics_buffer, float dt) {
 
 	m_graphics_buffer = graphics_buffer;
 	m_window_data = window_data;
@@ -72,10 +72,40 @@ void game(WindowData * window_data, Keyboard * keyboard, GraphicsBuffer * graphi
 	// Vector2f offset_point = {0.3f, -0.1f};
 	// buffer_quad_centered_at(offset_point, square_size/2, 0.2f);
 
-	if(keyboard->key_left) 	player.position.x -= 0.05f;
-	if(keyboard->key_right)	player.position.x += 0.05f;
-	if(keyboard->key_up)	player.position.y += 0.05f;
-	if(keyboard->key_down) 	player.position.y -= 0.05f;
+
+	// Handle player movement
+	{
+		float speed = 0.01f;
+
+		if(keyboard->key_shift) speed = 0.03f;
+
+		float position_delta = speed * dt;
+
+		//
+		// @Incomplete Need to use and normalize velocity vector
+		//
+		if(keyboard->key_left) 	player.position.x -= position_delta;
+		if(keyboard->key_right)	player.position.x += position_delta;
+		if(keyboard->key_up)	player.position.y -= position_delta;
+		if(keyboard->key_down) 	player.position.y += position_delta;
+
+
+
+		// Clamp player position
+		if(player.position.x < 0)  {
+			player.position.x = 0;
+		}
+		if(player.position.x > TILES_PER_ROW - 1)  {
+			player.position.x = TILES_PER_ROW - 1;
+		}
+
+		if(player.position.y < 0) {
+			player.position.y = 0;
+		}	
+		if(player.position.y > ROWS_PER_SCREEN - 1)  {
+			player.position.y = ROWS_PER_SCREEN - 1;
+		}
+	}
 
 	TileScreen current_tile_screen;
 
@@ -104,17 +134,19 @@ void buffer_player() {
 	VertexBuffer vb;
 	IndexBuffer ib;
 
-	Vertex v1 = {tile_width * (player.position.x - 1.0f), tile_height * (player.position.y + 1.0f), 0.0f, 0.0f, 0.0f, 0};
-	Vertex v2 = {tile_width * (player.position.x + 1.0f), tile_height * (player.position.y - 1.0f), 0.0f, 1.0f, 1.0f, 0};
-	Vertex v3 = {tile_width * (player.position.x - 1.0f), tile_height * (player.position.y - 1.0f), 0.0f, 0.0f, 1.0f, 0};
-	Vertex v4 = {tile_width * (player.position.x + 1.0f), tile_height * (player.position.y + 1.0f), 0.0f, 1.0f, 0.0f, 0};
+	Vertex v1 = {tile_width * (player.position.x + 0), tile_height * (player.position.y + 0), 0.0f, 0.0f, 0.0f, 0};
+	Vertex v2 = {tile_width * (player.position.x + 1), tile_height * (player.position.y + 1), 0.0f, 1.0f, 1.0f, 0};
+	Vertex v3 = {tile_width * (player.position.x + 0), tile_height * (player.position.y + 1), 0.0f, 0.0f, 1.0f, 0};
+	Vertex v4 = {tile_width * (player.position.x + 1), tile_height * (player.position.y + 0), 0.0f, 1.0f, 0.0f, 0};
+	
+	convert_top_left_coords_to_centered(&v1, &v2, &v3, &v4);
+	buffer_quad(v1, v2, v3, v4, &vb, &ib);
 
-	// buffer_quad(v1, v2, v3, v4, &vb, &ib);
-	Vector2f position;
-	position.x = player.position.x * tile_width;
-	position.y = player.position.y * tile_height;
+	//Vector2f position;
+	//position.x = player.position.x * tile_width;
+	//position.y = player.position.y * tile_height;
 
-	buffer_quad_centered_at(position, player.radius, 0.0f, &vb, &ib);
+	//buffer_quad_centered_at(position, player.radius, 0.0f, &vb, &ib);
 
 	std::vector<char *> texture_ids;	
 	texture_ids.push_back(player.texture);	
@@ -151,7 +183,9 @@ void buffer_tiles(TileScreen * tile_screen) {
 		Vertex v3 = {tile_width * (tile.local_x + 0), tile_height * (tile.local_y + 1), 0.9f, 0.0f, 1.0f, texture_depth};
 		Vertex v4 = {tile_width * (tile.local_x + 1), tile_height * (tile.local_y + 0), 0.9f, 1.0f, 0.0f, texture_depth};
 
-		buffer_quad_gl(v1, v2, v3, v4, &vb, &ib);
+
+		convert_top_left_coords_to_centered(&v1, &v2, &v3, &v4);
+		buffer_quad(v1, v2, v3, v4, &vb, &ib);
 		
 	}
 
@@ -202,27 +236,25 @@ void buffer_quad(Vertex v1, Vertex v2, Vertex v3, Vertex v4, VertexBuffer * vb, 
 	ib->indices.push_back(first_index+1);
 }
 
-void buffer_quad_gl(Vertex v1, Vertex v2, Vertex v3, Vertex v4, VertexBuffer * vb, IndexBuffer * ib) {
-	// Convert from GL coords to centered
-	v1.position.x *= 2.0f;
-	v2.position.x *= 2.0f;
-	v3.position.x *= 2.0f;
-	v4.position.x *= 2.0f;
+void convert_top_left_coords_to_centered(Vertex * v1, Vertex * v2, Vertex * v3, Vertex * v4) {
 
-	v1.position.y *= -2.0f;
-	v2.position.y *= -2.0f;
-	v3.position.y *= -2.0f;
-	v4.position.y *= -2.0f;
+	v1->position.x *= 2.0f;
+	v2->position.x *= 2.0f;
+	v3->position.x *= 2.0f;
+	v4->position.x *= 2.0f;
 
-	v1.position.x -= 1.0f;
-	v2.position.x -= 1.0f;
-	v3.position.x -= 1.0f;
-	v4.position.x -= 1.0f;
+	v1->position.y *= -2.0f;
+	v2->position.y *= -2.0f;
+	v3->position.y *= -2.0f;
+	v4->position.y *= -2.0f;
 
-	v1.position.y += 1.0f;
-	v2.position.y += 1.0f;
-	v3.position.y += 1.0f;
-	v4.position.y += 1.0f;
+	v1->position.x -= 1.0f;
+	v2->position.x -= 1.0f;
+	v3->position.x -= 1.0f;
+	v4->position.x -= 1.0f;
 
-	buffer_quad(v1, v2, v3, v4, vb, ib);
+	v1->position.y += 1.0f;
+	v2->position.y += 1.0f;
+	v3->position.y += 1.0f;
+	v4->position.y += 1.0f;
 }

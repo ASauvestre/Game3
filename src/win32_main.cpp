@@ -87,43 +87,45 @@ LRESULT CALLBACK WndProc(HWND window_handle, UINT message, WPARAM w_param, LPARA
 
 			switch(w_param) {
 				case VK_LEFT : {
-					printf("Keyboard Event: Key LEFT was pressed.\n");
+					// printf("Keyboard Event: Key LEFT was pressed.\n");
 					keyboard.key_left = true;
 					break;
 				}
 				case VK_RIGHT : {
-					printf("Keyboard Event: Key RIGHT was pressed.\n");
+					// printf("Keyboard Event: Key RIGHT was pressed.\n");
 					keyboard.key_right = true;
 					break;
 				}
 				case VK_UP : {
-					printf("Keyboard Event: Key UP was pressed.\n");
+					// printf("Keyboard Event: Key UP was pressed.\n");
 					keyboard.key_up = true;
 					break;
 				}
 				case VK_DOWN : {
-					printf("Keyboard Event: Key DOWN was pressed.\n");
+					// printf("Keyboard Event: Key DOWN was pressed.\n");
 					keyboard.key_down = true;
 					break;
 				}
 				case VK_SHIFT : {
-					printf("Keyboard Event: Key SHIFT was pressed.\n");
+					// printf("Keyboard Event: Key SHIFT was pressed.\n");
+					keyboard.key_shift = true;
 					break;
 				}
 				case VK_CONTROL : {
-					printf("Keyboard Event: Key CONTROL was pressed.\n");
+					// printf("Keyboard Event: Key CONTROL was pressed.\n");
 					break;
 				}
 				case VK_SPACE : {
-					printf("Keyboard Event: Key SPACE was pressed.\n");
+					// printf("Keyboard Event: Key SPACE was pressed.\n");
+					keyboard.key_space = true;
 					break;
 				}
 				case VK_ESCAPE : {
-					printf("Keyboard Event: Key ESCAPE was pressed.\n");
+					// printf("Keyboard Event: Key ESCAPE was pressed.\n");
 					break;
 				}
 				default : {
-					printf("Keyboard Event: Unknown key was pressed.\n");
+					// printf("Keyboard Event: Unknown key was pressed.\n");
 				}
 			}
 			break;	
@@ -131,44 +133,46 @@ LRESULT CALLBACK WndProc(HWND window_handle, UINT message, WPARAM w_param, LPARA
 		case WM_KEYUP : {
 			switch(w_param) {
 				case VK_LEFT : {
-					printf("Keyboard Event: Key LEFT was released.\n");
+					// printf("Keyboard Event: Key LEFT was released.\n");
 					keyboard.key_left = false;
 					break;
 				}
 				case VK_RIGHT : {
-					printf("Keyboard Event: Key RIGHT was released.\n");
+					// printf("Keyboard Event: Key RIGHT was released.\n");
 					keyboard.key_right = false;
 					break;
 				}
 				case VK_UP : {
-					printf("Keyboard Event: Key UP was released.\n");
+					// printf("Keyboard Event: Key UP was released.\n");
 					keyboard.key_up = false;
 					break;
 				}
 				case VK_DOWN : {
-					printf("Keyboard Event: Key DOWN was released.\n");
+					// printf("Keyboard Event: Key DOWN was released.\n");
 					keyboard.key_down = false;
 					break;
 				}
 				case VK_SHIFT : {
-					printf("Keyboard Event: Key SHIFT was released.\n");
+					// printf("Keyboard Event: Key SHIFT was released.\n");
+					keyboard.key_shift = false;
 					break;
 				}
 				case VK_CONTROL : {
-					printf("Keyboard Event: Key CONTROL was released.\n");
+					// printf("Keyboard Event: Key CONTROL was released.\n");
 					break;
 				}
 				case VK_SPACE : {
-					printf("Keyboard Event: Key SPACE was released.\n");
+					// printf("Keyboard Event: Key SPACE was released.\n");
+					keyboard.key_space = false;
 					break;
 				}
 				case VK_ESCAPE : {
-					printf("Keyboard Event: Key ESCAPE was released.\n");
+					// printf("Keyboard Event: Key ESCAPE was released.\n");
 					SendMessage(window_handle, WM_QUIT, NULL, NULL);
 					break;
 				}
 				default : {
-					printf("Keyboard Event: Unknown key was released.\n");
+					// printf("Keyboard Event: Unknown key was released.\n");
 				}
 			}
 			break;
@@ -203,14 +207,18 @@ bool create_window(int width, int height, char * name) {
 		handle = CreateWindowEx(0, window_class.lpszClassName, (LPCTSTR) name, window_style, centered_x, 
 								centered_y, window_dimensions.right - window_dimensions.left, 
 								window_dimensions.bottom - window_dimensions.top, NULL, NULL, instance, NULL);
+		
+		ShowCursor(false);
+
 		if(handle) {
 			device_context = GetDC(handle);
 			if(device_context) {
+				ShowCursor(false);
 				ShowWindow(handle, 1);
 				UpdateWindow(handle);
 
-				}
 			}
+		}
 	}
 	return false;
 }
@@ -440,8 +448,6 @@ void draw_frame() {
 	graphics_buffer.vertex_buffers.clear();
 	graphics_buffer.index_buffers.clear();
 	graphics_buffer.texture_ids.clear();
-	
-
 
 }
 
@@ -462,6 +468,9 @@ void do_load_texture(Texture * texture) {
 	if(n != 4) {
 		log_print("do_load_texture", "Loaded texture \"%s\", but it has %d bit depth, we prefer using 32 bit depth textures", texture->name, n*8);
 		n = 4;
+	} else {
+		log_print("do_load_texture", "Loaded texture \"%s\"", texture->name);
+
 	}
 
 	texture_data.SysMemPitch 		= x * n;
@@ -521,12 +530,18 @@ void init_textures() {
 	add_texture_to_load_queue("grass.png");
 	add_texture_to_load_queue("dirt.png");
 	add_texture_to_load_queue("megaperson.png");
+	add_texture_to_load_queue("bullet.png");
 	bind_textures_to_srv();
 }
 
 void main() {
-	window_data.width 	= 1920;
-	window_data.height 	= 1080;
+
+	window_data.width 	= 1280;
+	window_data.height 	= 720;
+
+	// window_data.width 	= 1920;
+	// window_data.height 	= 1080;
+
 	window_data.aspect_ratio = (float) window_data.width/window_data.height;
 	char * window_name = "Game3";
 
@@ -542,16 +557,17 @@ void main() {
 
 
 	while(!should_quit) {
-		// QueryPerformanceFrequency(&frequency);
-		// QueryPerformanceCounter(&start_time);
+		QueryPerformanceFrequency(&frequency);
+		QueryPerformanceCounter(&start_time);
 
 		update_window_events();
-		game(&window_data, &keyboard, &graphics_buffer);
+		game(&window_data, &keyboard, &graphics_buffer, frame_time);
 		draw_frame();
 
-		// QueryPerformanceCounter(&end_time);
+		QueryPerformanceCounter(&end_time);
 		
-		// frame_time = ((float)(end_time.QuadPart - start_time.QuadPart)*1000/(float)frequency.QuadPart);
+		frame_time = ((float)(end_time.QuadPart - start_time.QuadPart)*1000/(float)frequency.QuadPart);
+		
 		// log_print("perf_counter", "Total frame time is %f", frame_time);
 	}
 }
