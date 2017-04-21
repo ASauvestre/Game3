@@ -30,5 +30,12 @@ float4 PS(VS_OUTPUT input) : SV_TARGET
 	coords.x = input.tex_coord.x;
 	coords.y = input.tex_coord.y;
 	coords.z = input.texid;
-	return m_texture_array.Sample( m_sampler_state, coords);
+	float4 textureColor =  m_texture_array.Sample( m_sampler_state, coords);
+
+	// Discard transparent pixels
+	if(textureColor.a < 1.0) {	
+		discard;
+	}
+
+	return textureColor;
 }

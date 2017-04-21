@@ -12,6 +12,8 @@
 
 #define assert(condition) if(!condition) { *(int *)0 = 0; }
 
+#define array_size(array)  (sizeof(array)/sizeof(array[0]))
+
 // Constants
 const int TILES_PER_ROW		= 32;
 const int ROWS_PER_SCREEN	= 18;
@@ -133,6 +135,8 @@ void init_game();
 void game(WindowData * window_data, Keyboard * keyboard, GraphicsBuffer * graphics_buffer, float dt);
 
 void buffer_player();
+
+void buffer_trees();
 
 void buffer_tiles(TileScreen * tile_screen);
 

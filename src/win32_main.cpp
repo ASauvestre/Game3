@@ -48,7 +48,7 @@ static ID3D11Texture2D * d3d_texture_array;
 static ID3D11ShaderResourceView * d3d_texture_array_srv;
 static ID3D11Buffer * d3d_texture_index_map_buffer;
 
-static ID3D11BlendState* transparent_blend_state;
+// static ID3D11BlendState* transparent_blend_state;
 
 static bool should_quit = false;
 
@@ -208,7 +208,7 @@ bool create_window(int width, int height, char * name) {
 								centered_y, window_dimensions.right - window_dimensions.left, 
 								window_dimensions.bottom - window_dimensions.top, NULL, NULL, instance, NULL);
 		
-		ShowCursor(false);
+		// ShowCursor(false);
 
 		if(handle) {
 			device_context = GetDC(handle);
@@ -270,6 +270,7 @@ void init_d3d() {
 							depth_stencil_desc.MiscFlags 			= 0;
 
 	d3d_device->CreateTexture2D(&depth_stencil_desc, NULL, &depth_stencil_buffer);
+
 	d3d_device->CreateDepthStencilView(depth_stencil_buffer, NULL, &depth_stencil_view);
 
 	d3d_dc->OMSetRenderTargets( 1, &render_target_view, depth_stencil_view);
@@ -357,26 +358,32 @@ void init_d3d() {
 
 	d3d_device->CreateBuffer( &texture_map_index_buffer_desc, NULL, &d3d_texture_index_map_buffer );
 
+
+	//
+	// We're discarding transparent pixels, since we only have alpha equal to 1 or 0, 
+	// we don't need blending, if we end up having other alphas, we'll come back to this.
+	//
+
 	// Blending	
-	D3D11_RENDER_TARGET_BLEND_DESC render_target_blend_desc;
+	// D3D11_RENDER_TARGET_BLEND_DESC render_target_blend_desc;
 
-	render_target_blend_desc.BlendEnable 			= true;
-	render_target_blend_desc.SrcBlend 				= D3D11_BLEND_SRC_ALPHA;
-	render_target_blend_desc.DestBlend 				= D3D11_BLEND_INV_SRC_ALPHA;
-	render_target_blend_desc.BlendOp 				= D3D11_BLEND_OP_ADD;
-	render_target_blend_desc.SrcBlendAlpha 			= D3D11_BLEND_ONE;
-	render_target_blend_desc.DestBlendAlpha 		= D3D11_BLEND_ZERO;
-	render_target_blend_desc.BlendOpAlpha 			= D3D11_BLEND_OP_ADD;
-	render_target_blend_desc.RenderTargetWriteMask 	= D3D11_COLOR_WRITE_ENABLE_ALL;
+	// render_target_blend_desc.BlendEnable 			= true;
+	// render_target_blend_desc.SrcBlend 				= D3D11_BLEND_SRC_ALPHA;
+	// render_target_blend_desc.DestBlend 				= D3D11_BLEND_INV_SRC_ALPHA;
+	// render_target_blend_desc.BlendOp 				= D3D11_BLEND_OP_ADD;
+	// render_target_blend_desc.SrcBlendAlpha 			= D3D11_BLEND_ONE;
+	// render_target_blend_desc.DestBlendAlpha 		= D3D11_BLEND_ZERO;
+	// render_target_blend_desc.BlendOpAlpha 			= D3D11_BLEND_OP_ADD;
+	// render_target_blend_desc.RenderTargetWriteMask 	= D3D11_COLOR_WRITE_ENABLE_ALL;
 
-	D3D11_BLEND_DESC blend_desc;
-	blend_desc.AlphaToCoverageEnable 	= false;
-	blend_desc.IndependentBlendEnable 	= false;
-	blend_desc.RenderTarget[0]			= render_target_blend_desc;
+	// D3D11_BLEND_DESC blend_desc;
+	// blend_desc.AlphaToCoverageEnable 	= false;
+	// blend_desc.IndependentBlendEnable 	= false;
+	// blend_desc.RenderTarget[0]			= render_target_blend_desc;
 
-	d3d_device->CreateBlendState(&blend_desc, &transparent_blend_state);
+	// //d3d_device->CreateBlendState(&blend_desc, &transparent_blend_state);
 
-	d3d_dc->OMSetBlendState(transparent_blend_state, NULL, 0xffffffff);
+	// //d3d_dc->OMSetBlendState(transparent_blend_state, NULL, 0xffffffff);
 }
 
 void draw_buffer(int buffer_index) {
@@ -435,7 +442,6 @@ void draw_frame() {
 
 	d3d_dc->ClearRenderTargetView(render_target_view, color_array);
 	d3d_dc->ClearDepthStencilView(depth_stencil_view, D3D11_CLEAR_DEPTH|D3D11_CLEAR_STENCIL, 1.0f, 0);
-	
 
 	for(int i = 0; i < graphics_buffer.vertex_buffers.size(); i++) {
 		// Draw buffer
@@ -530,17 +536,17 @@ void init_textures() {
 	add_texture_to_load_queue("grass.png");
 	add_texture_to_load_queue("dirt.png");
 	add_texture_to_load_queue("megaperson.png");
-	add_texture_to_load_queue("bullet.png");
+	add_texture_to_load_queue("tree.png");
 	bind_textures_to_srv();
 }
 
 void main() {
 
-	window_data.width 	= 1280;
-	window_data.height 	= 720;
+	// window_data.width 	= 1280;
+	// window_data.height 	= 720;
 
-	// window_data.width 	= 1920;
-	// window_data.height 	= 1080;
+	window_data.width 	= 1920;
+	window_data.height 	= 1080;
 
 	window_data.aspect_ratio = (float) window_data.width/window_data.height;
 	char * window_name = "Game3";
