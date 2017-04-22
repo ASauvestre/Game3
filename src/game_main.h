@@ -21,7 +21,11 @@ const int TILES_PER_SCREEN	= TILES_PER_ROW * ROWS_PER_SCREEN;
 
 // Structs
 struct Tile;
-struct TileScreen;
+
+// struct TileScreen; 
+
+struct Room;
+
 struct Vector2f;
 struct Vector3f;
 struct Color4f;
@@ -39,9 +43,34 @@ struct Tile {
 	int local_y;
 };
 
-struct TileScreen {
-	Tile tiles[TILES_PER_SCREEN];
+struct Room {
+	Room(int w, int h) {
+
+		width = w;
+		height = h;
+
+		num_tiles = w*h;
+
+		tiles = (Tile *) malloc(num_tiles*sizeof(Tile));
+	}
+
+	~Room() {
+		free(tiles);
+	}
+
+	int width;
+	int height;
+	int num_tiles;
+	Tile * tiles;
 };
+
+
+// We don't use this anymore, this was used when we had screen locked camera, 
+// now we follow the player movement.
+
+// struct TileScreen {
+// 	Tile tiles[TILES_PER_SCREEN];
+// };
 
 struct Vector2 {
 	Vector2() {}
@@ -138,7 +167,7 @@ void buffer_player();
 
 void buffer_trees();
 
-void buffer_tiles(TileScreen * tile_screen);
+void buffer_tiles(Room * room);
 
 void buffer_title_block();
 

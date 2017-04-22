@@ -438,7 +438,7 @@ void draw_buffer(int buffer_index) {
 void draw_frame() {
 	
 	// Clear view
-	float color_array[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+	float color_array[4] = {0.0f, 0.0f, 0.1f, 1.0f};
 
 	d3d_dc->ClearRenderTargetView(render_target_view, color_array);
 	d3d_dc->ClearDepthStencilView(depth_stencil_view, D3D11_CLEAR_DEPTH|D3D11_CLEAR_STENCIL, 1.0f, 0);
@@ -537,16 +537,18 @@ void init_textures() {
 	add_texture_to_load_queue("dirt.png");
 	add_texture_to_load_queue("megaperson.png");
 	add_texture_to_load_queue("tree.png");
+	add_texture_to_load_queue("tree_window.png");
 	bind_textures_to_srv();
 }
 
 void main() {
 
-	// window_data.width 	= 1280;
-	// window_data.height 	= 720;
+	window_data.width 	= 1280;
+	window_data.height 	= 720;
 
-	window_data.width 	= 1920;
-	window_data.height 	= 1080;
+
+	// window_data.width 	= 1920;
+	// window_data.height 	= 1080;
 
 	window_data.aspect_ratio = (float) window_data.width/window_data.height;
 	char * window_name = "Game3";
