@@ -173,6 +173,11 @@ void game(WindowData * window_data, Keyboard * keyboard, GraphicsBuffer * graphi
 	buffer_trees();	
 }
 
+
+// Globals used :
+//		current_room
+//		trees
+//		camera_offset
 void buffer_trees() {
 	for(int i = 0; i< array_size(trees); i++) {
 		VertexBuffer vb;
@@ -191,16 +196,16 @@ void buffer_trees() {
 
 
 		Vertex v1 = {tile_width * (screen_pos.x + 0), tile_height * (screen_pos.y  + 0), 
-					 1.0f - (tree.position.y + tree.size)/ROWS_PER_SCREEN, 0.0f, 0.0f, 0};
+					 1.0f - (tree.position.y + tree.size)/current_room->height, 0.0f, 0.0f, 0};
 
 		Vertex v2 = {tile_width * (screen_pos.x + trees[i].size), tile_height * (screen_pos.y + tree.size),
-					 1.0f - (tree.position.y + tree.size)/ROWS_PER_SCREEN, 1.0f, 1.0f, 0};
+					 1.0f - (tree.position.y + tree.size)/current_room->height, 1.0f, 1.0f, 0};
 
 		Vertex v3 = {tile_width * (screen_pos.x + 0), tile_height * (screen_pos.y  + tree.size), 
-					 1.0f - (tree.position.y + tree.size)/ROWS_PER_SCREEN, 0.0f, 1.0f, 0};
+					 1.0f - (tree.position.y + tree.size)/current_room->height, 0.0f, 1.0f, 0};
 
 		Vertex v4 = {tile_width * (screen_pos.x + tree.size), tile_height * (screen_pos.y  + 0), 
-					 1.0f - (tree.position.y + tree.size)/ROWS_PER_SCREEN, 1.0f, 0.0f, 0};
+					 1.0f - (tree.position.y + tree.size)/current_room->height, 1.0f, 0.0f, 0};
 
 		
 		convert_top_left_coords_to_centered(&v1, &v2, &v3, &v4);
@@ -233,16 +238,16 @@ void buffer_player() {
 	// 			 1.0f - (player.position.y + player.size)/ROWS_PER_SCREEN, 1.0f, 0.0f, 0};
 
 	Vertex v1 = {tile_width * (TILES_PER_ROW/2 + 0), tile_height * (ROWS_PER_SCREEN/2 + 0), 
-				 1.0f - (player.position.y + player.size)/ROWS_PER_SCREEN, 0.0f, 0.0f, 0};
+				 1.0f - (player.position.y + player.size)/current_room->height, 0.0f, 0.0f, 0};
 
 	Vertex v2 = {tile_width * (TILES_PER_ROW/2 + player.size), tile_height * (ROWS_PER_SCREEN/2 + player.size),
-				 1.0f - (player.position.y + player.size)/ROWS_PER_SCREEN, 1.0f, 1.0f, 0};
+				 1.0f - (player.position.y + player.size)/current_room->height, 1.0f, 1.0f, 0};
 
 	Vertex v3 = {tile_width * (TILES_PER_ROW/2 + 0), tile_height * (ROWS_PER_SCREEN/2 + player.size), 
-				 1.0f - (player.position.y + player.size)/ROWS_PER_SCREEN, 0.0f, 1.0f, 0};
+				 1.0f - (player.position.y + player.size)/current_room->height, 0.0f, 1.0f, 0};
 
 	Vertex v4 = {tile_width * (TILES_PER_ROW/2 + player.size), tile_height * (ROWS_PER_SCREEN/2 + 0), 
-				 1.0f - (player.position.y + player.size)/ROWS_PER_SCREEN, 1.0f, 0.0f, 0};
+				 1.0f - (player.position.y + player.size)/current_room->height, 1.0f, 0.0f, 0};
 	
 	convert_top_left_coords_to_centered(&v1, &v2, &v3, &v4);
 	buffer_quad(v1, v2, v3, v4, &vb, &ib);
