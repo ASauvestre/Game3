@@ -14,15 +14,8 @@
 
 #define array_size(array)  (sizeof(array)/sizeof(array[0]))
 
-// Constants
-const int TILES_PER_ROW		= 32;
-const int ROWS_PER_SCREEN	= 18;
-const int TILES_PER_SCREEN	= TILES_PER_ROW * ROWS_PER_SCREEN;
-
 // Structs
 struct Tile;
-
-// struct TileScreen; 
 
 struct Room;
 
@@ -63,14 +56,6 @@ struct Room {
 	int num_tiles;
 	Tile * tiles;
 };
-
-
-// We don't use this anymore, this was used when we had screen locked camera, 
-// now we follow the player movement.
-
-// struct TileScreen {
-// 	Tile tiles[TILES_PER_SCREEN];
-// };
 
 struct Vector2 {
 	Vector2() {}
