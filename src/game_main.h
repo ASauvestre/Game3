@@ -18,7 +18,7 @@
 struct Tile;
 
 struct Room;
-
+struct Entity;
 struct Vector2f;
 struct Vector3f;
 struct Color4f;
@@ -151,6 +151,8 @@ void game(WindowData * window_data, Keyboard * keyboard, GraphicsBuffer * graphi
 void buffer_player();
 
 void buffer_trees();
+
+void buffer_entity(Entity entity);
 
 void buffer_tiles(Room * room);
 

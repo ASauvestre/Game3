@@ -25,7 +25,7 @@ const int ROWS_PER_SCREEN	= 18;
 const int TILES_PER_SCREEN	= TILES_PER_ROW * ROWS_PER_SCREEN;
 
 Entity player;
-Entity trees[30];
+Entity trees[TILES_PER_SCREEN/60];
 
 Room * current_room;
 
@@ -46,7 +46,7 @@ void init_game() {
 
 	{
 		// TEST Create test room
-		Room * room = new Room(30, 10);
+		Room * room = new Room(31, 11);
 
 		for(int i=0; i<(room->num_tiles); i++) {
 			Tile tile;
@@ -68,15 +68,15 @@ void init_game() {
 	// TEST Init trees
 	{
 		for(int i = 0; i < array_size(trees)/2; i++) {
-			trees[i].position.x = 0.5+(14*i)%32;
-			trees[i].position.y = 0.5+(12*i)/32;
+			trees[i].position.x = (int)(8.9*i)%(current_room->width-2);
+			trees[i].position.y = (int)(2.3*i)%(current_room->height-2);
 			trees[i].texture = "tree.png";
 			trees[i].is_player = false;
 			trees[i].size = 3;
 		}
 		for(int i = array_size(trees)/2; i < array_size(trees); i++) {
-			trees[i].position.x = 0.5+(12*i)%32;
-			trees[i].position.y = 0.5+(16*i)/32;
+			trees[i].position.x = (int)(5.5*i)%(current_room->width-2);
+			trees[i].position.y = (int)(4.1*i)%(current_room->height-2);
 			trees[i].texture = "tree.png";
 			trees[i].is_player = false;
 			trees[i].size = 3;
@@ -186,8 +186,7 @@ void game(WindowData * window_data, Keyboard * keyboard, GraphicsBuffer * graphi
 			camera_offset.y = current_room->height - ROWS_PER_SCREEN/2.0f;
 		}
 			
-
-		log_print("[game_camera]", "Camera offset is (%f, %f)", camera_offset.x, camera_offset.y);
+		// log_print("[game_camera]", "Camera offset is (%f, %f)", camera_offset.x, camera_offset.y);
 
 	}
 
@@ -196,82 +195,52 @@ void game(WindowData * window_data, Keyboard * keyboard, GraphicsBuffer * graphi
 	buffer_trees();	
 }
 
-
-// Globals used :
-//		current_room
-//		trees
-//		camera_offset
 void buffer_trees() {
 	for(int i = 0; i< array_size(trees); i++) {
+		buffer_entity(trees[i]);
+	}
+}
+
+void buffer_player() {
+	buffer_entity(player);
+}
+
+void buffer_entity(Entity entity) {
 		VertexBuffer vb;
 		IndexBuffer ib;
 
-		Entity tree = trees[i];
-
 		Vector2f screen_pos;
-		screen_pos.x = tree.position.x - camera_offset.x + TILES_PER_ROW/2;
-		screen_pos.y = tree.position.y - camera_offset.y + ROWS_PER_SCREEN/2;
+		screen_pos.x = entity.position.x - camera_offset.x + TILES_PER_ROW/2;
+		screen_pos.y = entity.position.y - camera_offset.y + ROWS_PER_SCREEN/2;
 
-		if(screen_pos.x + tree.size < 0) continue;
-		if(screen_pos.x > TILES_PER_ROW) continue;
-		if(screen_pos.y + tree.size < 0) continue;
-		if(screen_pos.y > ROWS_PER_SCREEN) continue;
+		if(screen_pos.x + entity.size < 0) return;
+		if(screen_pos.x > TILES_PER_ROW) return;
+		if(screen_pos.y + entity.size < 0) return;
+		if(screen_pos.y > ROWS_PER_SCREEN) return;
 
 
 		Vertex v1 = {tile_width * (screen_pos.x + 0), tile_height * (screen_pos.y  + 0), 
-					 1.0f - (tree.position.y + tree.size)/current_room->height, 0.0f, 0.0f, 0};
+					 1.0f - (entity.position.y + entity.size)/current_room->height, 0.0f, 0.0f, 0};
 
-		Vertex v2 = {tile_width * (screen_pos.x + trees[i].size), tile_height * (screen_pos.y + tree.size),
-					 1.0f - (tree.position.y + tree.size)/current_room->height, 1.0f, 1.0f, 0};
+		Vertex v2 = {tile_width * (screen_pos.x + entity.size), tile_height * (screen_pos.y + entity.size),
+					 1.0f - (entity.position.y + entity.size)/current_room->height, 1.0f, 1.0f, 0};
 
-		Vertex v3 = {tile_width * (screen_pos.x + 0), tile_height * (screen_pos.y  + tree.size), 
-					 1.0f - (tree.position.y + tree.size)/current_room->height, 0.0f, 1.0f, 0};
+		Vertex v3 = {tile_width * (screen_pos.x + 0), tile_height * (screen_pos.y  + entity.size), 
+					 1.0f - (entity.position.y + entity.size)/current_room->height, 0.0f, 1.0f, 0};
 
-		Vertex v4 = {tile_width * (screen_pos.x + tree.size), tile_height * (screen_pos.y  + 0), 
-					 1.0f - (tree.position.y + tree.size)/current_room->height, 1.0f, 0.0f, 0};
+		Vertex v4 = {tile_width * (screen_pos.x + entity.size), tile_height * (screen_pos.y  + 0), 
+					 1.0f - (entity.position.y + entity.size)/current_room->height, 1.0f, 0.0f, 0};
 
 		
 		convert_top_left_coords_to_centered(&v1, &v2, &v3, &v4);
 		buffer_quad(v1, v2, v3, v4, &vb, &ib);
 
 		std::vector<char *> texture_ids;	
-		texture_ids.push_back(trees[i].texture);	
+		texture_ids.push_back(entity.texture);	
 		m_graphics_buffer->texture_ids.push_back(texture_ids);
 
 		m_graphics_buffer->vertex_buffers.push_back(vb);
 		m_graphics_buffer->index_buffers.push_back(ib);
-	}
-}
-
-void buffer_player() {
-	VertexBuffer vb;
-	IndexBuffer ib;
-
-	Vertex v1 = {tile_width * (TILES_PER_ROW/2.0f - (camera_offset.x - player.position.x) + 0), 
-				 tile_height * (ROWS_PER_SCREEN/2.0f - (camera_offset.y - player.position.y) + 0), 
-				 1.0f - (player.position.y + player.size)/current_room->height, 0.0f, 0.0f, 0};
-
-	Vertex v2 = {tile_width * (TILES_PER_ROW/2.0f  - (camera_offset.x - player.position.x) + player.size), 
-				 tile_height * (ROWS_PER_SCREEN/2.0f - (camera_offset.y - player.position.y) + player.size),
-				 1.0f - (player.position.y + player.size)/current_room->height, 1.0f, 1.0f, 0};
-
-	Vertex v3 = {tile_width * (TILES_PER_ROW/2.0f  - (camera_offset.x - player.position.x) + 0), 
-				 tile_height * (ROWS_PER_SCREEN/2.0f - (camera_offset.y - player.position.y) + player.size), 
-				 1.0f - (player.position.y + player.size)/current_room->height, 0.0f, 1.0f, 0};
-
-	Vertex v4 = {tile_width * (TILES_PER_ROW/2.0f  - (camera_offset.x - player.position.x) + player.size), 
-				 tile_height * (ROWS_PER_SCREEN/2.0f - (camera_offset.y - player.position.y) + 0), 
-				 1.0f - (player.position.y + player.size)/current_room->height, 1.0f, 0.0f, 0};
-	
-	convert_top_left_coords_to_centered(&v1, &v2, &v3, &v4);
-	buffer_quad(v1, v2, v3, v4, &vb, &ib);
-
-	std::vector<char *> texture_ids;	
-	texture_ids.push_back(player.texture);	
-	m_graphics_buffer->texture_ids.push_back(texture_ids);
-
-	m_graphics_buffer->vertex_buffers.push_back(vb);
-	m_graphics_buffer->index_buffers.push_back(ib);
 }
 
 void buffer_tiles(Room * room) {
