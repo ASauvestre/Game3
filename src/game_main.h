@@ -16,9 +16,9 @@
 
 // Structs
 struct Tile;
-
 struct Room;
 struct Entity;
+
 struct Vector2f;
 struct Vector3f;
 struct Color4f;
@@ -29,34 +29,6 @@ struct GraphicsBuffer;
 struct Keyboard;
 struct WindowData;
 
-
-struct Tile {
-	char * texture;
-	int local_x;
-	int local_y;
-};
-
-struct Room {
-	Room(int w, int h) {
-
-		width = w;
-		height = h;
-
-		num_tiles = w*h;
-
-		tiles = (Tile *) malloc(num_tiles*sizeof(Tile));
-	}
-
-	~Room() {
-		free(tiles);
-	}
-
-	int width;
-	int height;
-	int num_tiles;
-	Tile * tiles;
-};
-
 struct Vector2 {
 	Vector2() {}
 	Vector2(int x, int y) {
@@ -65,18 +37,27 @@ struct Vector2 {
 	}
 	int x;
 	int y;
+
+	void operator=(Vector2 b) {
+		x = b.x;
+		y = b.y;
+	}
 };
 
 struct Vector2f {
 	
-	Vector2f() {}
-	;
+	Vector2f() {};
 	Vector2f(float x, float y) {
 		this->x = x;
 		this->y = y;
 	}
 	float x;
 	float y;
+
+	void operator=(Vector2 b) {
+		x = b.x;
+		y = b.y;
+	}
 };
 
 struct Vector3f {
@@ -144,6 +125,7 @@ struct WindowData {
 	float aspect_ratio;
 	Color4f background_color;
 };
+
 void init_game();
 
 void game(WindowData * window_data, Keyboard * keyboard, GraphicsBuffer * graphics_buffer, float dt);

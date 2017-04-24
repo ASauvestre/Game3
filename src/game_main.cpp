@@ -5,10 +5,15 @@ enum GameMode {
 	GAME
 };
 
-static GraphicsBuffer * m_graphics_buffer;
-static WindowData     * m_window_data;
+enum TileType {
+	DEFAULT,
+	SWITCH_ROOM
+};
 
-static float square_size = 0.5f;
+struct Rectangle {
+	float x, y;
+	float width, height;
+};
 
 struct Entity {
 	Entity() {}
@@ -19,20 +24,67 @@ struct Entity {
 	float size; // relative to tile
 };
 
+struct Tile {
+	char * texture;
+	int local_x;
+	int local_y;
+
+	TileType type = DEFAULT;
+	int room_target_id; // Used if type is SWITCH_ROOM
+	Vector2 target_tile_coords; // Used if type is SWITCH_ROOM
+
+	Rectangle collision_box;
+
+	bool * additional_collision_condition = NULL;
+
+	bool collision_enabled = false;
+};
+
+struct Room {
+	Room(int w, int h) {
+
+		width = w;
+		height = h;
+
+		num_tiles = w*h;
+
+		tiles = (Tile *) malloc(num_tiles*sizeof(Tile));
+	}
+
+	~Room() {
+		free(tiles);
+	}
+
+	int width;
+	int height;
+	int num_tiles;
+	Tile * tiles;
+};
+
+
 // Constants
 const int TILES_PER_ROW		= 32;
 const int ROWS_PER_SCREEN	= 18;
 const int TILES_PER_SCREEN	= TILES_PER_ROW * ROWS_PER_SCREEN;
 
-Entity player;
-Entity trees[TILES_PER_SCREEN/60];
+// Globals
+static WindowData 		* m_window_data;
+static Keyboard m_keyboard;
+static GraphicsBuffer 	* m_graphics_buffer;
 
-Room * current_room;
+static float square_size = 0.5f;
 
-Vector2f camera_offset;
+static Entity player;
+static Entity trees[TILES_PER_SCREEN/60];
 
-float tile_width = 1.0f/TILES_PER_ROW;
-float tile_height = 1.0f/ROWS_PER_SCREEN; // @Incomplete, handle aspect ratios
+Room * rooms[2];
+
+static Room * current_room;
+
+static Vector2f camera_offset;
+
+static float tile_width = 1.0f/TILES_PER_ROW;
+static float tile_height = 1.0f/ROWS_PER_SCREEN; // @Incomplete, handle aspect ratios
 
 void init_game() {
 	// Init player
@@ -41,29 +93,84 @@ void init_game() {
 		player.position.y = 0;
 		player.texture = "megaperson.png";
 		player.is_player = true;
-		player.size = 1; 
+		player.size = 1.0; 
 	}
 
 	{
-		// TEST Create test room
-		Room * room = new Room(31, 11);
+		// TEST Create test rooms
+		{
+			Room * room = new Room(31, 11);
 
-		for(int i=0; i<(room->num_tiles); i++) {
-			Tile tile;
-			tile.texture = "grass.png";
-			tile.local_x = i % room->width;
-			tile.local_y = i / room->height;
+			for(int i=0; i<(room->num_tiles); i++) {
+				Tile tile;
+				tile.texture = "grass.png";
+				tile.local_x = i % room->width;
+				tile.local_y = i / room->width;
 
-			if(tile.local_x % 2 == 1 && tile.local_y % 2 == 1) {
-				tile.texture = "dirt.png";
+				/*if(tile.local_x % 2 == 1 && tile.local_y % 2 == 1) {
+					tile.texture = "dirt.png";
+				}*/
+
+				room->tiles[i] = tile;
+
 			}
 
-			room->tiles[i] = tile;
+			room->tiles[5].type = SWITCH_ROOM;
+			room->tiles[5].room_target_id = 1;
+			room->tiles[5].target_tile_coords = Vector2(9, 13);
 
+			room->tiles[5].texture = "dirt.png";
+
+			room->tiles[5].collision_enabled = true;
+			room->tiles[5].collision_box.x = room->tiles[5].local_x + 0.25;
+			room->tiles[5].collision_box.y = room->tiles[5].local_y;
+			room->tiles[5].collision_box.width = 0.5;
+			room->tiles[5].collision_box.height = 0;
+
+			room->tiles[5].additional_collision_condition = &(m_keyboard.key_up);
+
+			rooms[0] = room;
 		}
 
-		current_room = room;
+		// ----------------------------
+		{
+			Room * room = new Room(28, 14);
+
+			for(int i=0; i<(room->num_tiles); i++) {
+				Tile tile;
+				tile.texture = "grass.png";
+				tile.local_x = i % room->width;
+				tile.local_y = i / room->width;
+
+				/*if(tile.local_x % 2 == 1 && tile.local_y % 2 == 1) {
+					tile.texture = "dirt.png";
+				}*/
+
+				room->tiles[i] = tile;
+
+			}
+
+			room->tiles[13 * (room->width) + 9].type = SWITCH_ROOM;
+			room->tiles[13 * (room->width) + 9].room_target_id = 0;
+			room->tiles[13 * (room->width) + 9].target_tile_coords = Vector2(5, 0);
+
+			room->tiles[13 * (room->width) + 9].texture = "dirt.png";
+
+			room->tiles[13 * (room->width) + 9].collision_enabled = true;
+			room->tiles[13 * (room->width) + 9].collision_box.x = room->tiles[13 * (room->width) + 9].local_x + 0.25;
+			room->tiles[13 * (room->width) + 9].collision_box.y = room->tiles[13 * (room->width) + 9].local_y + 1;
+			room->tiles[13 * (room->width) + 9].collision_box.width = 0.5;
+			room->tiles[13 * (room->width) + 9].collision_box.height = 0;
+
+			room->tiles[13 * (room->width) + 9].additional_collision_condition = &(m_keyboard.key_down);
+
+			rooms[1] = room;
+		}
+
+		current_room = rooms[0];
 	}
+
+
 
 	// TEST Init trees
 	{
@@ -87,8 +194,9 @@ void init_game() {
 
 void game(WindowData * window_data, Keyboard * keyboard, GraphicsBuffer * graphics_buffer, float dt) {
 
-	m_graphics_buffer = graphics_buffer;
 	m_window_data = window_data;
+	m_keyboard = *keyboard;
+	m_graphics_buffer = graphics_buffer;
 
 
 	// Title Screen
@@ -157,8 +265,6 @@ void game(WindowData * window_data, Keyboard * keyboard, GraphicsBuffer * graphi
 		if(player.position.y >  current_room->height - 1)  {
 			player.position.y = current_room->height - 1;
 		}
-
-		buffer_player();
 	}
 
 	// Camera logic
@@ -190,9 +296,41 @@ void game(WindowData * window_data, Keyboard * keyboard, GraphicsBuffer * graphi
 
 	}
 
+	// Early collision detection, find current tile
+	{
+		// @Optimisation We can probably infer the tiles we collide with from the player's x and y coordinates and information about the room's size
+		for(int i = 0; i < current_room->num_tiles; i++) {
+			Tile tile = current_room->tiles[i];
+
+			bool should_compute_collision = tile.collision_enabled;
+			if(tile.additional_collision_condition != NULL) {
+				should_compute_collision &= *tile.additional_collision_condition;
+			}
+
+			if(should_compute_collision) {
+
+
+				if((player.position.x <= tile.collision_box.x + tile.collision_box.width) && (tile.collision_box.x <= player.position.x + player.size) &&	// X tests
+				   (player.position.y <= tile.collision_box.y + tile.collision_box.height) && (tile.collision_box.y <= player.position.y + player.size)) {	// Y tests
+
+					if(tile.type == SWITCH_ROOM) {
+						log_print("collision", "Player is on a tile with type SWITCH_ROOM, switching to room %d", tile.room_target_id);
+						current_room = rooms[tile.room_target_id];
+
+						player.position = tile.target_tile_coords;
+					}
+
+				}
+
+			}
+		}
+	}
+
 	buffer_tiles(current_room);
 	
 	buffer_trees();	
+
+	buffer_player();
 }
 
 void buffer_trees() {
