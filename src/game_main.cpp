@@ -7,6 +7,7 @@ enum GameMode {
 
 enum TileType {
 	DEFAULT,
+	BLOCK,
 	SWITCH_ROOM
 };
 
@@ -35,8 +36,6 @@ struct Tile {
 
 	Rectangle collision_box;
 
-	bool * additional_collision_condition = NULL;
-
 	bool collision_enabled = false;
 };
 
@@ -47,8 +46,10 @@ struct Room {
 		height = h;
 
 		num_tiles = w*h;
+		num_outer_tiles = 2 * (w + h);
 
 		tiles = (Tile *) malloc(num_tiles*sizeof(Tile));
+		outer_tiles = (Tile *) malloc(num_outer_tiles * sizeof(Tile));
 	}
 
 	~Room() {
@@ -59,6 +60,9 @@ struct Room {
 	int height;
 	int num_tiles;
 	Tile * tiles;
+
+	int num_outer_tiles;
+	Tile * outer_tiles; // Border tiles, used for teleport triggers
 };
 
 
@@ -115,19 +119,49 @@ void init_game() {
 
 			}
 
-			room->tiles[5].type = SWITCH_ROOM;
-			room->tiles[5].room_target_id = 1;
-			room->tiles[5].target_tile_coords = Vector2(9, 13);
+			for(int i=0; i<(room->num_outer_tiles); i++) {
+				Tile tile;
+
+				if(i<room->width) {
+					tile.local_x = i;
+					tile.local_y = -1;
+
+					tile.collision_box.x = tile.local_x+0.48;
+					tile.collision_box.y = tile.local_y;
+					tile.collision_box.width = 0.04;
+					tile.collision_box.height = 1;
+				} else if(i > (room->num_outer_tiles - room->width - 1)) {
+					tile.local_x = (i - (room->num_outer_tiles - room->width));
+					tile.local_y = room->height;
+
+					tile.collision_box.x = tile.local_x+0.48;
+					tile.collision_box.y = tile.local_y;
+					tile.collision_box.width = 0.04;
+					tile.collision_box.height = 1;
+				} else {
+					tile.local_x = room->width + 1 - (room->width + 2)*((i - room->width + 1)%2);
+					tile.local_y = (i - room->width)/2 + 1;
+
+					tile.collision_box.x = tile.local_x;
+					tile.collision_box.y = tile.local_y + 0.48;
+					tile.collision_box.width = 1;
+					tile.collision_box.height = 0.04;
+				}
+
+				tile.type = BLOCK;
+				tile.collision_enabled = true;
+
+
+				// log_print("outer_tiles_generation", "Created tile %d at (%d, %d)", i, tile.local_x, tile.local_y);
+
+				room->outer_tiles[i] = tile;
+			}
+
+			room->outer_tiles[5].type = SWITCH_ROOM;
+			room->outer_tiles[5].room_target_id = 1;
+			room->outer_tiles[5].target_tile_coords = Vector2(5, 13);
 
 			room->tiles[5].texture = "dirt.png";
-
-			room->tiles[5].collision_enabled = true;
-			room->tiles[5].collision_box.x = room->tiles[5].local_x + 0.25;
-			room->tiles[5].collision_box.y = room->tiles[5].local_y;
-			room->tiles[5].collision_box.width = 0.5;
-			room->tiles[5].collision_box.height = 0;
-
-			room->tiles[5].additional_collision_condition = &(m_keyboard.key_up);
 
 			rooms[0] = room;
 		}
@@ -147,22 +181,40 @@ void init_game() {
 				}*/
 
 				room->tiles[i] = tile;
-
 			}
 
-			room->tiles[13 * (room->width) + 9].type = SWITCH_ROOM;
-			room->tiles[13 * (room->width) + 9].room_target_id = 0;
-			room->tiles[13 * (room->width) + 9].target_tile_coords = Vector2(5, 0);
+			for(int i=0; i<(room->num_outer_tiles); i++) {
+				Tile tile;
 
-			room->tiles[13 * (room->width) + 9].texture = "dirt.png";
+				if(i<room->width) {
+					tile.local_x = i;
+					tile.local_y = -1;
+				} else if(i > (room->num_outer_tiles - room->width - 1)) {
+					tile.local_x = (i - (room->num_outer_tiles - room->width));
+					tile.local_y = room->height;
+				} else {
+					tile.local_x = room->width + 1 - (room->width + 2)*((i - room->width + 1)%2);
+					tile.local_y = (i - room->width)/2 + 1;
+				}
 
-			room->tiles[13 * (room->width) + 9].collision_enabled = true;
-			room->tiles[13 * (room->width) + 9].collision_box.x = room->tiles[13 * (room->width) + 9].local_x + 0.25;
-			room->tiles[13 * (room->width) + 9].collision_box.y = room->tiles[13 * (room->width) + 9].local_y + 1;
-			room->tiles[13 * (room->width) + 9].collision_box.width = 0.5;
-			room->tiles[13 * (room->width) + 9].collision_box.height = 0;
+				tile.type = BLOCK;
+				tile.collision_enabled = true;
+				tile.collision_box.x = tile.local_x+0.48;
+				tile.collision_box.y = tile.local_y;
+				tile.collision_box.width = 0.04;
+				tile.collision_box.height = 1;
 
-			room->tiles[13 * (room->width) + 9].additional_collision_condition = &(m_keyboard.key_down);
+				// log_print("outer_tiles_generation", "Created tile %d at (%d, %d)", i, tile.local_x, tile.local_y);
+
+				room->outer_tiles[i] = tile;
+			}
+
+			room->outer_tiles[61].type = SWITCH_ROOM;
+			room->outer_tiles[61].room_target_id = 0;
+			room->outer_tiles[61].target_tile_coords = Vector2(5, 0);
+
+			room->tiles[369].texture = "dirt.png";
+
 
 			rooms[1] = room;
 		}
@@ -248,10 +300,65 @@ void game(WindowData * window_data, Keyboard * keyboard, GraphicsBuffer * graphi
 		if(keyboard->key_right)	player.position.x += position_delta;
 		if(keyboard->key_up)	player.position.y -= position_delta;
 		if(keyboard->key_down) 	player.position.y += position_delta;
+	}
+
+	// Early collision detection, find current tile
+	{
+		// @Optimisation We can probably infer the tiles we collide with from the player's x and y coordinates and information about the room's size
+		// for(int i = 0; i < current_room->num_tiles; i++) {
+		// 	Tile tile = current_room->tiles[i];
+
+		// 	bool should_compute_collision = tile.collision_enabled;
+
+		// 	if(should_compute_collision) {
 
 
+		// 		if((player.position.x < tile.collision_box.x + tile.collision_box.width) && (tile.collision_box.x < player.position.x + player.size) &&	// X tests
+		// 		   (player.position.y < tile.collision_box.y + tile.collision_box.height) && (tile.collision_box.y < player.position.y + player.size)) {	// Y tests
 
-		// Clamp player position
+		// 			if(tile.type == SWITCH_ROOM) {
+		// 				log_print("collision", "Player is on a tile with type SWITCH_ROOM, switching to room %d", tile.room_target_id);
+		// 				current_room = rooms[tile.room_target_id];
+
+		// 				player.position = tile.target_tile_coords;
+		// 			}
+
+		// 		}
+
+		// 	}
+		// }
+
+		// @Optimisation We can probably infer the tiles we collide with from the player's x and y coordinates and information about the room's size
+		for(int i = 0; i < 2 * (current_room->width + current_room->height - 2); i++) {
+			Tile tile = current_room->outer_tiles[i];
+
+			bool should_compute_collision = tile.collision_enabled;
+
+			if(should_compute_collision) {
+
+
+				if((player.position.x < tile.collision_box.x + tile.collision_box.width) && (tile.collision_box.x < player.position.x + player.size) &&	// X tests
+				   (player.position.y < tile.collision_box.y + tile.collision_box.height) && (tile.collision_box.y < player.position.y + player.size)) {	// Y tests
+
+					if(tile.type == SWITCH_ROOM) {
+						log_print("collision", "Player is on a tile with type SWITCH_ROOM, switching to room %d", tile.room_target_id);
+						current_room = rooms[tile.room_target_id];
+
+						player.position.x = tile.target_tile_coords.x + (player.position.x - tile.local_x);
+						player.position.y = tile.target_tile_coords.y + (player.position.y - tile.local_y);
+
+						break;
+					}
+
+				}
+
+			}
+		}
+	}
+
+
+	// Clamp player position
+	{
 		if(player.position.x < 0)  {
 			player.position.x = 0;
 		}
@@ -294,36 +401,6 @@ void game(WindowData * window_data, Keyboard * keyboard, GraphicsBuffer * graphi
 			
 		// log_print("[game_camera]", "Camera offset is (%f, %f)", camera_offset.x, camera_offset.y);
 
-	}
-
-	// Early collision detection, find current tile
-	{
-		// @Optimisation We can probably infer the tiles we collide with from the player's x and y coordinates and information about the room's size
-		for(int i = 0; i < current_room->num_tiles; i++) {
-			Tile tile = current_room->tiles[i];
-
-			bool should_compute_collision = tile.collision_enabled;
-			if(tile.additional_collision_condition != NULL) {
-				should_compute_collision &= *tile.additional_collision_condition;
-			}
-
-			if(should_compute_collision) {
-
-
-				if((player.position.x <= tile.collision_box.x + tile.collision_box.width) && (tile.collision_box.x <= player.position.x + player.size) &&	// X tests
-				   (player.position.y <= tile.collision_box.y + tile.collision_box.height) && (tile.collision_box.y <= player.position.y + player.size)) {	// Y tests
-
-					if(tile.type == SWITCH_ROOM) {
-						log_print("collision", "Player is on a tile with type SWITCH_ROOM, switching to room %d", tile.room_target_id);
-						current_room = rooms[tile.room_target_id];
-
-						player.position = tile.target_tile_coords;
-					}
-
-				}
-
-			}
-		}
 	}
 
 	buffer_tiles(current_room);
