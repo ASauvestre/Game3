@@ -12,7 +12,6 @@ struct VS_OUTPUT
 	float texid : TEXID;
 };
 
-
 VS_OUTPUT VS(float4 input_pos : POSITION, float2 input_tex_coord : TEXCOORD, float input_texid : TEXID) 
 {
 	VS_OUTPUT output;

@@ -13,6 +13,20 @@ struct Texture {
 	// ID3D11SamplerState * sampler_state;
 };
 
+struct Shader {
+	char * filename;
+	char * vs_name;
+	char * ps_name;
+
+	ID3D11VertexShader * VS;
+	ID3D11PixelShader * PS;
+};
+
+// Extern Globals
+extern Shader * textured_shader;
+extern Shader * colored_shader;
+
+// Globals
 static HWND handle;
 static HDC device_context;
 
@@ -27,11 +41,6 @@ static ID3D11Texture2D * depth_stencil_buffer;
 
 static ID3D11Buffer * d3d_vertex_buffer_interface;
 static ID3D11Buffer * d3d_index_buffer_interface;
-
-static ID3D11VertexShader * VS;
-static ID3D11PixelShader * PS;
-static ID3DBlob * VS_bytecode;
-static ID3DBlob * PS_bytecode;
 
 static ID3D11InputLayout * vertex_layout;
 static D3D11_INPUT_ELEMENT_DESC layout_desc[] = {
@@ -207,13 +216,11 @@ bool create_window(int width, int height, char * name) {
 		handle = CreateWindowEx(0, window_class.lpszClassName, (LPCTSTR) name, window_style, centered_x, 
 								centered_y, window_dimensions.right - window_dimensions.left, 
 								window_dimensions.bottom - window_dimensions.top, NULL, NULL, instance, NULL);
-		
-		// ShowCursor(false);
 
 		if(handle) {
 			device_context = GetDC(handle);
 			if(device_context) {
-				ShowCursor(false);
+				//ShowCursor(false);
 				ShowWindow(handle, 1);
 				UpdateWindow(handle);
 
@@ -223,8 +230,12 @@ bool create_window(int width, int height, char * name) {
 	return false;
 }
 
+void set_shader(Shader * shader) {
+	d3d_dc->VSSetShader(shader->VS, NULL, 0);
+	d3d_dc->PSSetShader(shader->PS, NULL, 0);
+}
+
 void init_d3d() {
-	HRESULT error_code;
 
 	DXGI_MODE_DESC 	buffer_desc = {};
 					buffer_desc.Width 					= window_data.width;
@@ -246,13 +257,13 @@ void init_d3d() {
 							swap_chain_desc.SwapEffect 			= DXGI_SWAP_EFFECT_DISCARD;
 							swap_chain_desc.Flags 				= 0;
 
-	error_code = D3D11CreateDeviceAndSwapChain(	NULL, D3D_DRIVER_TYPE_HARDWARE, NULL, 0, NULL, 0, D3D11_SDK_VERSION, 
-												&swap_chain_desc, &swap_chain, &d3d_device, NULL, &d3d_dc);
+	D3D11CreateDeviceAndSwapChain(	NULL, D3D_DRIVER_TYPE_HARDWARE, NULL, 0, NULL, 0, D3D11_SDK_VERSION, 
+									&swap_chain_desc, &swap_chain, &d3d_device, NULL, &d3d_dc);
 
 	ID3D11Texture2D * backbuffer;
-	error_code = swap_chain->GetBuffer(0, __uuidof(backbuffer), (void**) &backbuffer);
+	swap_chain->GetBuffer(0, __uuidof(backbuffer), (void**) &backbuffer);
 
-	error_code = d3d_device->CreateRenderTargetView(backbuffer, NULL, &render_target_view);
+	d3d_device->CreateRenderTargetView(backbuffer, NULL, &render_target_view);
 	backbuffer->Release();
 
 	// Depth/Stencil Buffer
@@ -275,18 +286,6 @@ void init_d3d() {
 
 	d3d_dc->OMSetRenderTargets( 1, &render_target_view, depth_stencil_view);
 
-	error_code = D3DCompileFromFile(L"shader.hlsl", NULL, D3D_COMPILE_STANDARD_FILE_INCLUDE,
-									"VS", "vs_5_0", 0, 0, &VS_bytecode, NULL);
-	error_code = D3DCompileFromFile(L"shader.hlsl", NULL, D3D_COMPILE_STANDARD_FILE_INCLUDE,
-									"PS", "ps_5_0", 0, 0, &PS_bytecode, NULL);
-
-	error_code = d3d_device->CreateVertexShader(VS_bytecode->GetBufferPointer(), VS_bytecode->GetBufferSize(), 
-												NULL, &VS);
-	error_code = d3d_device->CreatePixelShader(	PS_bytecode->GetBufferPointer(), PS_bytecode->GetBufferSize(), 
-												NULL, &PS);
-	d3d_dc->VSSetShader(VS, NULL, 0);
-	d3d_dc->PSSetShader(PS, NULL, 0);
-
 	// Vectex Buffer
 	D3D11_BUFFER_DESC 	vertex_buffer_desc = {};
 						vertex_buffer_desc.Usage 			= D3D11_USAGE_DYNAMIC;
@@ -295,7 +294,7 @@ void init_d3d() {
 						vertex_buffer_desc.CPUAccessFlags 	= D3D11_CPU_ACCESS_WRITE;
 						vertex_buffer_desc.MiscFlags 		= 0;
 
-	error_code = d3d_device->CreateBuffer(&vertex_buffer_desc, NULL, &d3d_vertex_buffer_interface);
+	d3d_device->CreateBuffer(&vertex_buffer_desc, NULL, &d3d_vertex_buffer_interface);
 
 	UINT stride = sizeof(Vertex);
 	UINT offset = 0;
@@ -309,13 +308,28 @@ void init_d3d() {
 						index_buffer_desc.CPUAccessFlags 	= D3D11_CPU_ACCESS_WRITE;
 						index_buffer_desc.MiscFlags 		= 0;
 
-	error_code = d3d_device->CreateBuffer(&index_buffer_desc, NULL, &d3d_index_buffer_interface);
+	d3d_device->CreateBuffer(&index_buffer_desc, NULL, &d3d_index_buffer_interface);
 
 	d3d_dc->IASetIndexBuffer(d3d_index_buffer_interface, DXGI_FORMAT_R32_UINT, 0);
 
 	// Input Layout
-	d3d_device->CreateInputLayout(layout_desc, ARRAYSIZE(layout_desc), VS_bytecode->GetBufferPointer(), 
-								  VS_bytecode->GetBufferSize(), &vertex_layout);
+	ID3DBlob * VS_bytecode; // Maybe release those at some point.
+	ID3DBlob * error = NULL;
+	HRESULT error_code = D3DCompileFromFile(L"shaders/dummy_shader.hlsl", NULL, D3D_COMPILE_STANDARD_FILE_INCLUDE,
+						"dummy_vs", "vs_5_0", 0, 0, &VS_bytecode, &error);
+
+	if(error_code == HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND)) {
+		log_print("init_d3d", "\"dummy_shader.hlsl\" not found, could not compile the dummy shader to create the input layout.");
+		assert(false);
+	}
+
+	if(error) {
+		log_print("init_d3d", "Dummy shader failed to compile, error given is : \n\n%5s\n\n", 
+				   (char *)error->GetBufferPointer());
+		assert(false);
+	}
+
+	d3d_device->CreateInputLayout(layout_desc, ARRAYSIZE(layout_desc), VS_bytecode->GetBufferPointer(), VS_bytecode->GetBufferSize(), &vertex_layout);
 
 	d3d_dc->IASetInputLayout(vertex_layout);
 
@@ -388,6 +402,8 @@ void init_d3d() {
 
 void draw_buffer(int buffer_index) {
 	
+	set_shader(graphics_buffer.shaders[buffer_index]);
+
 	VertexBuffer * vb = &graphics_buffer.vertex_buffers[buffer_index];
 	IndexBuffer * ib = &graphics_buffer.index_buffers[buffer_index];
 	std::vector<char *> texture_ids = graphics_buffer.texture_ids[buffer_index];
@@ -531,6 +547,68 @@ void add_texture_to_load_queue(char * name) {
 	textures.push_back(texture);	
 }
 
+// Shader code
+bool create_shader(char * filename, char * vs_name, char * ps_name, Shader * shader){
+	shader->filename = filename;
+	shader->vs_name = vs_name;
+	shader->ps_name = ps_name;
+	shader->VS = NULL;
+	shader->PS = NULL;
+
+	ID3DBlob * VS_bytecode;
+	ID3DBlob * PS_bytecode;
+
+	ID3DBlob * error = NULL;
+
+	wchar_t path[512];;
+	swprintf(path, 512, L"shaders/%hs", filename);
+
+	HRESULT error_code = D3DCompileFromFile(path, NULL, D3D_COMPILE_STANDARD_FILE_INCLUDE,
+					   vs_name, "vs_5_0", 0, 0, &VS_bytecode, &error);
+
+	if(error_code == HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND)) {
+		log_print("init_d3d", "\"%s\" not found, could not compile the shader.", filename);
+		return false;
+	}
+
+	if(error) {
+		log_print("create_shader", "Vertex shader %s in %s failed to compile, error given is : \n---------\n%s---------", 
+				   vs_name, filename, (char *)error->GetBufferPointer());
+
+		error->Release();
+
+		return false;
+	}
+
+	D3DCompileFromFile(path, NULL, D3D_COMPILE_STANDARD_FILE_INCLUDE,
+					   ps_name, "ps_5_0", 0, 0, &PS_bytecode, &error);
+
+	if(error) {
+		log_print("create_shader", "Pixel shader %s in %s failed to compile, error given is : \n---------\n%s---------", 
+				   ps_name, filename, (char *)error->GetBufferPointer());
+
+		error->Release();
+		VS_bytecode->Release();
+
+		return false;
+	}
+
+	d3d_device->CreateVertexShader(VS_bytecode->GetBufferPointer(), VS_bytecode->GetBufferSize(), 
+									NULL, &shader->VS);
+	d3d_device->CreatePixelShader(	PS_bytecode->GetBufferPointer(), PS_bytecode->GetBufferSize(), 
+											NULL, &shader->PS);
+	return true;
+
+}
+
+void init_shaders() {
+	textured_shader = (Shader *) malloc(sizeof(Shader));
+	colored_shader = (Shader *) malloc(sizeof(Shader));
+
+	create_shader("textured_shader.hlsl", "VS", "PS", textured_shader);
+	create_shader("colored_shader.hlsl", "VS", "PS", colored_shader);
+}
+
 void init_textures() {
 	add_texture_to_load_queue("title_screen_logo.png");
 	add_texture_to_load_queue("grass.png");
@@ -556,6 +634,8 @@ void main() {
 	create_window(window_data.width, window_data.height, window_name);
 
 	init_d3d();
+
+	init_shaders();
 
 	init_textures();
 

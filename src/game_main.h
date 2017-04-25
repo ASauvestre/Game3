@@ -5,10 +5,12 @@
 
 
 // Macros
-#define log_print(category, format, ...)					\
-	char message [2048];									\
-	sprintf(message, format, __VA_ARGS__);					\
-	printf("[%s]: %s\n", category, message, __VA_ARGS__);	\
+#define log_print(category, format, ...)							\
+	{																\
+			char message [2048];									\
+			sprintf(message, format, __VA_ARGS__);					\
+			printf("[%s]: %s\n", category, message, __VA_ARGS__);	\
+	}																\
 
 #define assert(condition) if(!condition) { *(int *)0 = 0; }
 
@@ -22,10 +24,14 @@ struct Entity;
 struct Vector2f;
 struct Vector3f;
 struct Color4f;
+
 struct Vertex;
 struct VertexBuffer;
 struct IndexBuffer;
 struct GraphicsBuffer;
+
+struct Shader; // Platform specific definition
+
 struct Keyboard;
 struct WindowData;
 
@@ -86,9 +92,9 @@ struct Color4f {
 };
 
 struct Vertex {
-	Vertex(	float x, float y, float z, float u, float v) 
+	Vertex(	float x, float y, float z, float u, float v)
 			: position(x,y,z), tex_coord(u, v) {}
-	Vertex(	float x, float y, float z, float u, float v, float texid) 
+	Vertex(	float x, float y, float z, float u, float v, float texid)
 			: position(x,y,z), tex_coord(u, v),  texture_depth(texid) {}
 	Vector3f position;
 	Vector2f tex_coord;
@@ -104,9 +110,16 @@ struct IndexBuffer {
 };
 
 struct GraphicsBuffer {
+	GraphicsBuffer() {};
+	~GraphicsBuffer() {};
+
+	std::vector<Shader *> shaders;
 	std::vector<VertexBuffer> vertex_buffers;
 	std::vector<IndexBuffer> index_buffers;
-	std::vector<std::vector<char *>> texture_ids;
+	union {
+		std::vector<std::vector<char *>> texture_ids;
+		std::vector<std::vector<Color4f>> colors;
+	};
 };
 
 struct Keyboard {

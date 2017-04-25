@@ -71,6 +71,10 @@ const int TILES_PER_ROW		= 32;
 const int ROWS_PER_SCREEN	= 18;
 const int TILES_PER_SCREEN	= TILES_PER_ROW * ROWS_PER_SCREEN;
 
+// Extern Globals
+Shader * textured_shader;
+Shader * colored_shader;
+
 // Globals
 static WindowData 		* m_window_data;
 static Keyboard m_keyboard;
@@ -90,6 +94,24 @@ static Vector2f camera_offset;
 static float tile_width = 1.0f/TILES_PER_ROW;
 static float tile_height = 1.0f/ROWS_PER_SCREEN; // @Incomplete, handle aspect ratios
 
+int find_tile_index_from_coords(int x, int y, Room * room) {
+	return (x + 1) * room->width + y - 1;
+}
+
+int find_outer_tile_index_from_coords(int x, int y, Room * room) {
+	if(y == -1) {
+		return x;
+	} else if(y == room->height) {
+		return room->width + 2*room->height + x;
+	} else if (x == -1) {
+		return room->width + 2*(y - 1);
+	}  else if (x == room->width) {
+		return room->width + 2*(y - 1) + 1;
+	} else {
+		return -1;
+	}
+}
+
 void init_game() {
 	// Init player
 	{
@@ -103,7 +125,7 @@ void init_game() {
 	{
 		// TEST Create test rooms
 		{
-			Room * room = new Room(31, 11);
+			Room * room = new Room(50, 30);
 
 			for(int i=0; i<(room->num_tiles); i++) {
 				Tile tile;
@@ -126,31 +148,30 @@ void init_game() {
 					tile.local_x = i;
 					tile.local_y = -1;
 
-					tile.collision_box.x = tile.local_x+0.48;
+					tile.collision_box.x = tile.local_x+0.75;
 					tile.collision_box.y = tile.local_y;
-					tile.collision_box.width = 0.04;
+					tile.collision_box.width = -0.5;
 					tile.collision_box.height = 1;
 				} else if(i > (room->num_outer_tiles - room->width - 1)) {
 					tile.local_x = (i - (room->num_outer_tiles - room->width));
 					tile.local_y = room->height;
 
-					tile.collision_box.x = tile.local_x+0.48;
+					tile.collision_box.x = tile.local_x+0.75;
 					tile.collision_box.y = tile.local_y;
-					tile.collision_box.width = 0.04;
+					tile.collision_box.width = -0.5;
 					tile.collision_box.height = 1;
 				} else {
-					tile.local_x = room->width + 1 - (room->width + 2)*((i - room->width + 1)%2);
+					tile.local_x = room->width - (room->width + 1)*((i - room->width + 1)%2);
 					tile.local_y = (i - room->width)/2 + 1;
 
 					tile.collision_box.x = tile.local_x;
-					tile.collision_box.y = tile.local_y + 0.48;
+					tile.collision_box.y = tile.local_y + 0.75;
 					tile.collision_box.width = 1;
-					tile.collision_box.height = 0.04;
+					tile.collision_box.height = -0.5;
 				}
 
 				tile.type = BLOCK;
 				tile.collision_enabled = true;
-
 
 				// log_print("outer_tiles_generation", "Created tile %d at (%d, %d)", i, tile.local_x, tile.local_y);
 
@@ -189,20 +210,31 @@ void init_game() {
 				if(i<room->width) {
 					tile.local_x = i;
 					tile.local_y = -1;
+
+					tile.collision_box.x = tile.local_x+0.75;
+					tile.collision_box.y = tile.local_y;
+					tile.collision_box.width = -0.5;
+					tile.collision_box.height = 1;
 				} else if(i > (room->num_outer_tiles - room->width - 1)) {
 					tile.local_x = (i - (room->num_outer_tiles - room->width));
 					tile.local_y = room->height;
+
+					tile.collision_box.x = tile.local_x+0.75;
+					tile.collision_box.y = tile.local_y;
+					tile.collision_box.width = -0.5;
+					tile.collision_box.height = 1;
 				} else {
 					tile.local_x = room->width + 1 - (room->width + 2)*((i - room->width + 1)%2);
 					tile.local_y = (i - room->width)/2 + 1;
+
+					tile.collision_box.x = tile.local_x;
+					tile.collision_box.y = tile.local_y + 0.75;
+					tile.collision_box.width = 1;
+					tile.collision_box.height = -0.5;
 				}
 
 				tile.type = BLOCK;
 				tile.collision_enabled = true;
-				tile.collision_box.x = tile.local_x+0.48;
-				tile.collision_box.y = tile.local_y;
-				tile.collision_box.width = 0.04;
-				tile.collision_box.height = 1;
 
 				// log_print("outer_tiles_generation", "Created tile %d at (%d, %d)", i, tile.local_x, tile.local_y);
 
@@ -212,6 +244,8 @@ void init_game() {
 			room->outer_tiles[61].type = SWITCH_ROOM;
 			room->outer_tiles[61].room_target_id = 0;
 			room->outer_tiles[61].target_tile_coords = Vector2(5, 0);
+
+
 
 			room->tiles[369].texture = "dirt.png";
 
@@ -241,6 +275,26 @@ void init_game() {
 			trees[i].size = 3;
 		}
 
+	}
+
+
+	// TEST
+	{
+		int x = 4;
+		int y = 5;
+		int result = find_tile_index_from_coords(x, y, current_room);
+		log_print("find_tile_index_from_coords", "Returned index of tile at (%d, %d) is %d, this tile's coordinates actually are (%d, %d)", x, y, result, current_room->tiles[result].local_x, current_room->tiles[result].local_y);
+	
+		x = -1;
+		y = 1;
+		result = find_outer_tile_index_from_coords(x, y, current_room);
+		log_print("find_outer_tile_index_from_coords", "Returned index of outer tile at (%d, %d) is %d, this tile's coordinates actually are (%d, %d)", x, y, result, current_room->outer_tiles[result].local_x, current_room->outer_tiles[result].local_y);
+	
+		x = current_room->width;
+		y = 1;
+		result = find_outer_tile_index_from_coords(x, y, current_room);
+		log_print("find_outer_tile_index_from_coords", "Returned index of outer tile at (%d, %d) is %d, this tile's coordinates actually are (%d, %d)", x, y, result, current_room->outer_tiles[result].local_x, current_room->outer_tiles[result].local_y);
+	
 	}
 }
 
@@ -456,6 +510,8 @@ void buffer_entity(Entity entity) {
 
 		m_graphics_buffer->vertex_buffers.push_back(vb);
 		m_graphics_buffer->index_buffers.push_back(ib);
+
+		m_graphics_buffer->shaders.push_back(textured_shader);
 }
 
 void buffer_tiles(Room * room) {
@@ -506,6 +562,8 @@ void buffer_tiles(Room * room) {
 	m_graphics_buffer->texture_ids.push_back(texture_ids);
 	m_graphics_buffer->vertex_buffers.push_back(vb);
 	m_graphics_buffer->index_buffers.push_back(ib);
+
+	m_graphics_buffer->shaders.push_back(textured_shader);
 }
 
 void buffer_title_block() {
@@ -517,6 +575,8 @@ void buffer_title_block() {
 	m_graphics_buffer->texture_ids.push_back(texture_ids);
 
 	buffer_quad_centered_at(square_size, 0.0f, &vb, &ib);
+
+	m_graphics_buffer->shaders.push_back(textured_shader);
 }
 
 void buffer_quad_centered_at(float radius, float depth, VertexBuffer * vb, IndexBuffer * ib) {
