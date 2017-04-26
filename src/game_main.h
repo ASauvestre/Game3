@@ -2,7 +2,7 @@
 
 #include <stdio.h>
 #include <vector>
-
+#include <assert.h>
 
 // Macros
 #define log_print(category, format, ...)							\
@@ -12,7 +12,6 @@
 			printf("[%s]: %s\n", category, message, __VA_ARGS__);	\
 	}																\
 
-#define assert(condition) if(!condition) { *(int *)0 = 0; }
 
 #define array_size(array)  (sizeof(array)/sizeof(array[0]))
 

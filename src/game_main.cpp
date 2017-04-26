@@ -72,8 +72,8 @@ const int ROWS_PER_SCREEN	= 18;
 const int TILES_PER_SCREEN	= TILES_PER_ROW * ROWS_PER_SCREEN;
 
 // Extern Globals
-Shader * textured_shader;
-Shader * colored_shader;
+extern Shader * textured_shader;
+extern Shader * colored_shader;
 
 // Globals
 static WindowData 		* m_window_data;

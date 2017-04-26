@@ -5,7 +5,7 @@ struct VS_OUTPUT
 	float texid : TEXID;
 };
 
-VS_OUTPUT dummy_vs(float4 input_pos : POSITION, float2 input_tex_coord : TEXCOORD, float input_texid : TEXID) 
+VS_OUTPUT VS(float4 input_pos : POSITION, float2 input_tex_coord : TEXCOORD, float input_texid : TEXID) 
 {
 	VS_OUTPUT output;
 
@@ -14,4 +14,9 @@ VS_OUTPUT dummy_vs(float4 input_pos : POSITION, float2 input_tex_coord : TEXCOOR
 	output.texid = 0;
 
 	return output;
+}
+
+float4 PS(VS_OUTPUT input) : SV_TARGET
+{
+	return float4(0, 1, 0 , 1);
 }

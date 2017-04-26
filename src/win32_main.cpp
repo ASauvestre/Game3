@@ -23,8 +23,9 @@ struct Shader {
 };
 
 // Extern Globals
-extern Shader * textured_shader;
-extern Shader * colored_shader;
+Shader * textured_shader;
+Shader * colored_shader;
+Shader * dummy_shader;
 
 // Globals
 static HWND handle;
@@ -231,8 +232,17 @@ bool create_window(int width, int height, char * name) {
 }
 
 void set_shader(Shader * shader) {
-	d3d_dc->VSSetShader(shader->VS, NULL, 0);
-	d3d_dc->PSSetShader(shader->PS, NULL, 0);
+	if(shader->VS == NULL) {
+		d3d_dc->VSSetShader(dummy_shader->VS, NULL, 0);
+	} else {
+		d3d_dc->VSSetShader(shader->VS, NULL, 0);
+	}
+
+	if(shader->PS == NULL) {
+		d3d_dc->PSSetShader(dummy_shader->PS, NULL, 0);
+	} else {
+		d3d_dc->PSSetShader(shader->PS, NULL, 0);
+	}		
 }
 
 void init_d3d() {
@@ -316,7 +326,7 @@ void init_d3d() {
 	ID3DBlob * VS_bytecode; // Maybe release those at some point.
 	ID3DBlob * error = NULL;
 	HRESULT error_code = D3DCompileFromFile(L"shaders/dummy_shader.hlsl", NULL, D3D_COMPILE_STANDARD_FILE_INCLUDE,
-						"dummy_vs", "vs_5_0", 0, 0, &VS_bytecode, &error);
+						"VS", "vs_5_0", 0, 0, &VS_bytecode, &error);
 
 	if(error_code == HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND)) {
 		log_print("init_d3d", "\"dummy_shader.hlsl\" not found, could not compile the dummy shader to create the input layout.");
@@ -324,12 +334,14 @@ void init_d3d() {
 	}
 
 	if(error) {
-		log_print("init_d3d", "Dummy shader failed to compile, error given is : \n\n%5s\n\n", 
+		log_print("init_d3d", "Dummy shader failed to compile, error given is : \n---------\n%s---------\n", 
 				   (char *)error->GetBufferPointer());
 		assert(false);
 	}
 
 	d3d_device->CreateInputLayout(layout_desc, ARRAYSIZE(layout_desc), VS_bytecode->GetBufferPointer(), VS_bytecode->GetBufferSize(), &vertex_layout);
+
+	VS_bytecode->Release();
 
 	d3d_dc->IASetInputLayout(vertex_layout);
 
@@ -567,7 +579,7 @@ bool create_shader(char * filename, char * vs_name, char * ps_name, Shader * sha
 					   vs_name, "vs_5_0", 0, 0, &VS_bytecode, &error);
 
 	if(error_code == HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND)) {
-		log_print("init_d3d", "\"%s\" not found, could not compile the shader.", filename);
+		log_print("init_d3d", "\"%s\" not found, could not compile the shaders.", filename);
 		return false;
 	}
 
@@ -602,9 +614,11 @@ bool create_shader(char * filename, char * vs_name, char * ps_name, Shader * sha
 }
 
 void init_shaders() {
+	dummy_shader = (Shader *) malloc(sizeof(Shader));
 	textured_shader = (Shader *) malloc(sizeof(Shader));
 	colored_shader = (Shader *) malloc(sizeof(Shader));
 
+	create_shader("dummy_shader.hlsl", "VS", "PS", dummy_shader);
 	create_shader("textured_shader.hlsl", "VS", "PS", textured_shader);
 	create_shader("colored_shader.hlsl", "VS", "PS", colored_shader);
 }
