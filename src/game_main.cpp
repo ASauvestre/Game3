@@ -31,7 +31,7 @@ struct Tile {
 	int local_y;
 
 	TileType type = DEFAULT;
-	int room_target_id; // Used if type is SWITCH_ROOM
+	int room_target_id; 		 // Used if type is SWITCH_ROOM
 	Vector2 target_tile_coords; // Used if type is SWITCH_ROOM
 
 	Rectangle collision_box;
@@ -276,26 +276,6 @@ void init_game() {
 		}
 
 	}
-
-
-	// TEST
-	{
-		int x = 4;
-		int y = 5;
-		int result = find_tile_index_from_coords(x, y, current_room);
-		log_print("find_tile_index_from_coords", "Returned index of tile at (%d, %d) is %d, this tile's coordinates actually are (%d, %d)", x, y, result, current_room->tiles[result].local_x, current_room->tiles[result].local_y);
-	
-		x = -1;
-		y = 1;
-		result = find_outer_tile_index_from_coords(x, y, current_room);
-		log_print("find_outer_tile_index_from_coords", "Returned index of outer tile at (%d, %d) is %d, this tile's coordinates actually are (%d, %d)", x, y, result, current_room->outer_tiles[result].local_x, current_room->outer_tiles[result].local_y);
-	
-		x = current_room->width;
-		y = 1;
-		result = find_outer_tile_index_from_coords(x, y, current_room);
-		log_print("find_outer_tile_index_from_coords", "Returned index of outer tile at (%d, %d) is %d, this tile's coordinates actually are (%d, %d)", x, y, result, current_room->outer_tiles[result].local_x, current_room->outer_tiles[result].local_y);
-	
-	}
 }
 
 void game(WindowData * window_data, Keyboard * keyboard, GraphicsBuffer * graphics_buffer, float dt) {
@@ -395,7 +375,7 @@ void game(WindowData * window_data, Keyboard * keyboard, GraphicsBuffer * graphi
 				   (player.position.y < tile.collision_box.y + tile.collision_box.height) && (tile.collision_box.y < player.position.y + player.size)) {	// Y tests
 
 					if(tile.type == SWITCH_ROOM) {
-						log_print("collision", "Player is on a tile with type SWITCH_ROOM, switching to room %d", tile.room_target_id);
+						// log_print("collision", "Player is on a tile with type SWITCH_ROOM, switching to room %d", tile.room_target_id);
 						current_room = rooms[tile.room_target_id];
 
 						player.position.x = tile.target_tile_coords.x + (player.position.x - tile.local_x);
@@ -552,7 +532,6 @@ void buffer_tiles(Room * room) {
 			Vertex v2 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 1), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 1), 0.99f, 1.0f, 1.0f, texture_depth};
 			Vertex v3 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 0), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 1), 0.99f, 0.0f, 1.0f, texture_depth};
 			Vertex v4 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 1), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 0), 0.99f, 1.0f, 0.0f, texture_depth};
-
 
 			convert_top_left_coords_to_centered(&v1, &v2, &v3, &v4);
 			buffer_quad(v1, v2, v3, v4, &vb, &ib);

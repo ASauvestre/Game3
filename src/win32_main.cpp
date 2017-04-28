@@ -13,13 +13,25 @@ struct Texture {
 	// ID3D11SamplerState * sampler_state;
 };
 
+struct ShaderInputFormat {
+	ID3D11InputLayout *layout;
+	D3D11_INPUT_ELEMENT_DESC * layout_desc;
+	int num_inputs;
+};
+
 struct Shader {
+	HANDLE file_handle;
+
+	FILETIME last_modified;
+
 	char * filename;
 	char * vs_name;
 	char * ps_name;
 
 	ID3D11VertexShader * VS;
 	ID3D11PixelShader * PS;
+
+	ShaderInputFormat input_format;
 };
 
 // Extern Globals
@@ -42,13 +54,6 @@ static ID3D11Texture2D * depth_stencil_buffer;
 
 static ID3D11Buffer * d3d_vertex_buffer_interface;
 static ID3D11Buffer * d3d_index_buffer_interface;
-
-static ID3D11InputLayout * vertex_layout;
-static D3D11_INPUT_ELEMENT_DESC layout_desc[] = {
-	{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },  
-	{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }, 
-	{ "TEXID",    0, DXGI_FORMAT_R32_UINT,        0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }, 
-};
 
 static ID3D11SamplerState * default_sampler_state;
 
@@ -92,46 +97,38 @@ LRESULT CALLBACK WndProc(HWND window_handle, UINT message, WPARAM w_param, LPARA
 		}
 		case WM_KEYDOWN : {
 
-			if(l_param & 0x40000000) { break; } // Bit 30 "The previous key state. The value is 1 if the key is down 
+			// if(l_param & 0x40000000) { break; } // Bit 30 "The previous key state. The value is 1 if the key is down 
 												// before the message is sent, or it is zero if the key is up." (MSDN)
 
 			switch(w_param) {
 				case VK_LEFT : {
-					// printf("Keyboard Event: Key LEFT was pressed.\n");
 					keyboard.key_left = true;
 					break;
 				}
 				case VK_RIGHT : {
-					// printf("Keyboard Event: Key RIGHT was pressed.\n");
 					keyboard.key_right = true;
 					break;
 				}
 				case VK_UP : {
-					// printf("Keyboard Event: Key UP was pressed.\n");
 					keyboard.key_up = true;
 					break;
 				}
 				case VK_DOWN : {
-					// printf("Keyboard Event: Key DOWN was pressed.\n");
 					keyboard.key_down = true;
 					break;
 				}
 				case VK_SHIFT : {
-					// printf("Keyboard Event: Key SHIFT was pressed.\n");
 					keyboard.key_shift = true;
 					break;
 				}
 				case VK_CONTROL : {
-					// printf("Keyboard Event: Key CONTROL was pressed.\n");
 					break;
 				}
 				case VK_SPACE : {
-					// printf("Keyboard Event: Key SPACE was pressed.\n");
 					keyboard.key_space = true;
 					break;
 				}
 				case VK_ESCAPE : {
-					// printf("Keyboard Event: Key ESCAPE was pressed.\n");
 					break;
 				}
 				default : {
@@ -143,41 +140,33 @@ LRESULT CALLBACK WndProc(HWND window_handle, UINT message, WPARAM w_param, LPARA
 		case WM_KEYUP : {
 			switch(w_param) {
 				case VK_LEFT : {
-					// printf("Keyboard Event: Key LEFT was released.\n");
 					keyboard.key_left = false;
 					break;
 				}
 				case VK_RIGHT : {
-					// printf("Keyboard Event: Key RIGHT was released.\n");
 					keyboard.key_right = false;
 					break;
 				}
 				case VK_UP : {
-					// printf("Keyboard Event: Key UP was released.\n");
 					keyboard.key_up = false;
 					break;
 				}
 				case VK_DOWN : {
-					// printf("Keyboard Event: Key DOWN was released.\n");
 					keyboard.key_down = false;
 					break;
 				}
 				case VK_SHIFT : {
-					// printf("Keyboard Event: Key SHIFT was released.\n");
 					keyboard.key_shift = false;
 					break;
 				}
 				case VK_CONTROL : {
-					// printf("Keyboard Event: Key CONTROL was released.\n");
 					break;
 				}
 				case VK_SPACE : {
-					// printf("Keyboard Event: Key SPACE was released.\n");
 					keyboard.key_space = false;
 					break;
 				}
 				case VK_ESCAPE : {
-					// printf("Keyboard Event: Key ESCAPE was released.\n");
 					SendMessage(window_handle, WM_QUIT, NULL, NULL);
 					break;
 				}
@@ -233,8 +222,10 @@ bool create_window(int width, int height, char * name) {
 
 void set_shader(Shader * shader) {
 	if(shader->VS == NULL) {
+		d3d_dc->IASetInputLayout(dummy_shader->input_format.layout);
 		d3d_dc->VSSetShader(dummy_shader->VS, NULL, 0);
 	} else {
+		d3d_dc->IASetInputLayout(shader->input_format.layout);
 		d3d_dc->VSSetShader(shader->VS, NULL, 0);
 	}
 
@@ -322,29 +313,16 @@ void init_d3d() {
 
 	d3d_dc->IASetIndexBuffer(d3d_index_buffer_interface, DXGI_FORMAT_R32_UINT, 0);
 
+	// Default shader
+	dummy_shader = (Shader *)malloc(sizeof(Shader));
+
+	D3D11_INPUT_ELEMENT_DESC dummy_shader_layout_desc[] = {
+		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },  
+	};
+
+	create_shader("dummy_shader.hlsl", "VS", "PS", dummy_shader_layout_desc, ARRAYSIZE(dummy_shader_layout_desc), dummy_shader);
+
 	// Input Layout
-	ID3DBlob * VS_bytecode; // Maybe release those at some point.
-	ID3DBlob * error = NULL;
-	HRESULT error_code = D3DCompileFromFile(L"shaders/dummy_shader.hlsl", NULL, D3D_COMPILE_STANDARD_FILE_INCLUDE,
-						"VS", "vs_5_0", 0, 0, &VS_bytecode, &error);
-
-	if(error_code == HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND)) {
-		log_print("init_d3d", "\"dummy_shader.hlsl\" not found, could not compile the dummy shader to create the input layout.");
-		assert(false);
-	}
-
-	if(error) {
-		log_print("init_d3d", "Dummy shader failed to compile, error given is : \n---------\n%s---------\n", 
-				   (char *)error->GetBufferPointer());
-		assert(false);
-	}
-
-	d3d_device->CreateInputLayout(layout_desc, ARRAYSIZE(layout_desc), VS_bytecode->GetBufferPointer(), VS_bytecode->GetBufferSize(), &vertex_layout);
-
-	VS_bytecode->Release();
-
-	d3d_dc->IASetInputLayout(vertex_layout);
-
 	d3d_dc->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 	// Viewport
@@ -560,10 +538,26 @@ void add_texture_to_load_queue(char * name) {
 }
 
 // Shader code
-bool create_shader(char * filename, char * vs_name, char * ps_name, Shader * shader){
+bool create_shader(char * filename, char * vs_name, char * ps_name, D3D11_INPUT_ELEMENT_DESC * layout_desc, int num_shader_inputs, Shader * shader){
 	shader->filename = filename;
 	shader->vs_name = vs_name;
 	shader->ps_name = ps_name;
+
+	shader->input_format.num_inputs = num_shader_inputs;
+	shader->input_format.layout_desc = (D3D11_INPUT_ELEMENT_DESC *) malloc(sizeof(D3D11_INPUT_ELEMENT_DESC) * num_shader_inputs);
+
+	memcpy(shader->input_format.layout_desc, layout_desc, sizeof(D3D11_INPUT_ELEMENT_DESC) * num_shader_inputs);
+
+	char path[512];;
+	snprintf(path, 512, "shaders/%s", shader->filename);
+
+	shader->file_handle = CreateFile(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	GetFileTime(shader->file_handle, NULL, NULL, &shader->last_modified);
+
+	return compile_shader(shader);
+}
+
+bool compile_shader(Shader * shader) {
 	shader->VS = NULL;
 	shader->PS = NULL;
 
@@ -572,55 +566,87 @@ bool create_shader(char * filename, char * vs_name, char * ps_name, Shader * sha
 
 	ID3DBlob * error = NULL;
 
-	wchar_t path[512];;
-	swprintf(path, 512, L"shaders/%hs", filename);
+	int file_size = GetFileSize(shader->file_handle, NULL);
 
-	HRESULT error_code = D3DCompileFromFile(path, NULL, D3D_COMPILE_STANDARD_FILE_INCLUDE,
-					   vs_name, "vs_5_0", 0, 0, &VS_bytecode, &error);
+	void * file_data = malloc(file_size);
 
-	if(error_code == HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND)) {
-		log_print("init_d3d", "\"%s\" not found, could not compile the shaders.", filename);
+	DWORD shader_size = 0;
+
+	if(!ReadFile(shader->file_handle, file_data, file_size, &shader_size, NULL)) {
+		log_print("compile_shader", "An error occured while reading the file \"%s\", could not compile the shaders. Error code is 0x%x", shader->filename, GetLastError());
+		free(file_data);
 		return false;
 	}
 
+	HRESULT error_code = D3DCompile(file_data, file_size, NULL, NULL, D3D_COMPILE_STANDARD_FILE_INCLUDE,
+					   shader->vs_name, "vs_5_0", 0, 0, &VS_bytecode, &error);
+
 	if(error) {
-		log_print("create_shader", "Vertex shader %s in %s failed to compile, error given is : \n---------\n%s---------", 
-				   vs_name, filename, (char *)error->GetBufferPointer());
+		log_print("compile_shader", "Vertex shader %s in %s failed to compile, error given is : \n---------\n%s---------", 
+				   shader->vs_name, shader->filename, (char *)error->GetBufferPointer());
 
 		error->Release();
+		free(file_data);
 
 		return false;
 	}
 
-	D3DCompileFromFile(path, NULL, D3D_COMPILE_STANDARD_FILE_INCLUDE,
-					   ps_name, "ps_5_0", 0, 0, &PS_bytecode, &error);
+	if (error_code > S_FALSE) {
+		log_print("compile_shader", 
+				  "An error occured while compiling the file \"%s\", could not compile the shaders. Error code is 0x%x", 
+				  shader->filename, error_code);
+
+		free(file_data);
+		return false;
+	}
+
+	D3DCompile(file_data, file_size, NULL, NULL, D3D_COMPILE_STANDARD_FILE_INCLUDE,
+					   shader->ps_name, "ps_5_0", 0, 0, &PS_bytecode, &error);
 
 	if(error) {
-		log_print("create_shader", "Pixel shader %s in %s failed to compile, error given is : \n---------\n%s---------", 
-				   ps_name, filename, (char *)error->GetBufferPointer());
+		log_print("compile_shader", "Pixel shader %s in %s failed to compile, error given is : \n---------\n%s---------", 
+				   shader->ps_name, shader->filename, (char *)error->GetBufferPointer());
 
 		error->Release();
 		VS_bytecode->Release();
+		free(file_data);
 
 		return false;
 	}
 
 	d3d_device->CreateVertexShader(VS_bytecode->GetBufferPointer(), VS_bytecode->GetBufferSize(), 
-									NULL, &shader->VS);
-	d3d_device->CreatePixelShader(	PS_bytecode->GetBufferPointer(), PS_bytecode->GetBufferSize(), 
-											NULL, &shader->PS);
-	return true;
+								   NULL, &shader->VS);
+	d3d_device->CreatePixelShader(PS_bytecode->GetBufferPointer(), PS_bytecode->GetBufferSize(), 
+								  NULL, &shader->PS);
 
+	d3d_device->CreateInputLayout(shader->input_format.layout_desc, shader->input_format.num_inputs, VS_bytecode->GetBufferPointer(), 
+								  VS_bytecode->GetBufferSize(), &shader->input_format.layout);
+
+	VS_bytecode->Release();
+	PS_bytecode->Release();
+	free(file_data);
+
+	return true;
 }
 
 void init_shaders() {
-	dummy_shader = (Shader *) malloc(sizeof(Shader));
 	textured_shader = (Shader *) malloc(sizeof(Shader));
 	colored_shader = (Shader *) malloc(sizeof(Shader));
 
-	create_shader("dummy_shader.hlsl", "VS", "PS", dummy_shader);
-	create_shader("textured_shader.hlsl", "VS", "PS", textured_shader);
-	create_shader("colored_shader.hlsl", "VS", "PS", colored_shader);
+	// Pixel formats
+	D3D11_INPUT_ELEMENT_DESC textured_shader_layout_desc[] = {
+		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },  
+		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }, 
+		{ "TEXID",    0, DXGI_FORMAT_R32_UINT,        0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }, 
+	};
+
+	D3D11_INPUT_ELEMENT_DESC colored_shader_layout_desc[] = {
+		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },  
+		{ "COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }, 
+	};
+
+	create_shader("textured_shader.hlsl", "VS", "PS", textured_shader_layout_desc, ARRAYSIZE(textured_shader_layout_desc), textured_shader);
+	create_shader("colored_shader.hlsl", "VS", "PS", colored_shader_layout_desc, ARRAYSIZE(colored_shader_layout_desc), colored_shader);
 }
 
 void init_textures() {
@@ -631,6 +657,41 @@ void init_textures() {
 	add_texture_to_load_queue("tree.png");
 	add_texture_to_load_queue("tree_window.png");
 	bind_textures_to_srv();
+}
+
+void recompile_shaders() {
+	
+
+	compile_shader(textured_shader);
+	compile_shader(colored_shader);
+}
+void check_specific_shader_file_modification(Shader * shader) {
+	FILETIME new_last_modified;
+
+	GetFileTime(shader->file_handle, NULL, NULL, &new_last_modified);
+
+	if((new_last_modified.dwLowDateTime  != shader->last_modified.dwLowDateTime)  || 
+	   (new_last_modified.dwHighDateTime != shader->last_modified.dwHighDateTime)) {
+
+		// Get new handle
+		char path[512];;
+		snprintf(path, 512, "shaders/%s", shader->filename);
+
+		shader->file_handle = CreateFile(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+
+		log_print("recompile_shaders", "Detected file modification, recompiling shader \"%s\"", shader->filename);
+
+		compile_shader(shader);
+		
+		shader->last_modified = new_last_modified;
+	}
+}
+
+void check_shader_files_modification() {
+	
+	check_specific_shader_file_modification(dummy_shader);
+	check_specific_shader_file_modification(textured_shader);
+	check_specific_shader_file_modification(colored_shader);
 }
 
 void main() {
@@ -661,6 +722,8 @@ void main() {
 	while(!should_quit) {
 		QueryPerformanceFrequency(&frequency);
 		QueryPerformanceCounter(&start_time);
+
+		check_shader_files_modification();
 
 		update_window_events();
 		game(&window_data, &keyboard, &graphics_buffer, frame_time);
