@@ -615,7 +615,7 @@ void buffer_quad_centered_at(float radius, float depth, VertexBuffer * vb, Index
 	buffer_quad_centered_at(center, radius, depth, vb, ib);
 }
 
-float ENTITY_MIMINUM_DEPTH = 0.0001f;
+float ENTITY_MIMINUM_DEPTH = 0.0000f;
 
 inline float max(float a, float b) {
 	if(a > b) { return a;}

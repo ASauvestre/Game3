@@ -502,7 +502,7 @@ void draw_frame() {
 	graphics_buffer.vertex_buffers.clear();
 	graphics_buffer.index_buffers.clear();
 	graphics_buffer.texture_ids.clear();
-
+	graphics_buffer.shaders.clear();
 }
 
 void do_load_texture(Texture * texture) {
