@@ -19,6 +19,12 @@ struct ShaderInputFormat {
 	int num_inputs;
 };
 
+enum ShaderInputMode {
+	NONE,
+	POS_COL,
+	POS_IDX_TXID
+};
+
 struct Shader {
 	HANDLE file_handle;
 
@@ -32,6 +38,7 @@ struct Shader {
 	ID3D11PixelShader * PS;
 
 	ShaderInputFormat input_format;
+	ShaderInputMode input_mode;
 };
 
 // Extern Globals
@@ -220,21 +227,31 @@ bool create_window(int width, int height, char * name) {
 	return false;
 }
 
+Shader current_shader;
+
 void set_shader(Shader * shader) {
 	if(shader->VS == NULL) {
-		d3d_dc->IASetInputLayout(dummy_shader->input_format.layout);
-		d3d_dc->VSSetShader(dummy_shader->VS, NULL, 0);
+		current_shader.input_format.layout = dummy_shader->input_format.layout;
+		current_shader.VS = dummy_shader->VS;
+		current_shader.input_mode = dummy_shader->input_mode;
 	} else {
-		d3d_dc->IASetInputLayout(shader->input_format.layout);
-		d3d_dc->VSSetShader(shader->VS, NULL, 0);
+		current_shader.input_format.layout = shader->input_format.layout;
+		current_shader.VS = shader->VS;
+		current_shader.input_mode = shader->input_mode;
 	}
 
 	if(shader->PS == NULL) {
-		d3d_dc->PSSetShader(dummy_shader->PS, NULL, 0);
+		current_shader.PS = dummy_shader->PS;
 	} else {
-		d3d_dc->PSSetShader(shader->PS, NULL, 0);
-	}		
+		current_shader.PS = shader->PS;
+	}
+
+	d3d_dc->IASetInputLayout(current_shader.input_format.layout);
+	d3d_dc->VSSetShader(current_shader.VS, NULL, 0);	
+	d3d_dc->PSSetShader(current_shader.PS, NULL, 0);
 }
+
+ID3D11BlendState * transparent_blend_state;
 
 void init_d3d() {
 
@@ -320,7 +337,7 @@ void init_d3d() {
 		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },  
 	};
 
-	create_shader("dummy_shader.hlsl", "VS", "PS", dummy_shader_layout_desc, ARRAYSIZE(dummy_shader_layout_desc), dummy_shader);
+	create_shader("dummy_shader.hlsl", "VS", "PS", dummy_shader_layout_desc, ARRAYSIZE(dummy_shader_layout_desc), NONE, dummy_shader);
 
 	// Input Layout
 	d3d_dc->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -369,73 +386,98 @@ void init_d3d() {
 	//
 
 	// Blending	
-	// D3D11_RENDER_TARGET_BLEND_DESC render_target_blend_desc;
+	D3D11_RENDER_TARGET_BLEND_DESC render_target_blend_desc;
 
-	// render_target_blend_desc.BlendEnable 			= true;
-	// render_target_blend_desc.SrcBlend 				= D3D11_BLEND_SRC_ALPHA;
-	// render_target_blend_desc.DestBlend 				= D3D11_BLEND_INV_SRC_ALPHA;
-	// render_target_blend_desc.BlendOp 				= D3D11_BLEND_OP_ADD;
-	// render_target_blend_desc.SrcBlendAlpha 			= D3D11_BLEND_ONE;
-	// render_target_blend_desc.DestBlendAlpha 		= D3D11_BLEND_ZERO;
-	// render_target_blend_desc.BlendOpAlpha 			= D3D11_BLEND_OP_ADD;
-	// render_target_blend_desc.RenderTargetWriteMask 	= D3D11_COLOR_WRITE_ENABLE_ALL;
+	render_target_blend_desc.BlendEnable 			= true;
+	render_target_blend_desc.SrcBlend 				= D3D11_BLEND_SRC_ALPHA;
+	render_target_blend_desc.DestBlend 				= D3D11_BLEND_INV_SRC_ALPHA;
+	render_target_blend_desc.BlendOp 				= D3D11_BLEND_OP_ADD;
+	render_target_blend_desc.SrcBlendAlpha 			= D3D11_BLEND_ONE;
+	render_target_blend_desc.DestBlendAlpha 		= D3D11_BLEND_ZERO;
+	render_target_blend_desc.BlendOpAlpha 			= D3D11_BLEND_OP_ADD;
+	render_target_blend_desc.RenderTargetWriteMask 	= D3D11_COLOR_WRITE_ENABLE_ALL;
 
-	// D3D11_BLEND_DESC blend_desc;
-	// blend_desc.AlphaToCoverageEnable 	= false;
-	// blend_desc.IndependentBlendEnable 	= false;
-	// blend_desc.RenderTarget[0]			= render_target_blend_desc;
+	D3D11_BLEND_DESC blend_desc;
+	blend_desc.AlphaToCoverageEnable 	= false;
+	blend_desc.IndependentBlendEnable 	= false;
+	blend_desc.RenderTarget[0]			= render_target_blend_desc;
 
-	// //d3d_device->CreateBlendState(&blend_desc, &transparent_blend_state);
+	d3d_device->CreateBlendState(&blend_desc, &transparent_blend_state);
 
-	// //d3d_dc->OMSetBlendState(transparent_blend_state, NULL, 0xffffffff);
+	d3d_dc->OMSetBlendState(transparent_blend_state, NULL, 0xffffffff);
 }
 
 void draw_buffer(int buffer_index) {
 	
 	set_shader(graphics_buffer.shaders[buffer_index]);
 
-	VertexBuffer * vb = &graphics_buffer.vertex_buffers[buffer_index];
-	IndexBuffer * ib = &graphics_buffer.index_buffers[buffer_index];
-	std::vector<char *> texture_ids = graphics_buffer.texture_ids[buffer_index];
+	if(current_shader.input_mode == POS_IDX_TXID) {
 
-	// Update vertex buffer
-	D3D11_MAPPED_SUBRESOURCE resource = {};
-	d3d_dc->Map(d3d_vertex_buffer_interface, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
-	memcpy(resource.pData, &vb->vertices[0], sizeof(Vertex) * vb->vertices.size());
-	d3d_dc->Unmap(d3d_vertex_buffer_interface, 0);
+		VertexBuffer * vb = &graphics_buffer.vertex_buffers[buffer_index];
+		IndexBuffer * ib = &graphics_buffer.index_buffers[buffer_index];
+		std::vector<char *> texture_ids = graphics_buffer.texture_ids[buffer_index];
 
-	// Update index buffer
-	resource = {};
-	d3d_dc->Map(d3d_index_buffer_interface, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
-	memcpy(resource.pData, &ib->indices[0], sizeof( int ) *  ib->indices.size());
-	d3d_dc->Unmap(d3d_index_buffer_interface, 0);
+		// Update vertex buffer
+		D3D11_MAPPED_SUBRESOURCE resource = {};
+		d3d_dc->Map(d3d_vertex_buffer_interface, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
+		memcpy(resource.pData, &vb->vertices[0], sizeof(Vertex) * vb->vertices.size());
+		d3d_dc->Unmap(d3d_vertex_buffer_interface, 0);
 
-	// Create texture index map
-	int texture_index_map[MAX_TEXTURE_INDEX_MAP_SIZE];
-	for(int i = 0; i<texture_ids.size(); i++) {
-		// Find texture in the catalog
-		int texture_index = -1;
-		for(int j = 0; j<textures.size(); j++) {
-			if(strcmp(texture_ids[i], textures[j]->name) == 0) {
-				texture_index = textures[j]->index_in_array;
-				break;
+		// Update index buffer
+		resource = {};
+		d3d_dc->Map(d3d_index_buffer_interface, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
+		memcpy(resource.pData, &ib->indices[0], sizeof( int ) *  ib->indices.size());
+		d3d_dc->Unmap(d3d_index_buffer_interface, 0);
+
+		// Create texture index map
+		int texture_index_map[MAX_TEXTURE_INDEX_MAP_SIZE];
+		for(int i = 0; i<texture_ids.size(); i++) {
+			// Find texture in the catalog
+			int texture_index = -1;
+			for(int j = 0; j<textures.size(); j++) {
+				if(strcmp(texture_ids[i], textures[j]->name) == 0) {
+					texture_index = textures[j]->index_in_array;
+					break;
+				}
 			}
+			if(texture_index == -1) { log_print("draw_buffer", "Unable to find texture %s", texture_ids[i]); }
+			
+			texture_index_map[i] = texture_index;
 		}
-		if(texture_index == -1) { log_print("draw_buffer", "Unable to find texture %s", texture_ids[i]); }
-		
-		texture_index_map[i] = texture_index;
+
+		// Update texture index map buffer
+		resource = {};
+		d3d_dc->Map(d3d_texture_index_map_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
+		memcpy(resource.pData, &texture_index_map[0], sizeof( int ) *  MAX_TEXTURE_INDEX_MAP_SIZE);
+		d3d_dc->Unmap(d3d_texture_index_map_buffer, 0);
+
+		d3d_dc->VSSetConstantBuffers( 0, 1, &d3d_texture_index_map_buffer );
+
+		d3d_dc->PSSetShaderResources(0, 1, &d3d_texture_array_srv);
+		d3d_dc->PSSetSamplers(0, 1, &default_sampler_state);
+	} else if(current_shader.input_mode == POS_COL) {
+
+		VertexBuffer * vb = &graphics_buffer.vertex_buffers[buffer_index];
+		IndexBuffer * ib = &graphics_buffer.index_buffers[buffer_index];
+
+		// Update vertex buffer
+		D3D11_MAPPED_SUBRESOURCE resource = {};
+		d3d_dc->Map(d3d_vertex_buffer_interface, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
+		memcpy(resource.pData, &vb->vertices[0], sizeof(Vertex) * vb->vertices.size());
+		d3d_dc->Unmap(d3d_vertex_buffer_interface, 0);
+
+		// Update index buffer
+		resource = {};
+		d3d_dc->Map(d3d_index_buffer_interface, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
+		memcpy(resource.pData, &ib->indices[0], sizeof( int ) *  ib->indices.size());
+		d3d_dc->Unmap(d3d_index_buffer_interface, 0);
+
+		d3d_dc->PSSetSamplers(0, 1, &default_sampler_state);
+
+	} else {
+		log_print("draw_buffer", "Unsupported shader input mode");
+		return;
 	}
-
-	// Update texture index map buffer
-	resource = {};
-	d3d_dc->Map(d3d_texture_index_map_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
-	memcpy(resource.pData, &texture_index_map[0], sizeof( int ) *  MAX_TEXTURE_INDEX_MAP_SIZE);
-	d3d_dc->Unmap(d3d_texture_index_map_buffer, 0);
-
-	d3d_dc->VSSetConstantBuffers( 0, 1, &d3d_texture_index_map_buffer );
-
-	d3d_dc->PSSetShaderResources(0, 1, &d3d_texture_array_srv);
-	d3d_dc->PSSetSamplers(0, 1, &default_sampler_state);
 
 	
 	d3d_dc->DrawIndexed(graphics_buffer.index_buffers[buffer_index].indices.size(), 0, 0);
@@ -538,13 +580,15 @@ void add_texture_to_load_queue(char * name) {
 }
 
 // Shader code
-bool create_shader(char * filename, char * vs_name, char * ps_name, D3D11_INPUT_ELEMENT_DESC * layout_desc, int num_shader_inputs, Shader * shader){
+bool create_shader(char * filename, char * vs_name, char * ps_name, D3D11_INPUT_ELEMENT_DESC * layout_desc, int num_shader_inputs, ShaderInputMode input_mode, Shader * shader){
 	shader->filename = filename;
 	shader->vs_name = vs_name;
 	shader->ps_name = ps_name;
 
 	shader->input_format.num_inputs = num_shader_inputs;
 	shader->input_format.layout_desc = (D3D11_INPUT_ELEMENT_DESC *) malloc(sizeof(D3D11_INPUT_ELEMENT_DESC) * num_shader_inputs);
+	
+	shader->input_mode = input_mode;
 
 	memcpy(shader->input_format.layout_desc, layout_desc, sizeof(D3D11_INPUT_ELEMENT_DESC) * num_shader_inputs);
 
@@ -645,8 +689,8 @@ void init_shaders() {
 		{ "COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }, 
 	};
 
-	create_shader("textured_shader.hlsl", "VS", "PS", textured_shader_layout_desc, ARRAYSIZE(textured_shader_layout_desc), textured_shader);
-	create_shader("colored_shader.hlsl", "VS", "PS", colored_shader_layout_desc, ARRAYSIZE(colored_shader_layout_desc), colored_shader);
+	create_shader("textured_shader.hlsl", "VS", "PS", textured_shader_layout_desc, ARRAYSIZE(textured_shader_layout_desc), POS_IDX_TXID, textured_shader);
+	create_shader("colored_shader.hlsl", "VS", "PS", colored_shader_layout_desc, ARRAYSIZE(colored_shader_layout_desc), POS_COL, colored_shader);
 }
 
 void init_textures() {
@@ -670,6 +714,10 @@ void check_specific_shader_file_modification(Shader * shader) {
 
 	GetFileTime(shader->file_handle, NULL, NULL, &new_last_modified);
 
+
+	// @Temporary I'm pretty sure the file handle isn't valid after the file being 
+	// modified, so this condition only works because the new_last_modified is garbage.
+	// It will do for now, but fix it in the future.
 	if((new_last_modified.dwLowDateTime  != shader->last_modified.dwLowDateTime)  || 
 	   (new_last_modified.dwHighDateTime != shader->last_modified.dwHighDateTime)) {
 
@@ -679,6 +727,7 @@ void check_specific_shader_file_modification(Shader * shader) {
 
 		shader->file_handle = CreateFile(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 
+		// @Bug We run this twice sometimes, likely related to comment above.
 		log_print("recompile_shaders", "Detected file modification, recompiling shader \"%s\"", shader->filename);
 
 		compile_shader(shader);

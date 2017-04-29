@@ -66,6 +66,7 @@ struct Vector2f {
 };
 
 struct Vector3f {
+	Vector3f() {}
 	Vector3f(float x, float y, float z) {
 		this->x = x;
 		this->y = y;
@@ -90,14 +91,30 @@ struct Color4f {
 	float a = 1.0f;
 };
 
-struct Vertex {
-	Vertex(	float x, float y, float z, float u, float v)
-			: position(x,y,z), tex_coord(u, v) {}
-	Vertex(	float x, float y, float z, float u, float v, float texid)
-			: position(x,y,z), tex_coord(u, v),  texture_depth(texid) {}
-	Vector3f position;
+// Make texture coord 3D and remove this struct ?
+struct VertexTextureInfo {
 	Vector2f tex_coord;
 	float texture_depth;
+};
+
+struct Vertex {
+	Vertex(	float x, float y, float z, float u, float v, float texid) {
+		this->position = Vector3f(x, y, z);
+		this->tex_info.tex_coord = Vector2f(u,v);
+		this->tex_info.texture_depth = texid;
+	}
+
+	Vertex(	float x, float y, float z, Color4f color) {
+		this->position = Vector3f(x, y, z);
+		this->color = color;
+	}
+
+	Vector3f position;
+
+	union {
+		Color4f color;
+		VertexTextureInfo tex_info;
+	};
 };
 
 struct VertexBuffer {
@@ -115,10 +132,8 @@ struct GraphicsBuffer {
 	std::vector<Shader *> shaders;
 	std::vector<VertexBuffer> vertex_buffers;
 	std::vector<IndexBuffer> index_buffers;
-	union {
-		std::vector<std::vector<char *>> texture_ids;
-		std::vector<std::vector<Color4f>> colors;
-	};
+
+	std::vector<std::vector<char *>> texture_ids; // For textured shaders
 };
 
 struct Keyboard {
@@ -149,6 +164,8 @@ void buffer_trees();
 void buffer_entity(Entity entity);
 
 void buffer_tiles(Room * room);
+
+void buffer_debug_tile_overlay(Room * room);
 
 void buffer_title_block();
 

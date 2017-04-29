@@ -141,6 +141,8 @@ void init_game() {
 
 			}
 
+			room->tiles[5].type = SWITCH_ROOM;
+
 			for(int i=0; i<(room->num_outer_tiles); i++) {
 				Tile tile;
 
@@ -442,6 +444,56 @@ void game(WindowData * window_data, Keyboard * keyboard, GraphicsBuffer * graphi
 	buffer_trees();	
 
 	buffer_player();
+
+
+	// Debug overlays
+	buffer_debug_tile_overlay(current_room);
+}
+
+void buffer_debug_tile_overlay(Room * room) {
+	VertexBuffer vb;
+	IndexBuffer ib;
+
+	for(int row = camera_offset.y - ROWS_PER_SCREEN/2.0f; row < camera_offset.y + ROWS_PER_SCREEN/2.0f; row++) {
+
+		if(row < 0) continue;
+		if(row >= room->height) continue;
+
+
+		for(int col = camera_offset.x - TILES_PER_ROW/2.0f; col < camera_offset.x + TILES_PER_ROW/2.0f; col++) {
+
+			if(col < 0) continue;
+			if(col >= room->width) continue;
+
+			int tile_index = row * room->width + col;
+
+			Tile tile = room->tiles[tile_index];
+
+			Color4f color = Color4f(1.0f, 1.0f, 1.0f, 0.5f);
+
+			if(tile.type == SWITCH_ROOM) {
+				color = Color4f(1.0f, 0.0f, 0.0f, 0.5f);
+			} else if(tile.type == BLOCK) {
+				color = Color4f(0.0f, 1.0f, 1.0f, 0.5f);
+			}
+
+			Vertex v1 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 0), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 0), 0.0f, color};
+			Vertex v2 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 1), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 1), 0.0f, color};
+			Vertex v3 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 0), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 1), 0.0f, color};
+			Vertex v4 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 1), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 0), 0.0f, color};
+
+			convert_top_left_coords_to_centered(&v1, &v2, &v3, &v4);
+			buffer_quad(v1, v2, v3, v4, &vb, &ib);
+		}
+	}
+
+	// @Temporary, we need to push the texure_id buffer otherwise it doesn't 
+	// sync up with the other buffers. Find a way to fix this. (store texture_id array index ?)
+	m_graphics_buffer->texture_ids.push_back((std::vector<char * >) NULL);
+	m_graphics_buffer->vertex_buffers.push_back(vb);
+	m_graphics_buffer->index_buffers.push_back(ib);
+
+	m_graphics_buffer->shaders.push_back(colored_shader);
 }
 
 void buffer_trees() {
@@ -563,11 +615,18 @@ void buffer_quad_centered_at(float radius, float depth, VertexBuffer * vb, Index
 	buffer_quad_centered_at(center, radius, depth, vb, ib);
 }
 
+float ENTITY_MIMINUM_DEPTH = 0.0001f;
+
+inline float max(float a, float b) {
+	if(a > b) { return a;}
+	return b;
+}
+
 void buffer_quad_centered_at(Vector2f center, float radius, float depth, VertexBuffer * vb, IndexBuffer * ib) {
-	Vertex v1 = {center.x - radius, center.y + radius*m_window_data->aspect_ratio, depth, 0.0f, 0.0f, 0};
-	Vertex v2 = {center.x + radius, center.y - radius*m_window_data->aspect_ratio, depth, 1.0f, 1.0f, 0};
-	Vertex v3 = {center.x - radius, center.y - radius*m_window_data->aspect_ratio, depth, 0.0f, 1.0f, 0};
-	Vertex v4 = {center.x + radius, center.y + radius*m_window_data->aspect_ratio, depth, 1.0f, 0.0f, 0};
+	Vertex v1 = {center.x - radius, center.y + radius*m_window_data->aspect_ratio, max(depth, ENTITY_MIMINUM_DEPTH), 0.0f, 0.0f, 0};
+	Vertex v2 = {center.x + radius, center.y - radius*m_window_data->aspect_ratio, max(depth, ENTITY_MIMINUM_DEPTH), 1.0f, 1.0f, 0};
+	Vertex v3 = {center.x - radius, center.y - radius*m_window_data->aspect_ratio, max(depth, ENTITY_MIMINUM_DEPTH), 0.0f, 1.0f, 0};
+	Vertex v4 = {center.x + radius, center.y + radius*m_window_data->aspect_ratio, max(depth, ENTITY_MIMINUM_DEPTH), 1.0f, 0.0f, 0};
 
 	buffer_quad(v1, v2, v3, v4, vb, ib);
 }

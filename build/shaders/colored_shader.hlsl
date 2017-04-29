@@ -23,5 +23,9 @@ VS_OUTPUT VS(float4 input_pos : POSITION, float4 input_color : COLOR)
 
 float4 PS(VS_OUTPUT input) : SV_TARGET
 {
+	// float4 color = float4(1.0f, 0.0f, 0.0f, 0.8f);
+	// return color;
+
 	return input.color;
+
 }
