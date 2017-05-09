@@ -2,7 +2,8 @@
 
 enum GameMode {
 	TITLE_SCREEN,
-	GAME
+	GAME,
+	EDITOR
 };
 
 enum TileType {
@@ -38,6 +39,8 @@ struct Tile {
 
 	bool collision_enabled = false;
 };
+
+GameMode game_mode;
 
 struct Room {
 	Room(int w, int h) {
@@ -112,6 +115,72 @@ int find_outer_tile_index_from_coords(int x, int y, Room * room) {
 	}
 }
 
+Vector2f find_tile_coords_from_index(int index, Room * room) {
+	Vector2f result;
+	result.x = room->tiles[index].local_x;
+	result.y = room->tiles[index].local_y;
+	return result;
+}
+
+Vector2f find_outer_tile_coords_from_index(int index, Room * room) {
+	Vector2f result;
+	result.x = room->outer_tiles[index].local_x;
+	result.y = room->outer_tiles[index].local_y;
+	return result;
+}
+
+Room * generate_room(int width, int height) {
+	Room * room = new Room(width, height);
+
+	for(int i=0; i<(room->num_tiles); i++) {
+		Tile tile;
+		tile.texture = "grass.png";
+		tile.local_x = i % room->width;
+		tile.local_y = i / room->width;
+
+		room->tiles[i] = tile;
+	}
+
+	for(int i=0; i<(room->num_outer_tiles); i++) {
+		Tile tile;
+
+		if(i<room->width) {
+			tile.local_x = i;
+			tile.local_y = -1;
+
+			tile.collision_box.x = tile.local_x + 0.75;
+			tile.collision_box.y = tile.local_y;
+			tile.collision_box.width = -0.5;
+			tile.collision_box.height = 1;
+		} else if(i > (room->num_outer_tiles - room->width - 1)) {
+			tile.local_x = (i - (room->num_outer_tiles - room->width));
+			tile.local_y = room->height;
+
+			tile.collision_box.x = tile.local_x + 0.75;
+			tile.collision_box.y = tile.local_y;
+			tile.collision_box.width = -0.5;
+			tile.collision_box.height = 1;
+		} else {
+			tile.local_x = room->width - (room->width + 1)*((i - room->width)%2);
+			tile.local_y = (i - room->width)/2;
+
+			tile.collision_box.x = tile.local_x;
+			tile.collision_box.y = tile.local_y + 0.75;
+			tile.collision_box.width = 1;
+			tile.collision_box.height = -0.5;
+		}
+
+		tile.type = BLOCK;
+		tile.collision_enabled = true;
+
+		// log_print("outer_tiles_generation", "Created tile %d at (%d, %d)", i, tile.local_x, tile.local_y);
+
+		room->outer_tiles[i] = tile;
+	}
+
+	return room;
+}
+
 void init_game() {
 	// Init player
 	{
@@ -122,143 +191,35 @@ void init_game() {
 		player.size = 1.0; 
 	}
 
+	// TEST Create test rooms
 	{
-		// TEST Create test rooms
-		{
-			Room * room = new Room(50, 30);
+		
+		Room * room = generate_room(50, 30);
 
-			for(int i=0; i<(room->num_tiles); i++) {
-				Tile tile;
-				tile.texture = "grass.png";
-				tile.local_x = i % room->width;
-				tile.local_y = i / room->width;
+		room->outer_tiles[5].type = SWITCH_ROOM;
+		room->outer_tiles[5].room_target_id = 1;
+		room->outer_tiles[5].target_tile_coords = Vector2(5, 13);
 
-				/*if(tile.local_x % 2 == 1 && tile.local_y % 2 == 1) {
-					tile.texture = "dirt.png";
-				}*/
+		room->tiles[5].texture = "dirt.png";
 
-				room->tiles[i] = tile;
-
-			}
-
-			room->tiles[5].type = SWITCH_ROOM;
-
-			for(int i=0; i<(room->num_outer_tiles); i++) {
-				Tile tile;
-
-				if(i<room->width) {
-					tile.local_x = i;
-					tile.local_y = -1;
-
-					tile.collision_box.x = tile.local_x+0.75;
-					tile.collision_box.y = tile.local_y;
-					tile.collision_box.width = -0.5;
-					tile.collision_box.height = 1;
-				} else if(i > (room->num_outer_tiles - room->width - 1)) {
-					tile.local_x = (i - (room->num_outer_tiles - room->width));
-					tile.local_y = room->height;
-
-					tile.collision_box.x = tile.local_x+0.75;
-					tile.collision_box.y = tile.local_y;
-					tile.collision_box.width = -0.5;
-					tile.collision_box.height = 1;
-				} else {
-					tile.local_x = room->width - (room->width + 1)*((i - room->width + 1)%2);
-					tile.local_y = (i - room->width)/2 + 1;
-
-					tile.collision_box.x = tile.local_x;
-					tile.collision_box.y = tile.local_y + 0.75;
-					tile.collision_box.width = 1;
-					tile.collision_box.height = -0.5;
-				}
-
-				tile.type = BLOCK;
-				tile.collision_enabled = true;
-
-				// log_print("outer_tiles_generation", "Created tile %d at (%d, %d)", i, tile.local_x, tile.local_y);
-
-				room->outer_tiles[i] = tile;
-			}
-
-			room->outer_tiles[5].type = SWITCH_ROOM;
-			room->outer_tiles[5].room_target_id = 1;
-			room->outer_tiles[5].target_tile_coords = Vector2(5, 13);
-
-			room->tiles[5].texture = "dirt.png";
-
-			rooms[0] = room;
-		}
+		rooms[0] = room;
 
 		// ----------------------------
-		{
-			Room * room = new Room(28, 14);
 
-			for(int i=0; i<(room->num_tiles); i++) {
-				Tile tile;
-				tile.texture = "grass.png";
-				tile.local_x = i % room->width;
-				tile.local_y = i / room->width;
+		room = generate_room(28, 14);
 
-				/*if(tile.local_x % 2 == 1 && tile.local_y % 2 == 1) {
-					tile.texture = "dirt.png";
-				}*/
+		room->outer_tiles[61].type = SWITCH_ROOM;
+		room->outer_tiles[61].room_target_id = 0;
+		room->outer_tiles[61].target_tile_coords = Vector2(5, 0);
 
-				room->tiles[i] = tile;
-			}
+		room->tiles[369].texture = "dirt.png";
 
-			for(int i=0; i<(room->num_outer_tiles); i++) {
-				Tile tile;
-
-				if(i<room->width) {
-					tile.local_x = i;
-					tile.local_y = -1;
-
-					tile.collision_box.x = tile.local_x+0.75;
-					tile.collision_box.y = tile.local_y;
-					tile.collision_box.width = -0.5;
-					tile.collision_box.height = 1;
-				} else if(i > (room->num_outer_tiles - room->width - 1)) {
-					tile.local_x = (i - (room->num_outer_tiles - room->width));
-					tile.local_y = room->height;
-
-					tile.collision_box.x = tile.local_x+0.75;
-					tile.collision_box.y = tile.local_y;
-					tile.collision_box.width = -0.5;
-					tile.collision_box.height = 1;
-				} else {
-					tile.local_x = room->width + 1 - (room->width + 2)*((i - room->width + 1)%2);
-					tile.local_y = (i - room->width)/2 + 1;
-
-					tile.collision_box.x = tile.local_x;
-					tile.collision_box.y = tile.local_y + 0.75;
-					tile.collision_box.width = 1;
-					tile.collision_box.height = -0.5;
-				}
-
-				tile.type = BLOCK;
-				tile.collision_enabled = true;
-
-				// log_print("outer_tiles_generation", "Created tile %d at (%d, %d)", i, tile.local_x, tile.local_y);
-
-				room->outer_tiles[i] = tile;
-			}
-
-			room->outer_tiles[61].type = SWITCH_ROOM;
-			room->outer_tiles[61].room_target_id = 0;
-			room->outer_tiles[61].target_tile_coords = Vector2(5, 0);
-
-
-
-			room->tiles[369].texture = "dirt.png";
-
-
-			rooms[1] = room;
-		}
-
-		current_room = rooms[0];
+		rooms[1] = room;
+	
 	}
 
-
+	current_room = rooms[0];
+	game_mode = GAME;
 
 	// TEST Init trees
 	{
@@ -276,16 +237,25 @@ void init_game() {
 			trees[i].is_player = false;
 			trees[i].size = 3;
 		}
-
 	}
 }
 
 void game(WindowData * window_data, Keyboard * keyboard, GraphicsBuffer * graphics_buffer, float dt) {
 
+	Keyboard m_previous_keyboard = m_keyboard;
+
 	m_window_data = window_data;
 	m_keyboard = *keyboard;
 	m_graphics_buffer = graphics_buffer;
 
+	if(m_keyboard.key_F1 && !m_previous_keyboard.key_F1) {
+		if(game_mode == GAME) {
+			game_mode = EDITOR;
+		}
+		else if(game_mode == EDITOR) {
+			game_mode = GAME;
+		}
+	}
 
 	// Title Screen
 	{
@@ -321,120 +291,137 @@ void game(WindowData * window_data, Keyboard * keyboard, GraphicsBuffer * graphi
 		// buffer_title_block();
 	}
 
-	// Handle player movement
-	{
-		float speed = 0.006f;
+	if(game_mode == GAME) {
+		// Handle player movement
+		{
+			float speed = 0.006f;
 
-		if(keyboard->key_shift) speed = 0.02f;
+			if(keyboard->key_shift) speed = 0.02f;
 
-		float position_delta = speed * dt;
+			float position_delta = speed * dt;
 
-		//
-		// @Incomplete Need to use and normalize velocity vector
-		//
-		if(keyboard->key_left) 	player.position.x -= position_delta;
-		if(keyboard->key_right)	player.position.x += position_delta;
-		if(keyboard->key_up)	player.position.y -= position_delta;
-		if(keyboard->key_down) 	player.position.y += position_delta;
-	}
+			//
+			// @Incomplete Need to use and normalize velocity vector
+			//
+			if(keyboard->key_left) 	player.position.x -= position_delta;
+			if(keyboard->key_right)	player.position.x += position_delta;
+			if(keyboard->key_up)	player.position.y -= position_delta;
+			if(keyboard->key_down) 	player.position.y += position_delta;
+		}
 
-	// Early collision detection, find current tile
-	{
-		// @Optimisation We can probably infer the tiles we collide with from the player's x and y coordinates and information about the room's size
-		// for(int i = 0; i < current_room->num_tiles; i++) {
-		// 	Tile tile = current_room->tiles[i];
+		// Early collision detection, find current tile
+		{
+			// @Optimisation We can probably infer the tiles we collide with from the player's x and y coordinates and information about the room's size
+			// for(int i = 0; i < current_room->num_tiles; i++) {
+			// 	Tile tile = current_room->tiles[i];
 
-		// 	bool should_compute_collision = tile.collision_enabled;
+			// 	bool should_compute_collision = tile.collision_enabled;
 
-		// 	if(should_compute_collision) {
-
-
-		// 		if((player.position.x < tile.collision_box.x + tile.collision_box.width) && (tile.collision_box.x < player.position.x + player.size) &&	// X tests
-		// 		   (player.position.y < tile.collision_box.y + tile.collision_box.height) && (tile.collision_box.y < player.position.y + player.size)) {	// Y tests
-
-		// 			if(tile.type == SWITCH_ROOM) {
-		// 				log_print("collision", "Player is on a tile with type SWITCH_ROOM, switching to room %d", tile.room_target_id);
-		// 				current_room = rooms[tile.room_target_id];
-
-		// 				player.position = tile.target_tile_coords;
-		// 			}
-
-		// 		}
-
-		// 	}
-		// }
-
-		// @Optimisation We can probably infer the tiles we collide with from the player's x and y coordinates and information about the room's size
-		for(int i = 0; i < 2 * (current_room->width + current_room->height - 2); i++) {
-			Tile tile = current_room->outer_tiles[i];
-
-			bool should_compute_collision = tile.collision_enabled;
-
-			if(should_compute_collision) {
+			// 	if(should_compute_collision) {
 
 
-				if((player.position.x < tile.collision_box.x + tile.collision_box.width) && (tile.collision_box.x < player.position.x + player.size) &&	// X tests
-				   (player.position.y < tile.collision_box.y + tile.collision_box.height) && (tile.collision_box.y < player.position.y + player.size)) {	// Y tests
+			// 		if((player.position.x < tile.collision_box.x + tile.collision_box.width) && (tile.collision_box.x < player.position.x + player.size) &&	// X tests
+			// 		   (player.position.y < tile.collision_box.y + tile.collision_box.height) && (tile.collision_box.y < player.position.y + player.size)) {	// Y tests
 
-					if(tile.type == SWITCH_ROOM) {
-						// log_print("collision", "Player is on a tile with type SWITCH_ROOM, switching to room %d", tile.room_target_id);
-						current_room = rooms[tile.room_target_id];
+			// 			if(tile.type == SWITCH_ROOM) {
+			// 				log_print("collision", "Player is on a tile with type SWITCH_ROOM, switching to room %d", tile.room_target_id);
+			// 				current_room = rooms[tile.room_target_id];
 
-						player.position.x = tile.target_tile_coords.x + (player.position.x - tile.local_x);
-						player.position.y = tile.target_tile_coords.y + (player.position.y - tile.local_y);
+			// 				player.position = tile.target_tile_coords;
+			// 			}
 
-						break;
+			// 		}
+
+			// 	}
+			// }
+
+			// @Optimisation We can probably infer the tiles we collide with from the player's x and y coordinates and information about the room's size
+			for(int i = 0; i < 2 * (current_room->width + current_room->height - 2); i++) {
+				Tile tile = current_room->outer_tiles[i];
+
+				bool should_compute_collision = tile.collision_enabled;
+
+				if(should_compute_collision) {
+
+
+					if((player.position.x < tile.collision_box.x + tile.collision_box.width) && (tile.collision_box.x < player.position.x + player.size) &&	// X tests
+					   (player.position.y < tile.collision_box.y + tile.collision_box.height) && (tile.collision_box.y < player.position.y + player.size)) {	// Y tests
+
+						if(tile.type == SWITCH_ROOM) {
+							// log_print("collision", "Player is on a tile with type SWITCH_ROOM, switching to room %d", tile.room_target_id);
+							current_room = rooms[tile.room_target_id];
+
+							player.position.x = tile.target_tile_coords.x + (player.position.x - tile.local_x);
+							player.position.y = tile.target_tile_coords.y + (player.position.y - tile.local_y);
+
+							break;
+						}
 					}
-
 				}
-
 			}
 		}
-	}
 
+		// Clamp player position
+		{
+			if(player.position.x < 0)  {
+				player.position.x = 0;
+			}
+			if(player.position.x >  current_room->width - 1)  {
+				player.position.x = current_room->width - 1;
+			}
 
-	// Clamp player position
-	{
-		if(player.position.x < 0)  {
-			player.position.x = 0;
-		}
-		if(player.position.x >  current_room->width - 1)  {
-			player.position.x = current_room->width - 1;
-		}
-
-		if(player.position.y < 0) {
-			player.position.y = 0;
-		}	
-		if(player.position.y >  current_room->height - 1)  {
-			player.position.y = current_room->height - 1;
+			if(player.position.y < 0) {
+				player.position.y = 0;
+			}	
+			if(player.position.y >  current_room->height - 1)  {
+				player.position.y = current_room->height - 1;
+			}
 		}
 	}
 
 	// Camera logic
 	{
-		camera_offset.x = player.position.x;
-		camera_offset.y = player.position.y;
 
-		if(current_room->width <= TILES_PER_ROW) {
-			camera_offset.x = current_room->width/2.0f;
-		}
-		else if(camera_offset.x < TILES_PER_ROW/2.0f) {
-			camera_offset.x = TILES_PER_ROW/2.0f;
-		}
-		else if(camera_offset.x > current_room->width - TILES_PER_ROW/2.0f) {
-			camera_offset.x = current_room->width - TILES_PER_ROW/2.0f;
-		}
+		if(game_mode == GAME) {
+			camera_offset.x = player.position.x;
+			camera_offset.y = player.position.y;
 
-		if(current_room->height <= ROWS_PER_SCREEN) {
-			camera_offset.y = current_room->height/2.0f;
+			if(current_room->width <= TILES_PER_ROW) {
+				camera_offset.x = current_room->width/2.0f;
+			}
+			else if(camera_offset.x < TILES_PER_ROW/2.0f) {
+				camera_offset.x = TILES_PER_ROW/2.0f;
+			}
+			else if(camera_offset.x > current_room->width - TILES_PER_ROW/2.0f) {
+				camera_offset.x = current_room->width - TILES_PER_ROW/2.0f;
+			}
+
+			if(current_room->height <= ROWS_PER_SCREEN) {
+				camera_offset.y = current_room->height/2.0f;
+			}
+			else if(camera_offset.y < ROWS_PER_SCREEN/2.0f) {
+				camera_offset.y = ROWS_PER_SCREEN/2.0f;
+			}
+			else if(camera_offset.y > current_room->height - ROWS_PER_SCREEN/2.0f) {
+				camera_offset.y = current_room->height - ROWS_PER_SCREEN/2.0f;
+			}	
+		} else if (game_mode == EDITOR) {
+			//	@Refactor Same code as player movement
+
+			float speed = 0.006f;
+
+			if(keyboard->key_shift) speed = 0.02f;
+
+			float position_delta = speed * dt;
+
+			//
+			// @Incomplete Need to use and normalize velocity vector
+			//
+			if(keyboard->key_left) 	camera_offset.x -= position_delta;
+			if(keyboard->key_right)	camera_offset.x += position_delta;
+			if(keyboard->key_up)	camera_offset.y -= position_delta;
+			if(keyboard->key_down) 	camera_offset.y += position_delta;
 		}
-		else if(camera_offset.y < ROWS_PER_SCREEN/2.0f) {
-			camera_offset.y = ROWS_PER_SCREEN/2.0f;
-		}
-		else if(camera_offset.y > current_room->height - ROWS_PER_SCREEN/2.0f) {
-			camera_offset.y = current_room->height - ROWS_PER_SCREEN/2.0f;
-		}
-			
 		// log_print("[game_camera]", "Camera offset is (%f, %f)", camera_offset.x, camera_offset.y);
 
 	}
@@ -445,46 +432,86 @@ void game(WindowData * window_data, Keyboard * keyboard, GraphicsBuffer * graphi
 
 	buffer_player();
 
-
-	// Debug overlays
-	buffer_debug_tile_overlay(current_room);
+	// Editor overlays
+	if(game_mode == EDITOR) {
+		buffer_editor_tile_overlay(current_room);
+	}
 }
 
-void buffer_debug_tile_overlay(Room * room) {
+void buffer_editor_tile_overlay(Room * room) {
 	VertexBuffer vb;
 	IndexBuffer ib;
 
-	for(int row = camera_offset.y - ROWS_PER_SCREEN/2.0f; row < camera_offset.y + ROWS_PER_SCREEN/2.0f; row++) {
+	// Inner tiles
+	for(int tile_index = 0; tile_index < room->num_tiles; tile_index++) {
+		Tile tile = room->tiles[tile_index];
+		int col = tile.local_x;
+		int row = tile.local_y;
 
-		if(row < 0) continue;
-		if(row >= room->height) continue;
+		// Don't buffer out of screen tiles
+		if (col + 1 < camera_offset.x - TILES_PER_ROW/2.0f)   continue;
+		if (col 	> camera_offset.x + TILES_PER_ROW/2.0f)   continue;
+		if (row + 1 < camera_offset.y - ROWS_PER_SCREEN/2.0f) continue;
+		if (row 	> camera_offset.y + ROWS_PER_SCREEN/2.0f) continue;
+
+		if (col < 0) 			 continue;
+		if (col >= room->width)  continue;
+		if (row < 0) 			 continue;
+		if (row >= room->height) continue;
 
 
-		for(int col = camera_offset.x - TILES_PER_ROW/2.0f; col < camera_offset.x + TILES_PER_ROW/2.0f; col++) {
+		Color4f color = Color4f(1.0f, 1.0f, 1.0f, 0.5f);
 
-			if(col < 0) continue;
-			if(col >= room->width) continue;
-
-			int tile_index = row * room->width + col;
-
-			Tile tile = room->tiles[tile_index];
-
-			Color4f color = Color4f(1.0f, 1.0f, 1.0f, 0.5f);
-
-			if(tile.type == SWITCH_ROOM) {
-				color = Color4f(1.0f, 0.0f, 0.0f, 0.5f);
-			} else if(tile.type == BLOCK) {
-				color = Color4f(0.0f, 1.0f, 1.0f, 0.5f);
-			}
-
-			Vertex v1 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 0), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 0), 0.0f, color};
-			Vertex v2 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 1), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 1), 0.0f, color};
-			Vertex v3 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 0), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 1), 0.0f, color};
-			Vertex v4 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 1), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 0), 0.0f, color};
-
-			convert_top_left_coords_to_centered(&v1, &v2, &v3, &v4);
-			buffer_quad(v1, v2, v3, v4, &vb, &ib);
+		if(tile.type == SWITCH_ROOM) {
+			color = Color4f(1.0f, 0.0f, 0.0f, 0.5f);
+		} else if(tile.type == BLOCK) {
+			color = Color4f(0.0f, 1.0f, 1.0f, 0.5f);
 		}
+
+		Vertex v1 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 0), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 0), 0.0f, color};
+		Vertex v2 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 1), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 1), 0.0f, color};
+		Vertex v3 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 0), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 1), 0.0f, color};
+		Vertex v4 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 1), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 0), 0.0f, color};
+
+		convert_top_left_coords_to_centered(&v1, &v2, &v3, &v4);
+		buffer_quad(v1, v2, v3, v4, &vb, &ib);
+	}
+
+
+	// @Cleanup Refactor those loops ? They're exactly the same.
+	// Outer tiles
+	for(int tile_index = 0; tile_index < room->num_outer_tiles; tile_index++) {
+		Tile tile = room->outer_tiles[tile_index];
+		int col = tile.local_x;
+		int row = tile.local_y;
+
+		// Don't buffer out of screen tiles
+		if (col + 1 < camera_offset.x - TILES_PER_ROW/2.0f)   continue;
+		if (col 	> camera_offset.x + TILES_PER_ROW/2.0f)   continue;
+		if (row + 1 < camera_offset.y - ROWS_PER_SCREEN/2.0f) continue;
+		if (row 	> camera_offset.y + ROWS_PER_SCREEN/2.0f) continue;
+
+		if (col < -1) 			continue;
+		if (col > room->width)  continue;
+		if (row < -1) 			continue;
+		if (row > room->height) continue;
+
+
+		Color4f color = Color4f(1.0f, 1.0f, 1.0f, 0.5f);
+
+		if(tile.type == SWITCH_ROOM) {
+			color = Color4f(1.0f, 0.0f, 0.0f, 0.5f);
+		} else if(tile.type == BLOCK) {
+			color = Color4f(0.0f, 1.0f, 1.0f, 0.5f);
+		}
+
+		Vertex v1 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 0), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 0), 0.0f, color};
+		Vertex v2 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 1), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 1), 0.0f, color};
+		Vertex v3 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 0), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 1), 0.0f, color};
+		Vertex v4 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 1), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 0), 0.0f, color};
+
+		convert_top_left_coords_to_centered(&v1, &v2, &v3, &v4);
+		buffer_quad(v1, v2, v3, v4, &vb, &ib);
 	}
 
 	// @Temporary, we need to push the texure_id buffer otherwise it doesn't 
@@ -552,43 +579,83 @@ void buffer_tiles(Room * room) {
 
 	std::vector<char *> texture_ids;	
 
-	for(int row = camera_offset.y - ROWS_PER_SCREEN/2.0f; row < camera_offset.y + ROWS_PER_SCREEN/2.0f; row++) {
+	for(int tile_index = 0; tile_index < room->num_tiles; tile_index++) {
+		Tile tile = room->tiles[tile_index];
+		int col = tile.local_x;
+		int row = tile.local_y;
 
-		if(row < 0) continue;
-		if(row >= room->height) continue;
+		// Don't buffer out of screen tiles
+		if (col + 1 < camera_offset.x - TILES_PER_ROW/2.0f)   continue;
+		if (col > camera_offset.x + TILES_PER_ROW/2.0f)   continue;
+		if (row + 1 < camera_offset.y - ROWS_PER_SCREEN/2.0f) continue;
+		if (row > camera_offset.y + ROWS_PER_SCREEN/2.0f) continue;
+
+		if (col < 0) 			 continue;
+		if (col >= room->width)  continue;
+		if (row < 0) 			 continue;
+	 	if (row >= room->height) continue;
 
 
-		for(int col = camera_offset.x - TILES_PER_ROW/2.0f; col < camera_offset.x + TILES_PER_ROW/2.0f; col++) {
 
-			if(col < 0) continue;
-			if(col >= room->width) continue;
+		float texture_depth = texture_ids.size();
 
-			int tile_index = row * room->width + col;
-
-			Tile tile = room->tiles[tile_index];
-
-			float texture_depth = texture_ids.size();
-
-			bool texture_already_in_buffer = false;
-			for(int j = 0; j<texture_ids.size(); j++) {
-				char * id = texture_ids[j];
-				if(strcmp(id, tile.texture) == 0) {
-					texture_already_in_buffer = true;
-					texture_depth = j;
-				}
+		bool texture_already_in_buffer = false;
+		for(int j = 0; j<texture_ids.size(); j++) {
+			char * id = texture_ids[j];
+			if(strcmp(id, tile.texture) == 0) {
+				texture_already_in_buffer = true;
+				texture_depth = j;
 			}
-
-			if (!texture_already_in_buffer) texture_ids.push_back(tile.texture);
-
-			Vertex v1 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 0), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 0), 0.99f, 0.0f, 0.0f, texture_depth};
-			Vertex v2 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 1), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 1), 0.99f, 1.0f, 1.0f, texture_depth};
-			Vertex v3 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 0), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 1), 0.99f, 0.0f, 1.0f, texture_depth};
-			Vertex v4 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 1), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 0), 0.99f, 1.0f, 0.0f, texture_depth};
-
-			convert_top_left_coords_to_centered(&v1, &v2, &v3, &v4);
-			buffer_quad(v1, v2, v3, v4, &vb, &ib);
 		}
+
+		if (!texture_already_in_buffer) texture_ids.push_back(tile.texture);
+
+		Vertex v1 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 0), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 0), 0.99f, 0.0f, 0.0f, texture_depth};
+		Vertex v2 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 1), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 1), 0.99f, 1.0f, 1.0f, texture_depth};
+		Vertex v3 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 0), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 1), 0.99f, 0.0f, 1.0f, texture_depth};
+		Vertex v4 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 1), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 0), 0.99f, 1.0f, 0.0f, texture_depth};
+
+		convert_top_left_coords_to_centered(&v1, &v2, &v3, &v4);
+		buffer_quad(v1, v2, v3, v4, &vb, &ib);
 	}
+
+	// for(int row = camera_offset.y - ROWS_PER_SCREEN/2.0f; row < camera_offset.y + ROWS_PER_SCREEN/2.0f; row++) {
+
+	// 	if(row < 0) continue;
+	// 	if(row >= room->height) continue;
+
+
+	// 	for(int col = camera_offset.x - TILES_PER_ROW/2.0f; col < camera_offset.x + TILES_PER_ROW/2.0f; col++) {
+
+	// 		if(col < 0) continue;
+	// 		if(col >= room->width) continue;
+
+	// 		int tile_index = row * room->width + col;
+
+	// 		Tile tile = room->tiles[tile_index];
+
+	// 		float texture_depth = texture_ids.size();
+
+	// 		bool texture_already_in_buffer = false;
+	// 		for(int j = 0; j<texture_ids.size(); j++) {
+	// 			char * id = texture_ids[j];
+	// 			if(strcmp(id, tile.texture) == 0) {
+	// 				texture_already_in_buffer = true;
+	// 				texture_depth = j;
+	// 			}
+	// 		}
+
+	// 		if (!texture_already_in_buffer) texture_ids.push_back(tile.texture);
+
+	// 		Vertex v1 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 0), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 0), 0.99f, 0.0f, 0.0f, texture_depth};
+	// 		Vertex v2 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 1), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 1), 0.99f, 1.0f, 1.0f, texture_depth};
+	// 		Vertex v3 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 0), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 1), 0.99f, 0.0f, 1.0f, texture_depth};
+	// 		Vertex v4 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 1), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 0), 0.99f, 1.0f, 0.0f, texture_depth};
+
+	// 		convert_top_left_coords_to_centered(&v1, &v2, &v3, &v4);
+	// 		buffer_quad(v1, v2, v3, v4, &vb, &ib);
+	// 	}
+	// }
 
 	m_graphics_buffer->texture_ids.push_back(texture_ids);
 	m_graphics_buffer->vertex_buffers.push_back(vb);

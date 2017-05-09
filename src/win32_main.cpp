@@ -135,6 +135,10 @@ LRESULT CALLBACK WndProc(HWND window_handle, UINT message, WPARAM w_param, LPARA
 					keyboard.key_space = true;
 					break;
 				}
+				case VK_F1 : {
+					keyboard.key_F1 = true;
+					break;
+				}
 				case VK_ESCAPE : {
 					break;
 				}
@@ -171,6 +175,10 @@ LRESULT CALLBACK WndProc(HWND window_handle, UINT message, WPARAM w_param, LPARA
 				}
 				case VK_SPACE : {
 					keyboard.key_space = false;
+					break;
+				}
+				case VK_F1 : {
+					keyboard.key_F1 = false;
 					break;
 				}
 				case VK_ESCAPE : {
@@ -378,12 +386,6 @@ void init_d3d() {
 	texture_map_index_buffer_desc.StructureByteStride 	= 0;
 
 	d3d_device->CreateBuffer( &texture_map_index_buffer_desc, NULL, &d3d_texture_index_map_buffer );
-
-
-	//
-	// We're discarding transparent pixels, since we only have alpha equal to 1 or 0, 
-	// we don't need blending, if we end up having other alphas, we'll come back to this.
-	//
 
 	// Blending	
 	D3D11_RENDER_TARGET_BLEND_DESC render_target_blend_desc;

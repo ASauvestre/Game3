@@ -144,6 +144,8 @@ struct Keyboard {
 
 	bool key_shift 	= false;
 	bool key_space 	= false;
+
+	bool key_F1	= false;
 };
 
 struct WindowData {
@@ -165,7 +167,7 @@ void buffer_entity(Entity entity);
 
 void buffer_tiles(Room * room);
 
-void buffer_debug_tile_overlay(Room * room);
+void buffer_editor_tile_overlay(Room * room);
 
 void buffer_title_block();
 
