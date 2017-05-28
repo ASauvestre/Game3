@@ -1,18 +1,5 @@
 #include "win32_main.h"
 
-struct Texture {
-	char * name;
-
-	int width;
-	int height;
-	int bytes_per_pixel;
-	
-	D3D11_SUBRESOURCE_DATA data;
-
-	int index_in_array;
-	// ID3D11SamplerState * sampler_state;
-};
-
 struct ShaderInputFormat {
 	ID3D11InputLayout *layout;
 	D3D11_INPUT_ELEMENT_DESC * layout_desc;
@@ -22,7 +9,7 @@ struct ShaderInputFormat {
 enum ShaderInputMode {
 	NONE,
 	POS_COL,
-	POS_IDX_TXID
+	POS_TEXCOORD
 };
 
 struct Shader {
@@ -64,8 +51,6 @@ static ID3D11Buffer * d3d_index_buffer_interface;
 
 static ID3D11SamplerState * default_sampler_state;
 
-static std::vector<Texture*> textures;
-
 static ID3D11Texture2D * d3d_texture_array;
 static ID3D11ShaderResourceView * d3d_texture_array_srv;
 static ID3D11Buffer * d3d_texture_index_map_buffer;
@@ -77,6 +62,8 @@ static bool should_quit = false;
 static Keyboard keyboard = {};
 static WindowData window_data = {};
 static GraphicsBuffer graphics_buffer;
+
+static TextureManager texture_manager;
 
 const int MAX_VERTEX_BUFFER_SIZE 	 = 4096;
 const int MAX_INDEX_BUFFER_SIZE 	 = 4096;
@@ -410,14 +397,13 @@ void init_d3d() {
 }
 
 void draw_buffer(int buffer_index) {
-	
+
 	set_shader(graphics_buffer.shaders[buffer_index]);
 
-	if(current_shader.input_mode == POS_IDX_TXID) {
+	if(current_shader.input_mode == POS_TEXCOORD) {
 
 		VertexBuffer * vb = &graphics_buffer.vertex_buffers[buffer_index];
 		IndexBuffer * ib = &graphics_buffer.index_buffers[buffer_index];
-		std::vector<char *> texture_ids = graphics_buffer.texture_ids[buffer_index];
 
 		// Update vertex buffer
 		D3D11_MAPPED_SUBRESOURCE resource = {};
@@ -431,32 +417,21 @@ void draw_buffer(int buffer_index) {
 		memcpy(resource.pData, &ib->indices[0], sizeof( int ) *  ib->indices.size());
 		d3d_dc->Unmap(d3d_index_buffer_interface, 0);
 
-		// Create texture index map
-		int texture_index_map[MAX_TEXTURE_INDEX_MAP_SIZE];
-		for(int i = 0; i<texture_ids.size(); i++) {
-			// Find texture in the catalog
-			int texture_index = -1;
-			for(int j = 0; j<textures.size(); j++) {
-				if(strcmp(texture_ids[i], textures[j]->name) == 0) {
-					texture_index = textures[j]->index_in_array;
-					break;
-				}
-			}
-			if(texture_index == -1) { log_print("draw_buffer", "Unable to find texture %s", texture_ids[i]); }
-			
-			texture_index_map[i] = texture_index;
+		char * texture_name = graphics_buffer.texture_id_buffer[buffer_index];
+
+		int index = texture_manager.find_texture_index(texture_name);
+
+		if(index == -1) {
+			log_print("draw_buffer", "Texture %s was not found in the catalog", texture_name);
+			return;
 		}
 
-		// Update texture index map buffer
-		resource = {};
-		d3d_dc->Map(d3d_texture_index_map_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
-		memcpy(resource.pData, &texture_index_map[0], sizeof( int ) *  MAX_TEXTURE_INDEX_MAP_SIZE);
-		d3d_dc->Unmap(d3d_texture_index_map_buffer, 0);
+		ID3D11ShaderResourceView * srv = (ID3D11ShaderResourceView *) texture_manager.textures[index].platform_info->srv;
 
-		d3d_dc->VSSetConstantBuffers( 0, 1, &d3d_texture_index_map_buffer );
+		d3d_dc->PSSetShaderResources(0, 1, &srv);
 
-		d3d_dc->PSSetShaderResources(0, 1, &d3d_texture_array_srv);
 		d3d_dc->PSSetSamplers(0, 1, &default_sampler_state);
+
 	} else if(current_shader.input_mode == POS_COL) {
 
 		VertexBuffer * vb = &graphics_buffer.vertex_buffers[buffer_index];
@@ -498,52 +473,50 @@ void draw_frame() {
 		draw_buffer(i);
 
 	}
-	swap_chain->Present(0, 0);
+
+	swap_chain->Present(0, 0);  
 
 	// Clear buffer;
 	graphics_buffer.vertex_buffers.clear();
 	graphics_buffer.index_buffers.clear();
-	graphics_buffer.texture_ids.clear();
+	graphics_buffer.texture_id_buffer.clear();
 	graphics_buffer.shaders.clear();
 }
 
 void do_load_texture(Texture * texture) {
-	D3D11_SUBRESOURCE_DATA texture_data = {};
 
 	char path[512];
 	snprintf(path, 512, "textures/%s", texture->name);
 	
 	int x,y,n;
-	texture_data.pSysMem = stbi_load(path, &x, &y, &n, 4);
+	texture->bitmap = stbi_load(path, &x, &y, &n, 4);
 
-	if(texture_data.pSysMem == NULL) {
+	if(texture->bitmap == NULL) {
 		log_print("do_load_texture", "Failed to load texture \"%s\"", texture->name);
 		return;
 	}
 
 	if(n != 4) {
-		log_print("do_load_texture", "Loaded texture \"%s\", but it has %d bit depth, we prefer using 32 bit depth textures", texture->name, n*8);
+		log_print("do_load_texture", "Loaded texture \"%s\", it has %d bit depth, please convert to 32 bit depth", texture->name, n*8);
 		n = 4;
 	} else {
 		log_print("do_load_texture", "Loaded texture \"%s\"", texture->name);
 
 	}
 
-	texture_data.SysMemPitch 		= x * n;
-	texture_data.SysMemSlicePitch 	= texture_data.SysMemPitch * y;
-
-	texture->data 				= texture_data;
 	texture->width 				= x;
 	texture->height 			= y;
 	texture->bytes_per_pixel 	= n;
+	texture->width_in_bytes		= x * n;
+	texture->num_bytes	 		= texture->width_in_bytes * y;
 }
 
-void bind_textures_to_srv() {
+void bind_srv_to_texture(Texture * texture) {
 	D3D11_TEXTURE2D_DESC texture_desc;
-						 texture_desc.Width 				= 256; // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! @Incomplete 
-						 texture_desc.Height 				= 256; // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! @Incomplete
+						 texture_desc.Width 				= texture->width;
+						 texture_desc.Height 				= texture->height;
 						 texture_desc.MipLevels 			= 1;
-						 texture_desc.ArraySize 			= textures.size();
+						 texture_desc.ArraySize 			= 1;
 						 texture_desc.Format 				= DXGI_FORMAT_R8G8B8A8_UNORM;
 						 texture_desc.SampleDesc.Count 		= 1;
 						 texture_desc.SampleDesc.Quality 	= 0;
@@ -552,33 +525,45 @@ void bind_textures_to_srv() {
 						 texture_desc.CPUAccessFlags 		= 0;
 						 texture_desc.MiscFlags 			= 0;
 
-	std::vector<D3D11_SUBRESOURCE_DATA> texture_data_array;
+	D3D11_SUBRESOURCE_DATA texture_subresource;
+	texture_subresource.pSysMem 			= texture->bitmap;
+	texture_subresource.SysMemPitch			= texture->width_in_bytes;
+	texture_subresource.SysMemSlicePitch	= texture->num_bytes;
 
-	for(int i=0; i<textures.size(); i++) {
-		do_load_texture(textures[i]);
-		textures[i]->index_in_array = i;
-		texture_data_array.push_back(textures[i]->data);
-	}
+	ID3D11Texture2D * d3d_texture;
 
-	d3d_device->CreateTexture2D(&texture_desc, &texture_data_array[0], &d3d_texture_array);
+	d3d_device->CreateTexture2D(&texture_desc, &texture_subresource, &d3d_texture);
 
 	D3D11_SHADER_RESOURCE_VIEW_DESC srv_desc;
 									srv_desc.Format 						= DXGI_FORMAT_R8G8B8A8_UNORM;
-									srv_desc.ViewDimension 					= D3D11_SRV_DIMENSION_TEXTURE2DARRAY;
-									srv_desc.Texture2DArray.MostDetailedMip = 0;
-									srv_desc.Texture2DArray.MipLevels 		= 1;
-									srv_desc.Texture2DArray.FirstArraySlice = 0;
-									srv_desc.Texture2DArray.ArraySize 		= texture_desc.ArraySize;
+									srv_desc.ViewDimension 					= D3D11_SRV_DIMENSION_TEXTURE2D;
+									srv_desc.Texture2D.MostDetailedMip 		= 0;
+									srv_desc.Texture2D.MipLevels 			= 1;
 
-	d3d_device->CreateShaderResourceView(d3d_texture_array, &srv_desc, &d3d_texture_array_srv);
+	d3d_device->CreateShaderResourceView(d3d_texture, &srv_desc, (ID3D11ShaderResourceView **) &texture->platform_info->srv);
 
 }
 
-void add_texture_to_load_queue(char * name) {
-	Texture * texture = new Texture();
+void load_texture(char * name) {
+	Texture * texture = texture_manager.get_new_texture_slot();
+
+	texture->platform_info = (PlatformTextureInfo *) malloc(sizeof(PlatformTextureInfo));
+
 	texture->name = name;
 
-	textures.push_back(texture);	
+	do_load_texture(texture);
+	bind_srv_to_texture(texture);
+
+	texture_manager.register_texture(texture);
+}
+
+void init_textures() {
+	load_texture("title_screen_logo.png");
+	load_texture("grass.png");
+	load_texture("dirt.png");
+	load_texture("megaperson.png");
+	load_texture("tree.png");
+	load_texture("tree_window.png");
 }
 
 // Shader code
@@ -683,7 +668,6 @@ void init_shaders() {
 	D3D11_INPUT_ELEMENT_DESC textured_shader_layout_desc[] = {
 		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },  
 		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }, 
-		{ "TEXID",    0, DXGI_FORMAT_R32_UINT,        0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }, 
 	};
 
 	D3D11_INPUT_ELEMENT_DESC colored_shader_layout_desc[] = {
@@ -691,23 +675,11 @@ void init_shaders() {
 		{ "COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }, 
 	};
 
-	create_shader("textured_shader.hlsl", "VS", "PS", textured_shader_layout_desc, ARRAYSIZE(textured_shader_layout_desc), POS_IDX_TXID, textured_shader);
+	create_shader("textured_shader.hlsl", "VS", "PS", textured_shader_layout_desc, ARRAYSIZE(textured_shader_layout_desc), POS_TEXCOORD, textured_shader);
 	create_shader("colored_shader.hlsl", "VS", "PS", colored_shader_layout_desc, ARRAYSIZE(colored_shader_layout_desc), POS_COL, colored_shader);
 }
 
-void init_textures() {
-	add_texture_to_load_queue("title_screen_logo.png");
-	add_texture_to_load_queue("grass.png");
-	add_texture_to_load_queue("dirt.png");
-	add_texture_to_load_queue("megaperson.png");
-	add_texture_to_load_queue("tree.png");
-	add_texture_to_load_queue("tree_window.png");
-	bind_textures_to_srv();
-}
-
 void recompile_shaders() {
-	
-
 	compile_shader(textured_shader);
 	compile_shader(colored_shader);
 }
@@ -716,12 +688,12 @@ void check_specific_shader_file_modification(Shader * shader) {
 
 	GetFileTime(shader->file_handle, NULL, NULL, &new_last_modified);
 
-
-	// @Temporary I'm pretty sure the file handle isn't valid after the file being 
-	// modified, so this condition only works because the new_last_modified is garbage.
-	// It will do for now, but fix it in the future.
 	if((new_last_modified.dwLowDateTime  != shader->last_modified.dwLowDateTime)  || 
 	   (new_last_modified.dwHighDateTime != shader->last_modified.dwHighDateTime)) {
+
+		// log_print("recompile_shaders", "Previous time : %u %u, New time : %u %u",
+		// 		  shader->last_modified.dwHighDateTime, shader->last_modified.dwLowDateTime,
+		// 		  new_last_modified.dwHighDateTime, new_last_modified.dwLowDateTime);
 
 		// Get new handle
 		char path[512];;
@@ -729,7 +701,6 @@ void check_specific_shader_file_modification(Shader * shader) {
 
 		shader->file_handle = CreateFile(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 
-		// @Bug We run this twice sometimes, likely related to comment above.
 		log_print("recompile_shaders", "Detected file modification, recompiling shader \"%s\"", shader->filename);
 
 		compile_shader(shader);
@@ -745,11 +716,15 @@ void check_shader_files_modification() {
 	check_specific_shader_file_modification(colored_shader);
 }
 
+const int TARGET_FPS = 120;
+bool locked_fps = false;
+
 void main() {
+	QueryPerformanceFrequency(&frequency);
+	QueryPerformanceCounter(&start_time);
 
 	window_data.width 	= 1280;
 	window_data.height 	= 720;
-
 
 	// window_data.width 	= 1920;
 	// window_data.height 	= 1080;
@@ -767,8 +742,9 @@ void main() {
 
 	init_game();
 
-	float frame_time = 0.0f;
-
+	QueryPerformanceCounter(&end_time);
+	float frame_time = ((float)(end_time.QuadPart - start_time.QuadPart)*1000/(float)frequency.QuadPart);
+	log_print("perf_counter", "Startup time : %.3f seconds", frame_time/1000.f);
 
 	while(!should_quit) {
 		QueryPerformanceFrequency(&frequency);
@@ -777,13 +753,23 @@ void main() {
 		check_shader_files_modification();
 
 		update_window_events();
-		game(&window_data, &keyboard, &graphics_buffer, frame_time);
+		game(&window_data, &keyboard, &graphics_buffer, &texture_manager, frame_time);
 		draw_frame();
 
 		QueryPerformanceCounter(&end_time);
 		
 		frame_time = ((float)(end_time.QuadPart - start_time.QuadPart)*1000/(float)frequency.QuadPart);
-		
-		// log_print("perf_counter", "Total frame time is %f", frame_time);
+
+		if (locked_fps) {
+			while (frame_time < 1000.0f / TARGET_FPS) {
+				Sleep(0);
+
+				QueryPerformanceCounter(&end_time);
+
+				frame_time = ((float)(end_time.QuadPart - start_time.QuadPart) * 1000 / (float)frequency.QuadPart);
+			}
+		}
+
+		log_print("perf_counter", "Frame time : %f", frame_time);
 	}
 }

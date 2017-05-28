@@ -5,6 +5,7 @@
 #include <D3Dcompiler.h>
 
 #include "game_main.h"
+#include "win32_texture_manager.h"
 
 #define STBI_ONLY_PNG
 #define STB_IMAGE_IMPLEMENTATION
@@ -12,6 +13,7 @@
 
 enum ShaderInputMode;
 
+void win32_sleep_for_ms(float ms);
 void update_window_events();
 bool create_window(int width, int height, char * name);
 bool create_shader(char * filename, char * vs_name, char * ps_name, D3D11_INPUT_ELEMENT_DESC * layout_desc, int num_shader_inputs, ShaderInputMode input_mode, Shader * shader);

@@ -4,16 +4,9 @@
 #include <vector>
 #include <assert.h>
 
-// Macros
-#define log_print(category, format, ...)							\
-	{																\
-			char message [2048];									\
-			sprintf(message, format, __VA_ARGS__);					\
-			printf("[%s]: %s\n", category, message, __VA_ARGS__);	\
-	}																\
+#include "macros.h"
 
-
-#define array_size(array)  (sizeof(array)/sizeof(array[0]))
+#include "texture_manager.h"
 
 // Structs
 struct Tile;
@@ -91,17 +84,14 @@ struct Color4f {
 	float a = 1.0f;
 };
 
-// Make texture coord 3D and remove this struct ?
 struct VertexTextureInfo {
 	Vector2f tex_coord;
-	float texture_depth;
 };
 
 struct Vertex {
-	Vertex(	float x, float y, float z, float u, float v, float texid) {
+	Vertex(	float x, float y, float z, float u, float v, int texid) {
 		this->position = Vector3f(x, y, z);
 		this->tex_info.tex_coord = Vector2f(u,v);
-		this->tex_info.texture_depth = texid;
 	}
 
 	Vertex(	float x, float y, float z, Color4f color) {
@@ -132,8 +122,7 @@ struct GraphicsBuffer {
 	std::vector<Shader *> shaders;
 	std::vector<VertexBuffer> vertex_buffers;
 	std::vector<IndexBuffer> index_buffers;
-
-	std::vector<std::vector<char *>> texture_ids; // For textured shaders
+	std::vector<char *> texture_id_buffer;
 };
 
 struct Keyboard {
@@ -157,7 +146,7 @@ struct WindowData {
 
 void init_game();
 
-void game(WindowData * window_data, Keyboard * keyboard, GraphicsBuffer * graphics_buffer, float dt);
+void game(WindowData * window_data, Keyboard * keyboard, GraphicsBuffer * graphics_buffer, TextureManager * texture_manager, float dt);
 
 void buffer_player();
 

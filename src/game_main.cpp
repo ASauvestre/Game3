@@ -32,7 +32,7 @@ struct Tile {
 	int local_y;
 
 	TileType type = DEFAULT;
-	int room_target_id; 		 // Used if type is SWITCH_ROOM
+	int room_target_id; 		// Used if type is SWITCH_ROOM
 	Vector2 target_tile_coords; // Used if type is SWITCH_ROOM
 
 	Rectangle collision_box;
@@ -80,8 +80,9 @@ extern Shader * colored_shader;
 
 // Globals
 static WindowData 		* m_window_data;
-static Keyboard m_keyboard;
+static Keyboard 		* m_keyboard;
 static GraphicsBuffer 	* m_graphics_buffer;
+static TextureManager 	* m_texture_manager;
 
 static float square_size = 0.5f;
 
@@ -240,15 +241,16 @@ void init_game() {
 	}
 }
 
-void game(WindowData * window_data, Keyboard * keyboard, GraphicsBuffer * graphics_buffer, float dt) {
+void game(WindowData * window_data, Keyboard * keyboard, GraphicsBuffer * graphics_buffer, TextureManager * texture_manager, float dt) {
 
-	Keyboard m_previous_keyboard = m_keyboard;
+	Keyboard * m_previous_keyboard = m_keyboard;
 
-	m_window_data = window_data;
-	m_keyboard = *keyboard;
+	m_window_data 	  = window_data;
+	m_keyboard 		  = keyboard;
 	m_graphics_buffer = graphics_buffer;
+	m_texture_manager = texture_manager;
 
-	if(m_keyboard.key_F1 && !m_previous_keyboard.key_F1) {
+	if(m_keyboard->key_F1 && !m_previous_keyboard->key_F1) {
 		if(game_mode == GAME) {
 			game_mode = EDITOR;
 		}
@@ -514,9 +516,6 @@ void buffer_editor_tile_overlay(Room * room) {
 		buffer_quad(v1, v2, v3, v4, &vb, &ib);
 	}
 
-	// @Temporary, we need to push the texure_id buffer otherwise it doesn't 
-	// sync up with the other buffers. Find a way to fix this. (store texture_id array index ?)
-	m_graphics_buffer->texture_ids.push_back((std::vector<char * >) NULL);
 	m_graphics_buffer->vertex_buffers.push_back(vb);
 	m_graphics_buffer->index_buffers.push_back(ib);
 
@@ -534,8 +533,7 @@ void buffer_player() {
 }
 
 void buffer_entity(Entity entity) {
-		VertexBuffer vb;
-		IndexBuffer ib;
+
 
 		Vector2f screen_pos;
 		screen_pos.x = entity.position.x - camera_offset.x + TILES_PER_ROW/2;
@@ -561,23 +559,20 @@ void buffer_entity(Entity entity) {
 
 		
 		convert_top_left_coords_to_centered(&v1, &v2, &v3, &v4);
-		buffer_quad(v1, v2, v3, v4, &vb, &ib);
 
-		std::vector<char *> texture_ids;	
-		texture_ids.push_back(entity.texture);	
-		m_graphics_buffer->texture_ids.push_back(texture_ids);
+		VertexBuffer vb;
+		IndexBuffer ib;
+
+		buffer_quad(v1, v2, v3, v4, &vb, &ib);
 
 		m_graphics_buffer->vertex_buffers.push_back(vb);
 		m_graphics_buffer->index_buffers.push_back(ib);
-
+		m_graphics_buffer->texture_id_buffer.push_back(entity.texture);
 		m_graphics_buffer->shaders.push_back(textured_shader);
 }
 
 void buffer_tiles(Room * room) {
-	VertexBuffer vb;
-	IndexBuffer ib;
 
-	std::vector<char *> texture_ids;	
 
 	for(int tile_index = 0; tile_index < room->num_tiles; tile_index++) {
 		Tile tile = room->tiles[tile_index];
@@ -595,86 +590,31 @@ void buffer_tiles(Room * room) {
 		if (row < 0) 			 continue;
 	 	if (row >= room->height) continue;
 
+		int texture_index = m_texture_manager->find_texture_index(tile.texture);
 
-
-		float texture_depth = texture_ids.size();
-
-		bool texture_already_in_buffer = false;
-		for(int j = 0; j<texture_ids.size(); j++) {
-			char * id = texture_ids[j];
-			if(strcmp(id, tile.texture) == 0) {
-				texture_already_in_buffer = true;
-				texture_depth = j;
-			}
-		}
-
-		if (!texture_already_in_buffer) texture_ids.push_back(tile.texture);
-
-		Vertex v1 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 0), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 0), 0.99f, 0.0f, 0.0f, texture_depth};
-		Vertex v2 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 1), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 1), 0.99f, 1.0f, 1.0f, texture_depth};
-		Vertex v3 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 0), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 1), 0.99f, 0.0f, 1.0f, texture_depth};
-		Vertex v4 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 1), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 0), 0.99f, 1.0f, 0.0f, texture_depth};
+		Vertex v1 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 0), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 0), 0.99f, 0.0f, 0.0f, texture_index};
+		Vertex v2 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 1), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 1), 0.99f, 1.0f, 1.0f, texture_index};
+		Vertex v3 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 0), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 1), 0.99f, 0.0f, 1.0f, texture_index};
+		Vertex v4 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 1), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 0), 0.99f, 1.0f, 0.0f, texture_index};
 
 		convert_top_left_coords_to_centered(&v1, &v2, &v3, &v4);
+
+		VertexBuffer vb;
+		IndexBuffer ib;
+
 		buffer_quad(v1, v2, v3, v4, &vb, &ib);
+
+		m_graphics_buffer->vertex_buffers.push_back(vb);
+		m_graphics_buffer->index_buffers.push_back(ib);
+		m_graphics_buffer->texture_id_buffer.push_back(tile.texture);
+		m_graphics_buffer->shaders.push_back(textured_shader);
 	}
 
-	// for(int row = camera_offset.y - ROWS_PER_SCREEN/2.0f; row < camera_offset.y + ROWS_PER_SCREEN/2.0f; row++) {
 
-	// 	if(row < 0) continue;
-	// 	if(row >= room->height) continue;
-
-
-	// 	for(int col = camera_offset.x - TILES_PER_ROW/2.0f; col < camera_offset.x + TILES_PER_ROW/2.0f; col++) {
-
-	// 		if(col < 0) continue;
-	// 		if(col >= room->width) continue;
-
-	// 		int tile_index = row * room->width + col;
-
-	// 		Tile tile = room->tiles[tile_index];
-
-	// 		float texture_depth = texture_ids.size();
-
-	// 		bool texture_already_in_buffer = false;
-	// 		for(int j = 0; j<texture_ids.size(); j++) {
-	// 			char * id = texture_ids[j];
-	// 			if(strcmp(id, tile.texture) == 0) {
-	// 				texture_already_in_buffer = true;
-	// 				texture_depth = j;
-	// 			}
-	// 		}
-
-	// 		if (!texture_already_in_buffer) texture_ids.push_back(tile.texture);
-
-	// 		Vertex v1 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 0), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 0), 0.99f, 0.0f, 0.0f, texture_depth};
-	// 		Vertex v2 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 1), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 1), 0.99f, 1.0f, 1.0f, texture_depth};
-	// 		Vertex v3 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 0), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 1), 0.99f, 0.0f, 1.0f, texture_depth};
-	// 		Vertex v4 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 1), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 0), 0.99f, 1.0f, 0.0f, texture_depth};
-
-	// 		convert_top_left_coords_to_centered(&v1, &v2, &v3, &v4);
-	// 		buffer_quad(v1, v2, v3, v4, &vb, &ib);
-	// 	}
-	// }
-
-	m_graphics_buffer->texture_ids.push_back(texture_ids);
-	m_graphics_buffer->vertex_buffers.push_back(vb);
-	m_graphics_buffer->index_buffers.push_back(ib);
-
-	m_graphics_buffer->shaders.push_back(textured_shader);
 }
 
 void buffer_title_block() {
-	VertexBuffer vb;
-	IndexBuffer ib;
 
-	std::vector<char *> texture_ids;
-	texture_ids.push_back("title_screen_logo.png");
-	m_graphics_buffer->texture_ids.push_back(texture_ids);
-
-	buffer_quad_centered_at(square_size, 0.0f, &vb, &ib);
-
-	m_graphics_buffer->shaders.push_back(textured_shader);
 }
 
 void buffer_quad_centered_at(float radius, float depth, VertexBuffer * vb, IndexBuffer * ib) {
@@ -701,6 +641,8 @@ void buffer_quad_centered_at(Vector2f center, float radius, float depth, VertexB
 void buffer_quad(Vertex v1, Vertex v2, Vertex v3, Vertex v4, VertexBuffer * vb, IndexBuffer * ib) {
 
 	int first_index = vb->vertices.size();
+
+
 
 	vb->vertices.push_back(v1);
 	vb->vertices.push_back(v2);

@@ -1,10 +1,3 @@
-Texture2DArray m_texture_array;
-SamplerState m_sampler_state;
-
-cbuffer vs_buffer : register(b0) {
-	int4 texture_index_map[512]; // Max number of textures
-};
-
 struct VS_OUTPUT 
 {
 	float4 pos : SV_POSITION;
@@ -23,9 +16,5 @@ VS_OUTPUT VS(float4 input_pos : POSITION, float4 input_color : COLOR)
 
 float4 PS(VS_OUTPUT input) : SV_TARGET
 {
-	// float4 color = float4(1.0f, 0.0f, 0.0f, 0.8f);
-	// return color;
-
 	return input.color;
-
 }
