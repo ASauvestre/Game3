@@ -142,6 +142,7 @@ struct WindowData {
 	int height;
 	float aspect_ratio;
 	Color4f background_color;
+	float frame_time;
 };
 
 int get_file_size(FILE * file);

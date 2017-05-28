@@ -87,6 +87,7 @@ const int ROWS_PER_SCREEN	= 18;
 const int TILES_PER_SCREEN	= TILES_PER_ROW * ROWS_PER_SCREEN;
 
 // Extern Globals
+extern Shader * font_shader;
 extern Shader * textured_shader;
 extern Shader * colored_shader;
 
@@ -278,7 +279,7 @@ void init_game(TextureManager * texture_manager) {
 
 		unsigned char * bitmap = (unsigned char *) malloc(512*512*4); // Our bitmap is 512x512 pixels and each pixel takes 4 bytes
 
-		stbtt_BakeFontBitmap(font_file_buffer, 0, 32.0, bitmap, 512, 512, 32, 96, my_font.char_data); // no guarantee this fits!
+		stbtt_BakeFontBitmap(font_file_buffer, 0, 16.0, bitmap, 512, 512, 32, 96, my_font.char_data); // no guarantee this fits!
 
 		my_font.texture = create_texture(my_font.name, bitmap, 512, 512, 1);
 
@@ -363,6 +364,9 @@ void init_textures() {
 	load_texture("tree_window.png");
 }
 
+int frame_time_print_counter = 0;
+float displayed_frame_time = 0.0;
+
 void game(WindowData * window_data, Keyboard * keyboard, GraphicsBuffer * graphics_buffer, TextureManager * texture_manager, float dt) {
 
 	Keyboard * m_previous_keyboard = m_keyboard;
@@ -383,9 +387,20 @@ void game(WindowData * window_data, Keyboard * keyboard, GraphicsBuffer * graphi
 
 	// TEST Print a test string
 	{
-		float x = 50.0;
-		float y = 50.0;
-		char * text = "Hello World !";
+		
+		if(frame_time_print_counter == 0) { // @Temporary Update frame_time every 15 frames, TODO, average.
+			displayed_frame_time = m_window_data->frame_time;
+			frame_time_print_counter = 15;
+		} else {
+			frame_time_print_counter--;
+		}
+
+		float x = m_window_data->width - 200;
+		float y = 20.0;
+
+		char buffer[128];
+		snprintf(buffer, sizeof(buffer), "Frame Time : %03.3f", displayed_frame_time);
+		char * text = buffer;
 
 		VertexBuffer vb;
 		IndexBuffer ib;
@@ -411,7 +426,7 @@ void game(WindowData * window_data, Keyboard * keyboard, GraphicsBuffer * graphi
 	   	m_graphics_buffer->vertex_buffers.push_back(vb);
 		m_graphics_buffer->index_buffers.push_back(ib);
 		m_graphics_buffer->texture_id_buffer.push_back(my_font.texture->name);
-		m_graphics_buffer->shaders.push_back(textured_shader);
+		m_graphics_buffer->shaders.push_back(font_shader);
 	}
 
 	// Title Screen
@@ -727,7 +742,6 @@ void buffer_entity(Entity entity) {
 
 void buffer_tiles(Room * room) {
 
-
 	for(int tile_index = 0; tile_index < room->num_tiles; tile_index++) {
 		Tile tile = room->tiles[tile_index];
 		int col = tile.local_x;
@@ -795,8 +809,6 @@ void buffer_quad_centered_at(Vector2f center, float radius, float depth, VertexB
 void buffer_quad(Vertex v1, Vertex v2, Vertex v3, Vertex v4, VertexBuffer * vb, IndexBuffer * ib) {
 
 	int first_index = vb->vertices.size();
-
-
 
 	vb->vertices.push_back(v1);
 	vb->vertices.push_back(v2);

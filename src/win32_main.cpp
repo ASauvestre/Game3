@@ -29,6 +29,7 @@ struct Shader {
 };
 
 // Extern Globals
+Shader * font_shader;
 Shader * textured_shader;
 Shader * colored_shader;
 Shader * dummy_shader;
@@ -557,7 +558,8 @@ void bind_srv_to_texture(Texture * texture) {
 
 	// Our fonts are greyscale, so let's make a special case for those
 	if(texture->bytes_per_pixel == 1) {
-		texture_desc.Format = DXGI_FORMAT_R8_UNORM;
+		texture_desc.Format = DXGI_FORMAT_R8_UNORM
+		;
 	}
 
 	D3D11_SUBRESOURCE_DATA texture_subresource;
@@ -680,10 +682,16 @@ bool compile_shader(Shader * shader) {
 }
 
 void init_shaders() {
+	font_shader = (Shader *) malloc(sizeof(Shader));
 	textured_shader = (Shader *) malloc(sizeof(Shader));
 	colored_shader = (Shader *) malloc(sizeof(Shader));
 
 	// Pixel formats
+	D3D11_INPUT_ELEMENT_DESC font_shader_layout_desc[] = {
+		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },  
+		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }, 
+	};
+
 	D3D11_INPUT_ELEMENT_DESC textured_shader_layout_desc[] = {
 		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },  
 		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }, 
@@ -694,11 +702,13 @@ void init_shaders() {
 		{ "COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }, 
 	};
 
+	create_shader("font_shader.hlsl", "VS", "PS", font_shader_layout_desc, ARRAYSIZE(font_shader_layout_desc), POS_TEXCOORD, font_shader);
 	create_shader("textured_shader.hlsl", "VS", "PS", textured_shader_layout_desc, ARRAYSIZE(textured_shader_layout_desc), POS_TEXCOORD, textured_shader);
 	create_shader("colored_shader.hlsl", "VS", "PS", colored_shader_layout_desc, ARRAYSIZE(colored_shader_layout_desc), POS_COL, colored_shader);
 }
 
 void recompile_shaders() {
+	compile_shader(font_shader);
 	compile_shader(textured_shader);
 	compile_shader(colored_shader);
 }
@@ -733,6 +743,7 @@ void check_shader_files_modification() {
 	check_specific_shader_file_modification(dummy_shader);
 	check_specific_shader_file_modification(textured_shader);
 	check_specific_shader_file_modification(colored_shader);
+	check_specific_shader_file_modification(font_shader);
 }
 
 const int TARGET_FPS = 120;
@@ -742,11 +753,11 @@ void main() {
 	QueryPerformanceFrequency(&frequency);
 	QueryPerformanceCounter(&start_time);
 
-	window_data.width 	= 1280;
-	window_data.height 	= 720;
+	// window_data.width 	= 1280;
+	// window_data.height 	= 720;
 
-	// window_data.width 	= 1920;
-	// window_data.height 	= 1080;
+	window_data.width 	= 1920;
+	window_data.height 	= 1080;
 
 	window_data.aspect_ratio = (float) window_data.width/window_data.height;
 	char * window_name = "Game3";
@@ -786,7 +797,7 @@ void main() {
 				frame_time = ((float)(end_time.QuadPart - start_time.QuadPart) * 1000 / (float)frequency.QuadPart);
 			}
 		}
-
+		window_data.frame_time = frame_time;
 		log_print("perf_counter", "Frame time : %f", frame_time);
 	}
 }
