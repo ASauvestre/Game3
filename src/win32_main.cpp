@@ -425,8 +425,14 @@ void draw_buffer(int buffer_index) {
 			log_print("draw_buffer", "Texture %s was not found in the catalog", texture_name);
 			return;
 		}
+		Texture texture = texture_manager.textures[index];
+		ID3D11ShaderResourceView * srv = (ID3D11ShaderResourceView *) texture.platform_info->srv;
 
-		ID3D11ShaderResourceView * srv = (ID3D11ShaderResourceView *) texture_manager.textures[index].platform_info->srv;
+		// This texture doesn't have an srv, likely because it was create by the game, let's give it one
+		if(srv == NULL) {
+			bind_srv_to_texture(&texture);
+			srv = (ID3D11ShaderResourceView *) texture.platform_info->srv;
+		}
 
 		d3d_dc->PSSetShaderResources(0, 1, &srv);
 
