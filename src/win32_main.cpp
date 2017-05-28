@@ -431,7 +431,6 @@ void draw_buffer(int buffer_index) {
 		if(texture->platform_info == NULL) {
 			texture->platform_info = (PlatformTextureInfo *) malloc(sizeof(PlatformTextureInfo));
 			bind_srv_to_texture(texture);
-			
 		}
 
 		ID3D11ShaderResourceView * srv = (ID3D11ShaderResourceView *) texture->platform_info->srv;
@@ -556,6 +555,11 @@ void bind_srv_to_texture(Texture * texture) {
 						 texture_desc.CPUAccessFlags 		= 0;
 						 texture_desc.MiscFlags 			= 0;
 
+	// Our fonts are greyscale, so let's make a special case for those
+	if(texture->bytes_per_pixel == 1) {
+		texture_desc.Format = DXGI_FORMAT_R8_UNORM;
+	}
+
 	D3D11_SUBRESOURCE_DATA texture_subresource;
 	texture_subresource.pSysMem 			= texture->bitmap;
 	texture_subresource.SysMemPitch			= texture->width_in_bytes;
@@ -565,11 +569,17 @@ void bind_srv_to_texture(Texture * texture) {
 
 	d3d_device->CreateTexture2D(&texture_desc, &texture_subresource, &d3d_texture);
 
+
 	D3D11_SHADER_RESOURCE_VIEW_DESC srv_desc;
 									srv_desc.Format 						= DXGI_FORMAT_R8G8B8A8_UNORM;
 									srv_desc.ViewDimension 					= D3D11_SRV_DIMENSION_TEXTURE2D;
 									srv_desc.Texture2D.MostDetailedMip 		= 0;
 									srv_desc.Texture2D.MipLevels 			= 1;
+
+	// Our fonts are greyscale, so let's make a special case for those
+	if(texture->bytes_per_pixel == 1) {
+		srv_desc.Format = DXGI_FORMAT_R8_UNORM;
+	}
 
 	d3d_device->CreateShaderResourceView(d3d_texture, &srv_desc, (ID3D11ShaderResourceView **) &texture->platform_info->srv);
 

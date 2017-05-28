@@ -4,6 +4,9 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
+#define STB_TRUETYPE_IMPLEMENTATION
+#include "stb_truetype.h"
+
 enum GameMode {
 	TITLE_SCREEN,
 	GAME,
@@ -72,6 +75,11 @@ struct Room {
 	Tile * outer_tiles; // Border tiles, used for teleport triggers
 };
 
+struct Font {
+	char * name;
+	Texture * texture;
+	stbtt_bakedchar char_data[96]; // 96 ASCII characters
+};
 
 // Constants
 const int TILES_PER_ROW		= 32;
@@ -87,6 +95,8 @@ static WindowData 		* m_window_data;
 static Keyboard 		* m_keyboard;
 static GraphicsBuffer 	* m_graphics_buffer;
 static TextureManager 	* m_texture_manager;
+
+static Font my_font;
 
 static float square_size = 0.5f;
 
@@ -247,6 +257,42 @@ void init_game(TextureManager * texture_manager) {
 			trees[i].size = 3;
 		}
 	}
+
+
+	// TEST Create text bitmap
+	{
+		my_font.name = "Inconsolata.ttf";
+
+		char * font_file_path = "fonts/Inconsolata.ttf";
+		FILE * font_file = fopen(font_file_path, "rb");
+		int font_file_size = get_file_size(font_file);
+
+		unsigned char * font_file_buffer = (unsigned char *) malloc(font_file_size);
+
+		// log_print("font_loading", "Font file for %s is %d bytes long", my_font.name, font_file_size);
+
+		fread(font_file_buffer, 1, font_file_size, font_file);
+
+		// We no longer need the file
+		fclose(font_file);
+
+		unsigned char * bitmap = (unsigned char *) malloc(512*512*4); // Our bitmap is 512x512 pixels and each pixel takes 4 bytes
+
+		stbtt_BakeFontBitmap(font_file_buffer, 0, 32.0, bitmap, 512, 512, 32, 96, my_font.char_data); // no guarantee this fits!
+
+		my_font.texture = create_texture(my_font.name, bitmap, 512, 512, 1);
+
+		free(font_file_buffer);
+
+		log_print("load_font", "Loaded font %s", my_font.name);
+	}
+}
+
+int get_file_size(FILE * file) {
+  	fseek (file , 0 , SEEK_END);
+  	int size = ftell (file);
+  	fseek (file , 0 , SEEK_SET);
+  	return size;
 }
 
 // Texture loading
@@ -276,6 +322,26 @@ void do_load_texture(Texture * texture) {
 	texture->bytes_per_pixel 	= n;
 	texture->width_in_bytes		= x * n;
 	texture->num_bytes	 		= texture->width_in_bytes * y;
+}
+
+Texture * create_texture(char * name, unsigned char * data, int width, int height, int bytes_per_pixel) {
+	Texture * texture = m_texture_manager->get_new_texture_slot();
+
+	texture->name 				= name;
+	texture->bitmap 			= data;
+	texture->width 				= width;
+	texture->height 			= height;
+	texture->bytes_per_pixel 	= bytes_per_pixel;
+	texture->width_in_bytes		= texture->width * texture->bytes_per_pixel;
+	texture->num_bytes	 		= texture->width_in_bytes * texture->height;
+
+	m_texture_manager->register_texture(texture);
+
+	return texture;
+}
+
+Texture * create_texture(char * name, unsigned char * data, int width, int height) {
+	return create_texture(name, data, width, height, 4); // Default is 32-bit bitmap.
 }
 
 void load_texture(char * name) {
@@ -313,6 +379,39 @@ void game(WindowData * window_data, Keyboard * keyboard, GraphicsBuffer * graphi
 		else if(game_mode == EDITOR) {
 			game_mode = GAME;
 		}
+	}
+
+	// TEST Print a test string
+	{
+		float x = 50.0;
+		float y = 50.0;
+		char * text = "Hello World !";
+
+		VertexBuffer vb;
+		IndexBuffer ib;
+
+		while(*text) {
+			if (*text >= 32 && *text < 128) {
+				stbtt_aligned_quad q;
+				stbtt_GetBakedQuad(my_font.char_data, 512,512, *text-32, &x,&y,&q,1);
+			
+				Vertex v1 = {q.x0/m_window_data->width, q.y0/m_window_data->height, 0.0f, q.s0, q.t0, 0};
+				Vertex v2 = {q.x1/m_window_data->width, q.y1/m_window_data->height, 0.0f, q.s1, q.t1, 0};
+				Vertex v3 = {q.x0/m_window_data->width, q.y1/m_window_data->height, 0.0f, q.s0, q.t1, 0};
+				Vertex v4 = {q.x1/m_window_data->width, q.y0/m_window_data->height, 0.0f, q.s1, q.t0, 0};
+
+				convert_top_left_coords_to_centered(&v1, &v2, &v3, &v4);
+
+				buffer_quad(v1, v2, v3, v4, &vb, &ib);
+
+			}
+			++text;
+	   }
+
+	   	m_graphics_buffer->vertex_buffers.push_back(vb);
+		m_graphics_buffer->index_buffers.push_back(ib);
+		m_graphics_buffer->texture_id_buffer.push_back(my_font.texture->name);
+		m_graphics_buffer->shaders.push_back(textured_shader);
 	}
 
 	// Title Screen
@@ -481,12 +580,6 @@ void game(WindowData * window_data, Keyboard * keyboard, GraphicsBuffer * graphi
 			if(keyboard->key_down) 	camera_offset.y += position_delta;
 		}
 		// log_print("[game_camera]", "Camera offset is (%f, %f)", camera_offset.x, camera_offset.y);
-
-	}
-
-	// Create test text bitmap
-	{
-
 	}
 
 	buffer_tiles(current_room);
