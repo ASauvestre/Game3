@@ -425,14 +425,16 @@ void draw_buffer(int buffer_index) {
 			log_print("draw_buffer", "Texture %s was not found in the catalog", texture_name);
 			return;
 		}
-		Texture texture = texture_manager.textures[index];
-		ID3D11ShaderResourceView * srv = (ID3D11ShaderResourceView *) texture.platform_info->srv;
-
-		// This texture doesn't have an srv, likely because it was create by the game, let's give it one
-		if(srv == NULL) {
-			bind_srv_to_texture(&texture);
-			srv = (ID3D11ShaderResourceView *) texture.platform_info->srv;
+		Texture * texture = &texture_manager.textures[index];
+		
+		// This texture doesn't have its platform info, likely because it was create by the game, let's give it one
+		if(texture->platform_info == NULL) {
+			texture->platform_info = (PlatformTextureInfo *) malloc(sizeof(PlatformTextureInfo));
+			bind_srv_to_texture(texture);
+			
 		}
+
+		ID3D11ShaderResourceView * srv = (ID3D11ShaderResourceView *) texture->platform_info->srv;
 
 		d3d_dc->PSSetShaderResources(0, 1, &srv);
 
@@ -489,33 +491,56 @@ void draw_frame() {
 	graphics_buffer.shaders.clear();
 }
 
-void do_load_texture(Texture * texture) {
+// Texture code, moved to game_main.cpp
+// void do_load_texture(Texture * texture) {
 
-	char path[512];
-	snprintf(path, 512, "textures/%s", texture->name);
+// 	char path[512];
+// 	snprintf(path, 512, "textures/%s", texture->name);
 	
-	int x,y,n;
-	texture->bitmap = stbi_load(path, &x, &y, &n, 4);
+// 	int x,y,n;
+// 	texture->bitmap = stbi_load(path, &x, &y, &n, 4);
 
-	if(texture->bitmap == NULL) {
-		log_print("do_load_texture", "Failed to load texture \"%s\"", texture->name);
-		return;
-	}
+// 	if(texture->bitmap == NULL) {
+// 		log_print("do_load_texture", "Failed to load texture \"%s\"", texture->name);
+// 		return;
+// 	}
 
-	if(n != 4) {
-		log_print("do_load_texture", "Loaded texture \"%s\", it has %d bit depth, please convert to 32 bit depth", texture->name, n*8);
-		n = 4;
-	} else {
-		log_print("do_load_texture", "Loaded texture \"%s\"", texture->name);
+// 	if(n != 4) {
+// 		log_print("do_load_texture", "Loaded texture \"%s\", it has %d bit depth, please convert to 32 bit depth", texture->name, n*8);
+// 		n = 4;
+// 	} else {
+// 		log_print("do_load_texture", "Loaded texture \"%s\"", texture->name);
 
-	}
+// 	}
 
-	texture->width 				= x;
-	texture->height 			= y;
-	texture->bytes_per_pixel 	= n;
-	texture->width_in_bytes		= x * n;
-	texture->num_bytes	 		= texture->width_in_bytes * y;
-}
+// 	texture->width 				= x;
+// 	texture->height 			= y;
+// 	texture->bytes_per_pixel 	= n;
+// 	texture->width_in_bytes		= x * n;
+// 	texture->num_bytes	 		= texture->width_in_bytes * y;
+// }
+
+// void load_texture(char * name) {
+// 	Texture * texture = texture_manager.get_new_texture_slot();
+
+// 	texture->platform_info = (PlatformTextureInfo *) malloc(sizeof(PlatformTextureInfo));
+
+// 	texture->name = name;
+
+// 	do_load_texture(texture);
+// 	bind_srv_to_texture(texture);
+
+// 	texture_manager.register_texture(texture);
+// }
+
+// void init_textures() {
+// 	load_texture("title_screen_logo.png");
+// 	load_texture("grass.png");
+// 	load_texture("dirt.png");
+// 	load_texture("megaperson.png");
+// 	load_texture("tree.png");
+// 	load_texture("tree_window.png");
+// }
 
 void bind_srv_to_texture(Texture * texture) {
 	D3D11_TEXTURE2D_DESC texture_desc;
@@ -548,28 +573,6 @@ void bind_srv_to_texture(Texture * texture) {
 
 	d3d_device->CreateShaderResourceView(d3d_texture, &srv_desc, (ID3D11ShaderResourceView **) &texture->platform_info->srv);
 
-}
-
-void load_texture(char * name) {
-	Texture * texture = texture_manager.get_new_texture_slot();
-
-	texture->platform_info = (PlatformTextureInfo *) malloc(sizeof(PlatformTextureInfo));
-
-	texture->name = name;
-
-	do_load_texture(texture);
-	bind_srv_to_texture(texture);
-
-	texture_manager.register_texture(texture);
-}
-
-void init_textures() {
-	load_texture("title_screen_logo.png");
-	load_texture("grass.png");
-	load_texture("dirt.png");
-	load_texture("megaperson.png");
-	load_texture("tree.png");
-	load_texture("tree_window.png");
 }
 
 // Shader code
@@ -744,9 +747,7 @@ void main() {
 
 	init_shaders();
 
-	init_textures();
-
-	init_game();
+	init_game(&texture_manager);
 
 	QueryPerformanceCounter(&end_time);
 	float frame_time = ((float)(end_time.QuadPart - start_time.QuadPart)*1000/(float)frequency.QuadPart);

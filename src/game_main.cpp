@@ -1,5 +1,9 @@
 #include "game_main.h"
 
+#define STBI_ONLY_PNG
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+
 enum GameMode {
 	TITLE_SCREEN,
 	GAME,
@@ -182,7 +186,11 @@ Room * generate_room(int width, int height) {
 	return room;
 }
 
-void init_game() {
+void init_game(TextureManager * texture_manager) {
+	m_texture_manager = texture_manager;
+	// Load textures
+	init_textures();
+
 	// Init player
 	{
 		player.position.x = 0;
@@ -239,6 +247,54 @@ void init_game() {
 			trees[i].size = 3;
 		}
 	}
+}
+
+// Texture loading
+void do_load_texture(Texture * texture) {
+
+	char path[512];
+	snprintf(path, 512, "textures/%s", texture->name);
+	
+	int x,y,n;
+	texture->bitmap = stbi_load(path, &x, &y, &n, 4);
+
+	if(texture->bitmap == NULL) {
+		log_print("do_load_texture", "Failed to load texture \"%s\"", texture->name);
+		return;
+	}
+
+	if(n != 4) {
+		log_print("do_load_texture", "Loaded texture \"%s\", it has %d bit depth, please convert to 32 bit depth", texture->name, n*8);
+		n = 4;
+	} else {
+		log_print("do_load_texture", "Loaded texture \"%s\"", texture->name);
+
+	}
+
+	texture->width 				= x;
+	texture->height 			= y;
+	texture->bytes_per_pixel 	= n;
+	texture->width_in_bytes		= x * n;
+	texture->num_bytes	 		= texture->width_in_bytes * y;
+}
+
+void load_texture(char * name) {
+	Texture * texture = m_texture_manager->get_new_texture_slot();
+
+	texture->name = name;
+
+	do_load_texture(texture);
+
+	m_texture_manager->register_texture(texture);
+}
+
+void init_textures() {
+	load_texture("title_screen_logo.png");
+	load_texture("grass.png");
+	load_texture("dirt.png");
+	load_texture("megaperson.png");
+	load_texture("tree.png");
+	load_texture("tree_window.png");
 }
 
 void game(WindowData * window_data, Keyboard * keyboard, GraphicsBuffer * graphics_buffer, TextureManager * texture_manager, float dt) {
@@ -425,6 +481,11 @@ void game(WindowData * window_data, Keyboard * keyboard, GraphicsBuffer * graphi
 			if(keyboard->key_down) 	camera_offset.y += position_delta;
 		}
 		// log_print("[game_camera]", "Camera offset is (%f, %f)", camera_offset.x, camera_offset.y);
+
+	}
+
+	// Create test text bitmap
+	{
 
 	}
 

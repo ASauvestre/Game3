@@ -144,7 +144,9 @@ struct WindowData {
 	Color4f background_color;
 };
 
-void init_game();
+void init_textures();
+
+void init_game(TextureManager * texture_manager);
 
 void game(WindowData * window_data, Keyboard * keyboard, GraphicsBuffer * graphics_buffer, TextureManager * texture_manager, float dt);
 

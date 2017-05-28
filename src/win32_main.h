@@ -7,10 +7,6 @@
 #include "game_main.h"
 #include "win32_texture_manager.h"
 
-#define STBI_ONLY_PNG
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
-
 enum ShaderInputMode;
 
 void win32_sleep_for_ms(float ms);
