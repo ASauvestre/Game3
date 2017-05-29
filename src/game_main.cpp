@@ -86,6 +86,9 @@ const int TILES_PER_ROW		= 32;
 const int ROWS_PER_SCREEN	= 18;
 const int TILES_PER_SCREEN	= TILES_PER_ROW * ROWS_PER_SCREEN;
 
+const float DEBUG_OVERLAY_Z  = 0.0f;
+const float EDITOR_OVERLAY_Z = 0.001f;
+
 // Extern Globals
 extern Shader * font_shader;
 extern Shader * textured_shader;
@@ -389,7 +392,7 @@ void init_fonts() {
 	my_font = load_font("Inconsolata.ttf");
 }
 
-void buffer_string(char * text, float x, float y, Font * font) {
+void buffer_string(char * text, float x, float y, float z,  Font * font) {
 	VertexBuffer vb;
 	IndexBuffer ib;
 
@@ -399,10 +402,10 @@ void buffer_string(char * text, float x, float y, Font * font) {
 			stbtt_aligned_quad q;
 			stbtt_GetBakedQuad(font->char_data, 512,512, *text-32, &x,&y,&q,1);
 		
-			Vertex v1 = {q.x0/m_window_data->width, q.y0/m_window_data->height, 0.0f, q.s0, q.t0, 0};
-			Vertex v2 = {q.x1/m_window_data->width, q.y1/m_window_data->height, 0.0f, q.s1, q.t1, 0};
-			Vertex v3 = {q.x0/m_window_data->width, q.y1/m_window_data->height, 0.0f, q.s0, q.t1, 0};
-			Vertex v4 = {q.x1/m_window_data->width, q.y0/m_window_data->height, 0.0f, q.s1, q.t0, 0};
+			Vertex v1 = {q.x0/m_window_data->width, q.y0/m_window_data->height, z, q.s0, q.t0, 0};
+			Vertex v2 = {q.x1/m_window_data->width, q.y1/m_window_data->height, z, q.s1, q.t1, 0};
+			Vertex v3 = {q.x0/m_window_data->width, q.y1/m_window_data->height, z, q.s0, q.t1, 0};
+			Vertex v4 = {q.x1/m_window_data->width, q.y0/m_window_data->height, z, q.s1, q.t0, 0};
 
 			convert_top_left_coords_to_centered(&v1, &v2, &v3, &v4);
 
@@ -629,7 +632,7 @@ void buffer_debug_overlay() {
 			snprintf(buffer, sizeof(buffer), "Frame Time : %.3f", displayed_frame_time);
 		}
 
-		buffer_string(buffer, x, y, my_font);
+		buffer_string(buffer, x, y, DEBUG_OVERLAY_Z, my_font);
 	}
 }
 
@@ -663,10 +666,10 @@ void buffer_editor_tile_overlay(Room * room) {
 			color = Color4f(0.0f, 1.0f, 1.0f, 0.5f);
 		}
 
-		Vertex v1 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 0), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 0), 0.0f, color};
-		Vertex v2 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 1), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 1), 0.0f, color};
-		Vertex v3 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 0), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 1), 0.0f, color};
-		Vertex v4 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 1), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 0), 0.0f, color};
+		Vertex v1 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 0), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 0), EDITOR_OVERLAY_Z, color};
+		Vertex v2 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 1), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 1), EDITOR_OVERLAY_Z, color};
+		Vertex v3 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 0), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 1), EDITOR_OVERLAY_Z, color};
+		Vertex v4 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 1), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 0), EDITOR_OVERLAY_Z, color};
 
 		convert_top_left_coords_to_centered(&v1, &v2, &v3, &v4);
 		buffer_quad(v1, v2, v3, v4, &vb, &ib);
@@ -700,10 +703,10 @@ void buffer_editor_tile_overlay(Room * room) {
 			color = Color4f(0.0f, 1.0f, 1.0f, 0.5f);
 		}
 
-		Vertex v1 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 0), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 0), 0.0f, color};
-		Vertex v2 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 1), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 1), 0.0f, color};
-		Vertex v3 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 0), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 1), 0.0f, color};
-		Vertex v4 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 1), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 0), 0.0f, color};
+		Vertex v1 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 0), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 0), EDITOR_OVERLAY_Z, color};
+		Vertex v2 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 1), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 1), EDITOR_OVERLAY_Z, color};
+		Vertex v3 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 0), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 1), EDITOR_OVERLAY_Z, color};
+		Vertex v4 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 1), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 0), EDITOR_OVERLAY_Z, color};
 
 		convert_top_left_coords_to_centered(&v1, &v2, &v3, &v4);
 		buffer_quad(v1, v2, v3, v4, &vb, &ib);
@@ -712,6 +715,9 @@ void buffer_editor_tile_overlay(Room * room) {
 	m_graphics_buffer->vertex_buffers.push_back(vb);
 	m_graphics_buffer->index_buffers.push_back(ib);
 
+	// @Temporary Required because otherwise, the texture buffer is no longer synced with the other buffers
+	m_graphics_buffer->texture_id_buffer.push_back("placeholder");
+	
 	m_graphics_buffer->shaders.push_back(colored_shader);
 }
 
