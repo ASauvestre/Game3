@@ -127,6 +127,14 @@ LRESULT CALLBACK WndProc(HWND window_handle, UINT message, WPARAM w_param, LPARA
 					keyboard.key_F1 = true;
 					break;
 				}
+				case VK_F2 : {
+					keyboard.key_F2 = true;
+					break;
+				}
+				case VK_F3 : {
+					keyboard.key_F3 = true;
+					break;
+				}
 				case VK_ESCAPE : {
 					break;
 				}
@@ -167,6 +175,14 @@ LRESULT CALLBACK WndProc(HWND window_handle, UINT message, WPARAM w_param, LPARA
 				}
 				case VK_F1 : {
 					keyboard.key_F1 = false;
+					break;
+				}
+				case VK_F2 : {
+					keyboard.key_F2 = false;
+					break;
+				}
+				case VK_F3 : {
+					keyboard.key_F3 = false;
 					break;
 				}
 				case VK_ESCAPE : {
@@ -746,18 +762,17 @@ void check_shader_files_modification() {
 	check_specific_shader_file_modification(font_shader);
 }
 
-const int TARGET_FPS = 120;
-bool locked_fps = false;
+const int TARGET_FPS = 60;
 
 void main() {
 	QueryPerformanceFrequency(&frequency);
 	QueryPerformanceCounter(&start_time);
 
-	// window_data.width 	= 1280;
-	// window_data.height 	= 720;
+	window_data.width 	= 1280;
+	window_data.height 	= 720;
 
-	window_data.width 	= 1920;
-	window_data.height 	= 1080;
+	// window_data.width 	= 1920;
+	// window_data.height 	= 1080;
 
 	window_data.aspect_ratio = (float) window_data.width/window_data.height;
 	char * window_name = "Game3";
@@ -770,6 +785,8 @@ void main() {
 
 	init_game(&texture_manager);
 
+	Keyboard previous_keyboard;
+
 	QueryPerformanceCounter(&end_time);
 	float frame_time = ((float)(end_time.QuadPart - start_time.QuadPart)*1000/(float)frequency.QuadPart);
 	log_print("perf_counter", "Startup time : %.3f seconds", frame_time/1000.f);
@@ -781,14 +798,17 @@ void main() {
 		check_shader_files_modification();
 
 		update_window_events();
-		game(&window_data, &keyboard, &graphics_buffer, &texture_manager, frame_time);
+
+		game(&window_data, &keyboard, &previous_keyboard, &graphics_buffer, &texture_manager, frame_time);
 		draw_frame();
+
+		previous_keyboard = keyboard; // @Framerate
 
 		QueryPerformanceCounter(&end_time);
 		
 		frame_time = ((float)(end_time.QuadPart - start_time.QuadPart)*1000/(float)frequency.QuadPart);
 
-		if (locked_fps) {
+		if (window_data.locked_fps) {
 			while (frame_time < 1000.0f / TARGET_FPS) {
 				Sleep(0);
 
@@ -798,6 +818,6 @@ void main() {
 			}
 		}
 		window_data.frame_time = frame_time;
-		log_print("perf_counter", "Frame time : %f", frame_time);
+		// log_print("perf_counter", "Frame time : %f", frame_time);
 	}
 }

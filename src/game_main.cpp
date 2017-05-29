@@ -47,11 +47,9 @@ struct Tile {
 	bool collision_enabled = false;
 };
 
-GameMode game_mode;
-
 struct Room {
-	Room(int w, int h) {
-
+	Room(char * n, int w, int h) {
+		name = n;
 		width = w;
 		height = h;
 
@@ -65,6 +63,8 @@ struct Room {
 	~Room() {
 		free(tiles);
 	}
+
+	char * name;
 
 	int width;
 	int height;
@@ -97,7 +97,7 @@ static Keyboard 		* m_keyboard;
 static GraphicsBuffer 	* m_graphics_buffer;
 static TextureManager 	* m_texture_manager;
 
-static Font my_font;
+static Font * my_font;
 
 static float square_size = 0.5f;
 
@@ -112,6 +112,9 @@ static Vector2f camera_offset;
 
 static float tile_width = 1.0f/TILES_PER_ROW;
 static float tile_height = 1.0f/ROWS_PER_SCREEN; // @Incomplete, handle aspect ratios
+
+static GameMode game_mode;
+static bool debug_overlay_enabled = false;
 
 int find_tile_index_from_coords(int x, int y, Room * room) {
 	return (x + 1) * room->width + y - 1;
@@ -145,8 +148,8 @@ Vector2f find_outer_tile_coords_from_index(int index, Room * room) {
 	return result;
 }
 
-Room * generate_room(int width, int height) {
-	Room * room = new Room(width, height);
+Room * generate_room(char * name, int width, int height) {
+	Room * room = new Room(name, width, height);
 
 	for(int i=0; i<(room->num_tiles); i++) {
 		Tile tile;
@@ -199,8 +202,11 @@ Room * generate_room(int width, int height) {
 
 void init_game(TextureManager * texture_manager) {
 	m_texture_manager = texture_manager;
+	
 	// Load textures
 	init_textures();
+
+	init_fonts();
 
 	// Init player
 	{
@@ -214,7 +220,7 @@ void init_game(TextureManager * texture_manager) {
 	// TEST Create test rooms
 	{
 		
-		Room * room = generate_room(50, 30);
+		Room * room = generate_room("main_room", 50, 30);
 
 		room->outer_tiles[5].type = SWITCH_ROOM;
 		room->outer_tiles[5].room_target_id = 1;
@@ -226,7 +232,7 @@ void init_game(TextureManager * texture_manager) {
 
 		// ----------------------------
 
-		room = generate_room(28, 14);
+		room = generate_room("small_room", 28, 14);
 
 		room->outer_tiles[61].type = SWITCH_ROOM;
 		room->outer_tiles[61].room_target_id = 0;
@@ -258,35 +264,50 @@ void init_game(TextureManager * texture_manager) {
 			trees[i].size = 3;
 		}
 	}
+}
 
+Font * load_font(char * name) {
+	Font * font = (Font *) malloc(sizeof(Font));
 
-	// TEST Create text bitmap
-	{
-		my_font.name = "Inconsolata.ttf";
+	font->name = name;
 
-		char * font_file_path = "fonts/Inconsolata.ttf";
-		FILE * font_file = fopen(font_file_path, "rb");
-		int font_file_size = get_file_size(font_file);
+	char path[512];
+	snprintf(path, 512, "fonts/%s", font->name);
 
-		unsigned char * font_file_buffer = (unsigned char *) malloc(font_file_size);
+	FILE * font_file = fopen(path, "rb");
 
-		// log_print("font_loading", "Font file for %s is %d bytes long", my_font.name, font_file_size);
-
-		fread(font_file_buffer, 1, font_file_size, font_file);
-
-		// We no longer need the file
-		fclose(font_file);
-
-		unsigned char * bitmap = (unsigned char *) malloc(512*512*4); // Our bitmap is 512x512 pixels and each pixel takes 4 bytes
-
-		stbtt_BakeFontBitmap(font_file_buffer, 0, 16.0, bitmap, 512, 512, 32, 96, my_font.char_data); // no guarantee this fits!
-
-		my_font.texture = create_texture(my_font.name, bitmap, 512, 512, 1);
-
-		free(font_file_buffer);
-
-		log_print("load_font", "Loaded font %s", my_font.name);
+	if(font_file == NULL) {
+		log_print("load_font", "Font %s not found at %s", name, path)
+		free(font);
+		return NULL;
 	}
+
+	int font_file_size = get_file_size(font_file);
+
+	unsigned char * font_file_buffer = (unsigned char *) malloc(font_file_size);
+
+	// log_print("font_loading", "Font file for %s is %d bytes long", my_font->name, font_file_size);
+
+	fread(font_file_buffer, 1, font_file_size, font_file);
+
+	// We no longer need the file
+	fclose(font_file);
+
+	unsigned char * bitmap = (unsigned char *) malloc(512*512*4); // Our bitmap is 512x512 pixels and each pixel takes 4 bytes
+
+	int result = stbtt_BakeFontBitmap(font_file_buffer, 0, 16.0, bitmap, 512, 512, 32, 96, font->char_data); // no guarantee this fits!
+
+	if(result <= 0) {
+		log_print("load_font", "The font %s could not be loaded, it is too large to fit in a 512x512 bitmap", name);
+	}
+
+	font->texture = create_texture(font->name, bitmap, 512, 512, 1);
+
+	free(font_file_buffer);
+
+	log_print("load_font", "Loaded font %s", font->name);
+
+	return font;
 }
 
 int get_file_size(FILE * file) {
@@ -364,12 +385,42 @@ void init_textures() {
 	load_texture("tree_window.png");
 }
 
-int frame_time_print_counter = 0;
-float displayed_frame_time = 0.0;
+void init_fonts() {
+	my_font = load_font("Inconsolata.ttf");
+}
 
-void game(WindowData * window_data, Keyboard * keyboard, GraphicsBuffer * graphics_buffer, TextureManager * texture_manager, float dt) {
+void buffer_string(char * text, float x, float y, Font * font) {
+	VertexBuffer vb;
+	IndexBuffer ib;
 
-	Keyboard * m_previous_keyboard = m_keyboard;
+	while(*text) {
+		// Make sure it's an ascii character
+		if (*text >= 32 && *text < 128) {
+			stbtt_aligned_quad q;
+			stbtt_GetBakedQuad(font->char_data, 512,512, *text-32, &x,&y,&q,1);
+		
+			Vertex v1 = {q.x0/m_window_data->width, q.y0/m_window_data->height, 0.0f, q.s0, q.t0, 0};
+			Vertex v2 = {q.x1/m_window_data->width, q.y1/m_window_data->height, 0.0f, q.s1, q.t1, 0};
+			Vertex v3 = {q.x0/m_window_data->width, q.y1/m_window_data->height, 0.0f, q.s0, q.t1, 0};
+			Vertex v4 = {q.x1/m_window_data->width, q.y0/m_window_data->height, 0.0f, q.s1, q.t0, 0};
+
+			convert_top_left_coords_to_centered(&v1, &v2, &v3, &v4);
+
+			buffer_quad(v1, v2, v3, v4, &vb, &ib);
+
+		}
+		++text;
+   }
+
+   	m_graphics_buffer->vertex_buffers.push_back(vb);
+	m_graphics_buffer->index_buffers.push_back(ib);
+	m_graphics_buffer->texture_id_buffer.push_back(font->texture->name);
+	m_graphics_buffer->shaders.push_back(font_shader);
+}
+
+void game(WindowData * window_data, Keyboard * keyboard, Keyboard * previous_keyboard, GraphicsBuffer * graphics_buffer, TextureManager * texture_manager, float dt) { // @Redundant dt is now also in WindowData
+	
+	Keyboard *  m_previous_keyboard = previous_keyboard;
 
 	m_window_data 	  = window_data;
 	m_keyboard 		  = keyboard;
@@ -385,82 +436,12 @@ void game(WindowData * window_data, Keyboard * keyboard, GraphicsBuffer * graphi
 		}
 	}
 
-	// TEST Print a test string
-	{
-		
-		if(frame_time_print_counter == 0) { // @Temporary Update frame_time every 15 frames, TODO, average.
-			displayed_frame_time = m_window_data->frame_time;
-			frame_time_print_counter = 15;
-		} else {
-			frame_time_print_counter--;
-		}
-
-		float x = m_window_data->width - 200;
-		float y = 20.0;
-
-		char buffer[128];
-		snprintf(buffer, sizeof(buffer), "Frame Time : %03.3f", displayed_frame_time);
-		char * text = buffer;
-
-		VertexBuffer vb;
-		IndexBuffer ib;
-
-		while(*text) {
-			if (*text >= 32 && *text < 128) {
-				stbtt_aligned_quad q;
-				stbtt_GetBakedQuad(my_font.char_data, 512,512, *text-32, &x,&y,&q,1);
-			
-				Vertex v1 = {q.x0/m_window_data->width, q.y0/m_window_data->height, 0.0f, q.s0, q.t0, 0};
-				Vertex v2 = {q.x1/m_window_data->width, q.y1/m_window_data->height, 0.0f, q.s1, q.t1, 0};
-				Vertex v3 = {q.x0/m_window_data->width, q.y1/m_window_data->height, 0.0f, q.s0, q.t1, 0};
-				Vertex v4 = {q.x1/m_window_data->width, q.y0/m_window_data->height, 0.0f, q.s1, q.t0, 0};
-
-				convert_top_left_coords_to_centered(&v1, &v2, &v3, &v4);
-
-				buffer_quad(v1, v2, v3, v4, &vb, &ib);
-
-			}
-			++text;
-	   }
-
-	   	m_graphics_buffer->vertex_buffers.push_back(vb);
-		m_graphics_buffer->index_buffers.push_back(ib);
-		m_graphics_buffer->texture_id_buffer.push_back(my_font.texture->name);
-		m_graphics_buffer->shaders.push_back(font_shader);
+	if(m_keyboard->key_F2 && !m_previous_keyboard->key_F2) {
+		debug_overlay_enabled = !debug_overlay_enabled;
 	}
 
-	// Title Screen
-	{
-		// Color4f * current_color = &window_data->background_color;
-		// current_color->r = (current_color->r + 0.0001f);
-		// current_color->g = (current_color->g + 0.0001f);
-		// current_color->b = (current_color->b + 0.0001f);
-
-		// if(current_color->r > 1.0f) { current_color->r = 0.0f; }
-		// if(current_color->b > 1.0f) { current_color->b = 0.0f; }
-		// if(current_color->g > 1.0f) { current_color->g = 0.0f; }
-
-		
-		// square_size += d_square_size;
-
-		// if(square_went_full_size) {
-		// 	if(square_size < 0.557f ) {
-		// 		square_size = 0.557f; 
-		// 		d_square_size = 0.00001f; 
-		// 		square_went_full_size_and_back = true;
-		// 	}
-
-		// 	if(square_size > 0.56f ) {
-		// 		if(square_went_full_size_and_back) { 
-		// 			square_size = 0.56f; 
-		// 			d_square_size = -0.00001f; } 
-		// 		}
-
-		// } else {
-		// 	if(square_size > 0.58f ) {square_size = 0.58f; d_square_size = -0.0002f; square_went_full_size = true;}
-		// }
-
-		// buffer_title_block();
+	if(m_keyboard->key_F3 && !m_previous_keyboard->key_F3) {
+		m_window_data->locked_fps = !m_window_data->locked_fps;
 	}
 
 	if(game_mode == GAME) {
@@ -606,6 +587,49 @@ void game(WindowData * window_data, Keyboard * keyboard, GraphicsBuffer * graphi
 	// Editor overlays
 	if(game_mode == EDITOR) {
 		buffer_editor_tile_overlay(current_room);
+	}
+
+	// Debug overlay 
+	if(debug_overlay_enabled) {
+		buffer_debug_overlay();
+	}
+}
+
+int frame_time_print_counter = 0;
+
+const int FRAME_TIME_UPDATE_DELAY = 15; // in frames
+
+float displayed_frame_time = 0.0f;
+float summed_frame_rate = 0.0f;
+
+void buffer_debug_overlay() {
+	if(frame_time_print_counter == 0) { // @Temporary Updated every 15 frames and average of those 15 frames, maybe find a better system.
+		displayed_frame_time = summed_frame_rate / FRAME_TIME_UPDATE_DELAY;
+
+		// log_print("perf_counter", "Average of %d frames is %f", FRAME_TIME_UPDATE_DELAY, displayed_frame_time);
+
+		summed_frame_rate = 0.0f;
+		frame_time_print_counter = FRAME_TIME_UPDATE_DELAY;
+	}
+
+	summed_frame_rate += m_window_data->frame_time;
+	frame_time_print_counter--;
+	
+	// Buffer Frame time
+	{
+		float x = m_window_data->width - 160;
+		float y = 20.0f;
+
+		char buffer[64];
+
+		if(displayed_frame_time < 10.0f) {
+			// Add a space
+			snprintf(buffer, sizeof(buffer), "Frame Time :  %.3f", displayed_frame_time);
+		} else {
+			snprintf(buffer, sizeof(buffer), "Frame Time : %.3f", displayed_frame_time);
+		}
+
+		buffer_string(buffer, x, y, my_font);
 	}
 }
 

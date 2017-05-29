@@ -135,6 +135,8 @@ struct Keyboard {
 	bool key_space 	= false;
 
 	bool key_F1	= false;
+	bool key_F2	= false;
+	bool key_F3	= false;
 };
 
 struct WindowData {
@@ -142,12 +144,16 @@ struct WindowData {
 	int height;
 	float aspect_ratio;
 	Color4f background_color;
-	float frame_time;
+
+	float frame_time = 0.0f;
+	bool locked_fps = false;
 };
 
 int get_file_size(FILE * file);
 
 void init_textures();
+
+void init_fonts();
 
 void init_game(TextureManager * texture_manager);
 
@@ -155,7 +161,7 @@ Texture * create_texture(char * name, unsigned char * data, int width, int heigh
 
 Texture * create_texture(char * name, unsigned char * data, int width, int height);
 
-void game(WindowData * window_data, Keyboard * keyboard, GraphicsBuffer * graphics_buffer, TextureManager * texture_manager, float dt);
+void game(WindowData * window_data, Keyboard * keyboard, Keyboard * previous_keyboard, GraphicsBuffer * graphics_buffer, TextureManager * texture_manager, float dt);
 
 void buffer_player();
 
@@ -164,6 +170,8 @@ void buffer_trees();
 void buffer_entity(Entity entity);
 
 void buffer_tiles(Room * room);
+
+void buffer_debug_overlay();
 
 void buffer_editor_tile_overlay(Room * room);
 
