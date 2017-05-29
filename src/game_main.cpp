@@ -86,8 +86,10 @@ const int TILES_PER_ROW		= 32;
 const int ROWS_PER_SCREEN	= 18;
 const int TILES_PER_SCREEN	= TILES_PER_ROW * ROWS_PER_SCREEN;
 
-const float DEBUG_OVERLAY_Z  = 0.0f;
-const float EDITOR_OVERLAY_Z = 0.001f;
+const float DEBUG_OVERLAY_Z  			= 0.000000f;
+const float DEBUG_OVERLAY_BACKGROUND_Z  = 0.000001f;
+const float EDITOR_OVERLAY_Z  			= 0.000010f;
+const float MIN_ENTITY_Z  				= 0.000100f;
 
 // Extern Globals
 extern Shader * font_shader;
@@ -613,12 +615,12 @@ void buffer_debug_overlay() {
 		VertexBuffer vb;
 		IndexBuffer  ib;
 
-		Color4f color = Color4f(0.0f, 0.0f, 0.0f, 0.8f);
+		Color4f color = Color4f(0.0f, 0.0f, 0.0f, 0.7f);
 
-		Vertex v1 = {1.0f - (float)170/m_window_data->width, 0.0f 								  , EDITOR_OVERLAY_Z - 0.000001f, color};
-		Vertex v2 = {1.0f 								   , 0.0f + (float)56/m_window_data->width, EDITOR_OVERLAY_Z - 0.000001f, color};
-		Vertex v3 = {1.0f - (float)170/m_window_data->width, 0.0f + (float)56/m_window_data->width, EDITOR_OVERLAY_Z - 0.000001f, color};
-		Vertex v4 = {1.0f 								   , 0.0f 								  , EDITOR_OVERLAY_Z - 0.000001f, color};
+		Vertex v1 = {1.0f - (float)170/m_window_data->width, 0.0f 								  , DEBUG_OVERLAY_BACKGROUND_Z, color};
+		Vertex v2 = {1.0f 								   , 0.0f + (float)56/m_window_data->width, DEBUG_OVERLAY_BACKGROUND_Z, color};
+		Vertex v3 = {1.0f - (float)170/m_window_data->width, 0.0f + (float)56/m_window_data->width, DEBUG_OVERLAY_BACKGROUND_Z, color};
+		Vertex v4 = {1.0f 								   , 0.0f 								  , DEBUG_OVERLAY_BACKGROUND_Z, color};
 
 		convert_top_left_coords_to_centered(&v1, &v2, &v3, &v4);
 		buffer_quad(v1, v2, v3, v4, &vb, &ib);
@@ -758,8 +760,12 @@ void buffer_player() {
 	buffer_entity(player);
 }
 
-void buffer_entity(Entity entity) {
+inline float max(float a, float b) {
+	if(a > b) return a;
+	return b;
+}
 
+void buffer_entity(Entity entity) {
 
 		Vector2f screen_pos;
 		screen_pos.x = entity.position.x - camera_offset.x + TILES_PER_ROW/2;
@@ -771,17 +777,19 @@ void buffer_entity(Entity entity) {
 		if(screen_pos.y > ROWS_PER_SCREEN) return;
 
 
+		float z = max(MIN_ENTITY_Z, 1.0f - (entity.position.y + entity.size)/current_room->height);
+
 		Vertex v1 = {tile_width * (screen_pos.x + 0), tile_height * (screen_pos.y  + 0), 
-					 1.0f - (entity.position.y + entity.size)/current_room->height, 0.0f, 0.0f, 0};
+					 z, 0.0f, 0.0f, 0};
 
 		Vertex v2 = {tile_width * (screen_pos.x + entity.size), tile_height * (screen_pos.y + entity.size),
-					 1.0f - (entity.position.y + entity.size)/current_room->height, 1.0f, 1.0f, 0};
+					 z, 1.0f, 1.0f, 0};
 
 		Vertex v3 = {tile_width * (screen_pos.x + 0), tile_height * (screen_pos.y  + entity.size), 
-					 1.0f - (entity.position.y + entity.size)/current_room->height, 0.0f, 1.0f, 0};
+					 z, 0.0f, 1.0f, 0};
 
 		Vertex v4 = {tile_width * (screen_pos.x + entity.size), tile_height * (screen_pos.y  + 0), 
-					 1.0f - (entity.position.y + entity.size)/current_room->height, 1.0f, 0.0f, 0};
+					 z, 1.0f, 0.0f, 0};
 
 		
 		convert_top_left_coords_to_centered(&v1, &v2, &v3, &v4);
@@ -848,11 +856,6 @@ void buffer_quad_centered_at(float radius, float depth, VertexBuffer * vb, Index
 }
 
 float ENTITY_MIMINUM_DEPTH = 0.0000f;
-
-inline float max(float a, float b) {
-	if(a > b) { return a;}
-	return b;
-}
 
 void buffer_quad_centered_at(Vector2f center, float radius, float depth, VertexBuffer * vb, IndexBuffer * ib) {
 	Vertex v1 = {center.x - radius, center.y + radius*m_window_data->aspect_ratio, max(depth, ENTITY_MIMINUM_DEPTH), 0.0f, 0.0f, 0};
