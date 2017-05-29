@@ -296,9 +296,9 @@ Font * load_font(char * name) {
 	// We no longer need the file
 	fclose(font_file);
 
-	unsigned char * bitmap = (unsigned char *) malloc(512*512*4); // Our bitmap is 512x512 pixels and each pixel takes 4 bytes
+	unsigned char * bitmap = (unsigned char *) malloc(256*256*4); // Our bitmap is 512x512 pixels and each pixel takes 4 bytes @Robustness, make sure the bitmap is big enough for the font
 
-	int result = stbtt_BakeFontBitmap(font_file_buffer, 0, 16.0, bitmap, 512, 512, 32, 96, font->char_data); // no guarantee this fits!
+	int result = stbtt_BakeFontBitmap(font_file_buffer, 0, 16.0, bitmap, 512, 512, 32, 96, font->char_data); // From stb_truetype.h : "no guarantee this fits!""
 
 	if(result <= 0) {
 		log_print("load_font", "The font %s could not be loaded, it is too large to fit in a 512x512 bitmap", name);
@@ -606,6 +606,33 @@ float displayed_frame_time = 0.0f;
 float summed_frame_rate = 0.0f;
 
 void buffer_debug_overlay() {
+
+	// At the end.
+	// Buffer debug overlay background
+	{
+		VertexBuffer vb;
+		IndexBuffer  ib;
+
+		Color4f color = Color4f(0.0f, 0.0f, 0.0f, 0.8f);
+
+		Vertex v1 = {1.0f - (float)170/m_window_data->width, 0.0f 								  , EDITOR_OVERLAY_Z - 0.000001f, color};
+		Vertex v2 = {1.0f 								   , 0.0f + (float)56/m_window_data->width, EDITOR_OVERLAY_Z - 0.000001f, color};
+		Vertex v3 = {1.0f - (float)170/m_window_data->width, 0.0f + (float)56/m_window_data->width, EDITOR_OVERLAY_Z - 0.000001f, color};
+		Vertex v4 = {1.0f 								   , 0.0f 								  , EDITOR_OVERLAY_Z - 0.000001f, color};
+
+		convert_top_left_coords_to_centered(&v1, &v2, &v3, &v4);
+		buffer_quad(v1, v2, v3, v4, &vb, &ib);
+	
+		m_graphics_buffer->vertex_buffers.push_back(vb);
+		m_graphics_buffer->index_buffers.push_back(ib);
+
+		// @Temporary Required because otherwise, the texture buffer is no longer synced with the other buffers
+		m_graphics_buffer->texture_id_buffer.push_back("placeholder");
+
+		m_graphics_buffer->shaders.push_back(colored_shader);
+	}
+
+	// Compute frame time average
 	if(frame_time_print_counter == 0) { // @Temporary Updated every 15 frames and average of those 15 frames, maybe find a better system.
 		displayed_frame_time = summed_frame_rate / FRAME_TIME_UPDATE_DELAY;
 
@@ -618,7 +645,7 @@ void buffer_debug_overlay() {
 	summed_frame_rate += m_window_data->frame_time;
 	frame_time_print_counter--;
 	
-	// Buffer Frame time
+	// Buffer Frame time (text must always be bufferd last if it has AA);
 	{
 		float x = m_window_data->width - 160;
 		float y = 20.0f;
@@ -717,7 +744,7 @@ void buffer_editor_tile_overlay(Room * room) {
 
 	// @Temporary Required because otherwise, the texture buffer is no longer synced with the other buffers
 	m_graphics_buffer->texture_id_buffer.push_back("placeholder");
-	
+
 	m_graphics_buffer->shaders.push_back(colored_shader);
 }
 

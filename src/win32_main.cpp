@@ -574,7 +574,7 @@ void bind_srv_to_texture(Texture * texture) {
 
 	// Our fonts are greyscale, so let's make a special case for those
 	if(texture->bytes_per_pixel == 1) {
-		texture_desc.Format = DXGI_FORMAT_R8_UNORM
+		texture_desc.Format = DXGI_FORMAT_A8_UNORM
 		;
 	}
 
@@ -596,7 +596,7 @@ void bind_srv_to_texture(Texture * texture) {
 
 	// Our fonts are greyscale, so let's make a special case for those
 	if(texture->bytes_per_pixel == 1) {
-		srv_desc.Format = DXGI_FORMAT_R8_UNORM;
+		srv_desc.Format = DXGI_FORMAT_A8_UNORM;
 	}
 
 	d3d_device->CreateShaderResourceView(d3d_texture, &srv_desc, (ID3D11ShaderResourceView **) &texture->platform_info->srv);
