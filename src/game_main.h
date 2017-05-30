@@ -149,37 +149,7 @@ struct WindowData {
 	bool locked_fps = false;
 };
 
-int get_file_size(FILE * file);
-
-void init_textures();
-
-void init_fonts();
-
 void init_game(TextureManager * texture_manager);
-
-Texture * create_texture(char * name, unsigned char * data, int width, int height, int bytes_per_pixel);
-
-Texture * create_texture(char * name, unsigned char * data, int width, int height);
 
 void game(WindowData * window_data, Keyboard * keyboard, Keyboard * previous_keyboard, GraphicsBuffer * graphics_buffer, TextureManager * texture_manager, float dt);
 
-void buffer_player();
-
-void buffer_trees();
-
-void buffer_entity(Entity entity);
-
-void buffer_tiles(Room * room);
-
-void buffer_debug_overlay();
-
-void buffer_editor_tile_overlay(Room * room);
-
-void buffer_title_block();
-
-void buffer_quad(Vertex v1, Vertex v2, Vertex v3, Vertex v4, VertexBuffer * vb, IndexBuffer * ib);
-
-void buffer_quad_centered_at(Vector2f center, float radius, float depth, VertexBuffer * vb, IndexBuffer * ib);
-void buffer_quad_centered_at(float radius, float depth, VertexBuffer * vb, IndexBuffer * ib);
-
-void convert_top_left_coords_to_centered(Vertex * v1, Vertex * v2, Vertex * v3, Vertex * v4);

@@ -19,6 +19,13 @@ enum TileType {
 	SWITCH_ROOM
 };
 
+enum Alignement {
+	TOP_LEFT, 
+	TOP_RIGHT,
+	BOTTOM_RIGHT,
+	BOTTOM_LEFT
+};
+
 struct Rectangle {
 	float x, y;
 	float width, height;
@@ -80,6 +87,40 @@ struct Font {
 	Texture * texture;
 	stbtt_bakedchar char_data[96]; // 96 ASCII characters
 };
+
+// Prototypes
+int get_file_size(FILE * file);
+
+void init_textures();
+
+void init_fonts();
+
+Texture * create_texture(char * name, unsigned char * data, int width, int height, int bytes_per_pixel);
+Texture * create_texture(char * name, unsigned char * data, int width, int height);
+
+void buffer_string(char * text, float x, float y, float z,  Font * font, Alignement alignement);
+void buffer_string(char * text, float x, float y, float z,  Font * font);
+
+void buffer_player();
+
+void buffer_trees();
+
+void buffer_entity(Entity entity);
+
+void buffer_tiles(Room * room);
+
+void buffer_debug_overlay();
+
+void buffer_editor_tile_overlay(Room * room);
+
+void buffer_title_block();
+
+void buffer_quad(Vertex v1, Vertex v2, Vertex v3, Vertex v4, VertexBuffer * vb, IndexBuffer * ib);
+
+void buffer_quad_centered_at(Vector2f center, float radius, float depth, VertexBuffer * vb, IndexBuffer * ib);
+void buffer_quad_centered_at(float radius, float depth, VertexBuffer * vb, IndexBuffer * ib);
+
+void convert_top_left_coords_to_centered(Vertex * v1, Vertex * v2, Vertex * v3, Vertex * v4);
 
 // Constants
 const int TILES_PER_ROW		= 32;
@@ -394,35 +435,6 @@ void init_fonts() {
 	my_font = load_font("Inconsolata.ttf");
 }
 
-void buffer_string(char * text, float x, float y, float z,  Font * font) {
-	VertexBuffer vb;
-	IndexBuffer ib;
-
-	while(*text) {
-		// Make sure it's an ascii character
-		if (*text >= 32 && *text < 128) {
-			stbtt_aligned_quad q;
-			stbtt_GetBakedQuad(font->char_data, 512,512, *text-32, &x,&y,&q,1);
-		
-			Vertex v1 = {q.x0/m_window_data->width, q.y0/m_window_data->height, z, q.s0, q.t0, 0};
-			Vertex v2 = {q.x1/m_window_data->width, q.y1/m_window_data->height, z, q.s1, q.t1, 0};
-			Vertex v3 = {q.x0/m_window_data->width, q.y1/m_window_data->height, z, q.s0, q.t1, 0};
-			Vertex v4 = {q.x1/m_window_data->width, q.y0/m_window_data->height, z, q.s1, q.t0, 0};
-
-			convert_top_left_coords_to_centered(&v1, &v2, &v3, &v4);
-
-			buffer_quad(v1, v2, v3, v4, &vb, &ib);
-
-		}
-		++text;
-   }
-
-   	m_graphics_buffer->vertex_buffers.push_back(vb);
-	m_graphics_buffer->index_buffers.push_back(ib);
-	m_graphics_buffer->texture_id_buffer.push_back(font->texture->name);
-	m_graphics_buffer->shaders.push_back(font_shader);
-}
-
 void game(WindowData * window_data, Keyboard * keyboard, Keyboard * previous_keyboard, GraphicsBuffer * graphics_buffer, TextureManager * texture_manager, float dt) { // @Redundant dt is now also in WindowData
 	
 	Keyboard *  m_previous_keyboard = previous_keyboard;
@@ -607,9 +619,77 @@ const int FRAME_TIME_UPDATE_DELAY = 15; // in frames
 float displayed_frame_time = 0.0f;
 float summed_frame_rate = 0.0f;
 
+void buffer_string(char * text, float x, float y, float z,  Font * font) {
+	buffer_string(text, x, y, z, font, TOP_LEFT);
+}
+
+void buffer_string(char * text, float x, float y, float z,  Font * font, Alignement alignement) {
+	VertexBuffer vb;
+	IndexBuffer ib;
+
+	float pixel_x = x * m_window_data->width;
+	float pixel_y = y * m_window_data->height;
+
+	
+	float text_width = 0.0f;
+	float text_height = 0.0f;
+
+	if (alignement == TOP_RIGHT) {
+		char * original_text = text;
+		float original_pixel_x = pixel_x;
+		float original_pixel_y = pixel_y;
+
+		// First pass to determine width and height
+		while (*text) {
+			// Make sure it's an ascii character
+			if (*text >= 32 && *text < 128) {
+				stbtt_aligned_quad q;
+				stbtt_GetBakedQuad(font->char_data, 512, 512, *text - 32, &pixel_x, &pixel_y, &q, 1);
+			}
+			++text;
+		}
+
+		text_width = (float) ((int)(pixel_x - original_pixel_x + 0.5f)) / m_window_data->width;
+
+		text = original_text;
+		pixel_x = original_pixel_x;
+		pixel_y = original_pixel_y;
+	}
+
+	while(*text) {
+		// Make sure it's an ascii character
+		if (*text >= 32 && *text < 128) {
+			stbtt_aligned_quad q;
+			stbtt_GetBakedQuad(font->char_data, 512,512, *text-32, &pixel_x,&pixel_y,&q,1);
+		
+			Vertex v1 = {q.x0/m_window_data->width, q.y0/m_window_data->height, z, q.s0, q.t0, 0};
+			Vertex v2 = {q.x1/m_window_data->width, q.y1/m_window_data->height, z, q.s1, q.t1, 0};
+			Vertex v3 = {q.x0/m_window_data->width, q.y1/m_window_data->height, z, q.s0, q.t1, 0};
+			Vertex v4 = {q.x1/m_window_data->width, q.y0/m_window_data->height, z, q.s1, q.t0, 0};
+
+			if(alignement == TOP_RIGHT) {
+				v1.position.x -= text_width;
+				v2.position.x -= text_width;
+				v3.position.x -= text_width;
+				v4.position.x -= text_width;
+			}
+
+			convert_top_left_coords_to_centered(&v1, &v2, &v3, &v4);
+
+			buffer_quad(v1, v2, v3, v4, &vb, &ib);
+
+		}
+		++text;
+	}
+
+   	m_graphics_buffer->vertex_buffers.push_back(vb);
+	m_graphics_buffer->index_buffers.push_back(ib);
+	m_graphics_buffer->texture_id_buffer.push_back(font->texture->name);
+	m_graphics_buffer->shaders.push_back(font_shader);
+}
+
 void buffer_debug_overlay() {
 
-	// At the end.
 	// Buffer debug overlay background
 	{
 		VertexBuffer vb;
@@ -647,10 +727,10 @@ void buffer_debug_overlay() {
 	summed_frame_rate += m_window_data->frame_time;
 	frame_time_print_counter--;
 	
-	// Buffer Frame time (text must always be bufferd last if it has AA);
+	// Buffer Frame time (text must always be bufferd last if it has AA / transparency);
 	{
-		float x = m_window_data->width - 160;
-		float y = 20.0f;
+		float x = 0.9925;
+		float y = 0.028;
 
 		char buffer[64];
 
@@ -661,7 +741,7 @@ void buffer_debug_overlay() {
 			snprintf(buffer, sizeof(buffer), "Frame Time : %.3f", displayed_frame_time);
 		}
 
-		buffer_string(buffer, x, y, DEBUG_OVERLAY_Z, my_font);
+		buffer_string(buffer, x, y, DEBUG_OVERLAY_Z, my_font, TOP_RIGHT);
 	}
 }
 
