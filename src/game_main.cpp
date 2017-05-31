@@ -98,8 +98,8 @@ void init_fonts();
 Texture * create_texture(char * name, unsigned char * data, int width, int height, int bytes_per_pixel);
 Texture * create_texture(char * name, unsigned char * data, int width, int height);
 
-void buffer_string(char * text, float x, float y, float z,  Font * font, Alignement alignement);
-void buffer_string(char * text, float x, float y, float z,  Font * font);
+float buffer_string(char * text, float x, float y, float z,  Font * font, Alignement alignement);
+float buffer_string(char * text, float x, float y, float z,  Font * font);
 
 void buffer_player();
 
@@ -619,11 +619,11 @@ const int FRAME_TIME_UPDATE_DELAY = 15; // in frames
 float displayed_frame_time = 0.0f;
 float summed_frame_rate = 0.0f;
 
-void buffer_string(char * text, float x, float y, float z,  Font * font) {
-	buffer_string(text, x, y, z, font, TOP_LEFT);
+float buffer_string(char * text, float x, float y, float z,  Font * font) {
+	return buffer_string(text, x, y, z, font, TOP_LEFT);
 }
 
-void buffer_string(char * text, float x, float y, float z,  Font * font, Alignement alignement) {
+float buffer_string(char * text, float x, float y, float z,  Font * font, Alignement alignement) {
 	VertexBuffer vb;
 	IndexBuffer ib;
 
@@ -634,7 +634,21 @@ void buffer_string(char * text, float x, float y, float z,  Font * font, Alignem
 	float text_width = 0.0f;
 	float text_height = 0.0f;
 
-	if (alignement == TOP_RIGHT) {
+	// Compute height
+	if(alignement == TOP_RIGHT || alignement == TOP_LEFT) {
+		float zero_x = 0.0f;
+		float zero_y = 0.0f;
+
+		stbtt_aligned_quad q;
+		stbtt_GetBakedQuad(font->char_data, font->texture->width, font->texture->height, 'A' - 32, &zero_x, &zero_y, &q, 1);
+		
+		text_height = (float) ((int)(-q.y0 + 0.5f)) / m_window_data->height;
+
+		pixel_y += text_height * m_window_data->height;
+	}
+
+	// Compute width
+	{
 		char * original_text = text;
 		float original_pixel_x = pixel_x;
 		float original_pixel_y = pixel_y;
@@ -644,7 +658,7 @@ void buffer_string(char * text, float x, float y, float z,  Font * font, Alignem
 			// Make sure it's an ascii character
 			if (*text >= 32 && *text < 128) {
 				stbtt_aligned_quad q;
-				stbtt_GetBakedQuad(font->char_data, 512, 512, *text - 32, &pixel_x, &pixel_y, &q, 1);
+				stbtt_GetBakedQuad(font->char_data, font->texture->width, font->texture->height, *text - 32, &pixel_x, &pixel_y, &q, 1);
 			}
 			++text;
 		}
@@ -660,7 +674,7 @@ void buffer_string(char * text, float x, float y, float z,  Font * font, Alignem
 		// Make sure it's an ascii character
 		if (*text >= 32 && *text < 128) {
 			stbtt_aligned_quad q;
-			stbtt_GetBakedQuad(font->char_data, 512,512, *text-32, &pixel_x,&pixel_y,&q,1);
+			stbtt_GetBakedQuad(font->char_data, font->texture->width, font->texture->height, *text-32, &pixel_x, &pixel_y, &q, 1);
 		
 			Vertex v1 = {q.x0/m_window_data->width, q.y0/m_window_data->height, z, q.s0, q.t0, 0};
 			Vertex v2 = {q.x1/m_window_data->width, q.y1/m_window_data->height, z, q.s1, q.t1, 0};
@@ -686,32 +700,52 @@ void buffer_string(char * text, float x, float y, float z,  Font * font, Alignem
 	m_graphics_buffer->index_buffers.push_back(ib);
 	m_graphics_buffer->texture_id_buffer.push_back(font->texture->name);
 	m_graphics_buffer->shaders.push_back(font_shader);
+
+	return text_width;
 }
 
 void buffer_debug_overlay() {
+	float DEBUG_OVERLAY_PADDING = 0.004f;
+
+	float DEBUG_OVERLAY_WIDTH = 0.15f;
+	float DEBUG_OVERLAY_ROW_HEIGHT = DEBUG_OVERLAY_PADDING * 2 * m_window_data->aspect_ratio + 12.0f / m_window_data->height; // @Temporary Current distance from baseline to top of capital letter is 12px
+
+	float DEBUG_OVERLAY_NUM_ROWS = 4;
 
 	// Buffer debug overlay background
 	{
-		VertexBuffer vb;
-		IndexBuffer  ib;
+		for(int i = 0; i < DEBUG_OVERLAY_NUM_ROWS; i++) {
 
-		Color4f color = Color4f(0.0f, 0.0f, 0.0f, 0.7f);
+			float y = i * DEBUG_OVERLAY_ROW_HEIGHT;
 
-		Vertex v1 = {1.0f - (float)170/m_window_data->width, 0.0f 								  , DEBUG_OVERLAY_BACKGROUND_Z, color};
-		Vertex v2 = {1.0f 								   , 0.0f + (float)56/m_window_data->width, DEBUG_OVERLAY_BACKGROUND_Z, color};
-		Vertex v3 = {1.0f - (float)170/m_window_data->width, 0.0f + (float)56/m_window_data->width, DEBUG_OVERLAY_BACKGROUND_Z, color};
-		Vertex v4 = {1.0f 								   , 0.0f 								  , DEBUG_OVERLAY_BACKGROUND_Z, color};
+			VertexBuffer vb;
+			IndexBuffer  ib;
 
-		convert_top_left_coords_to_centered(&v1, &v2, &v3, &v4);
-		buffer_quad(v1, v2, v3, v4, &vb, &ib);
-	
-		m_graphics_buffer->vertex_buffers.push_back(vb);
-		m_graphics_buffer->index_buffers.push_back(ib);
+			Color4f color;
 
-		// @Temporary Required because otherwise, the texture buffer is no longer synced with the other buffers
-		m_graphics_buffer->texture_id_buffer.push_back("placeholder");
+			if(i % 2 == 0) {
+				color = Color4f(0.1f, 0.1f, 0.1f, 0.8f);
+			} else {
+				color = Color4f(0.3f, 0.3f, 0.3f, 0.7f);
+			}
 
-		m_graphics_buffer->shaders.push_back(colored_shader);
+			Vertex v1 = {1.0f - DEBUG_OVERLAY_WIDTH, y 							 , DEBUG_OVERLAY_BACKGROUND_Z, color};
+			Vertex v2 = {1.0f 					   , y + DEBUG_OVERLAY_ROW_HEIGHT, DEBUG_OVERLAY_BACKGROUND_Z, color};
+			Vertex v3 = {1.0f - DEBUG_OVERLAY_WIDTH, y + DEBUG_OVERLAY_ROW_HEIGHT, DEBUG_OVERLAY_BACKGROUND_Z, color};
+			Vertex v4 = {1.0f 					   , y 							 , DEBUG_OVERLAY_BACKGROUND_Z, color};
+
+			convert_top_left_coords_to_centered(&v1, &v2, &v3, &v4);
+			buffer_quad(v1, v2, v3, v4, &vb, &ib);
+		
+			m_graphics_buffer->vertex_buffers.push_back(vb);
+			m_graphics_buffer->index_buffers.push_back(ib);
+
+			// @Temporary Required because otherwise, the texture buffer is no longer synced with the other buffers
+			m_graphics_buffer->texture_id_buffer.push_back("placeholder");
+
+			m_graphics_buffer->shaders.push_back(colored_shader);
+		}
+
 	}
 
 	// Compute frame time average
@@ -726,23 +760,40 @@ void buffer_debug_overlay() {
 
 	summed_frame_rate += m_window_data->frame_time;
 	frame_time_print_counter--;
-	
+
+	float left_x = 1.0f - DEBUG_OVERLAY_WIDTH + DEBUG_OVERLAY_PADDING;
+	float right_x = 1.0f - DEBUG_OVERLAY_PADDING;
+	float y = 0.0f;
 	// Buffer Frame time (text must always be bufferd last if it has AA / transparency);
 	{
-		float x = 0.9925;
-		float y = 0.028;
-
 		char buffer[64];
 
-		if(displayed_frame_time < 10.0f) {
-			// Add a space
-			snprintf(buffer, sizeof(buffer), "Frame Time :  %.3f", displayed_frame_time);
-		} else {
-			snprintf(buffer, sizeof(buffer), "Frame Time : %.3f", displayed_frame_time);
-		}
+		snprintf(buffer, sizeof(buffer), "%.3f", displayed_frame_time);
 
-		buffer_string(buffer, x, y, DEBUG_OVERLAY_Z, my_font, TOP_RIGHT);
+		buffer_string("Frame Time :", left_x, y + DEBUG_OVERLAY_PADDING * m_window_data->aspect_ratio, DEBUG_OVERLAY_Z, my_font, TOP_LEFT); 
+
+		y += DEBUG_OVERLAY_ROW_HEIGHT;
+
+		buffer_string(buffer, right_x, y  + DEBUG_OVERLAY_PADDING * m_window_data->aspect_ratio, DEBUG_OVERLAY_Z, my_font, TOP_RIGHT);
+
+		y += DEBUG_OVERLAY_ROW_HEIGHT;
 	}
+
+	// Buffer Current world (text must always be bufferd last if it has AA / transparency);
+	{
+		char buffer[64];
+
+		snprintf(buffer, sizeof(buffer), "%s", current_room->name);
+
+		buffer_string("Current World :", left_x, y + DEBUG_OVERLAY_PADDING * m_window_data->aspect_ratio, DEBUG_OVERLAY_Z, my_font, TOP_LEFT); 
+
+		y += DEBUG_OVERLAY_ROW_HEIGHT;
+
+		buffer_string(buffer, right_x, y  + DEBUG_OVERLAY_PADDING * m_window_data->aspect_ratio, DEBUG_OVERLAY_Z, my_font, TOP_RIGHT);
+
+		y += DEBUG_OVERLAY_ROW_HEIGHT;
+	}
+
 }
 
 void buffer_editor_tile_overlay(Room * room) {
@@ -765,7 +816,6 @@ void buffer_editor_tile_overlay(Room * room) {
 		if (col >= room->width)  continue;
 		if (row < 0) 			 continue;
 		if (row >= room->height) continue;
-
 
 		Color4f color = Color4f(1.0f, 1.0f, 1.0f, 0.5f);
 
@@ -802,7 +852,6 @@ void buffer_editor_tile_overlay(Room * room) {
 		if (col > room->width)  continue;
 		if (row < -1) 			continue;
 		if (row > room->height) continue;
-
 
 		Color4f color = Color4f(1.0f, 1.0f, 1.0f, 0.5f);
 
@@ -894,9 +943,9 @@ void buffer_tiles(Room * room) {
 
 		// Don't buffer out of screen tiles
 		if (col + 1 < camera_offset.x - TILES_PER_ROW/2.0f)   continue;
-		if (col > camera_offset.x + TILES_PER_ROW/2.0f)   continue;
+		if (col > 	  camera_offset.x + TILES_PER_ROW/2.0f)   continue;
 		if (row + 1 < camera_offset.y - ROWS_PER_SCREEN/2.0f) continue;
-		if (row > camera_offset.y + ROWS_PER_SCREEN/2.0f) continue;
+		if (row > 	  camera_offset.y + ROWS_PER_SCREEN/2.0f) continue;
 
 		if (col < 0) 			 continue;
 		if (col >= room->width)  continue;
@@ -922,8 +971,6 @@ void buffer_tiles(Room * room) {
 		m_graphics_buffer->texture_id_buffer.push_back(tile.texture);
 		m_graphics_buffer->shaders.push_back(textured_shader);
 	}
-
-
 }
 
 void buffer_title_block() {
