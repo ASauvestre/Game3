@@ -132,6 +132,8 @@ void buffer_editor_tile_overlay(Room * room);
 
 void buffer_title_block();
 
+void buffer_colored_quad(Vector2f position, Alignement alignement, float width, float height, float depth, Color4f color, VertexBuffer * vb, IndexBuffer * ib);
+
 void buffer_quad(Vertex v1, Vertex v2, Vertex v3, Vertex v4, VertexBuffer * vb, IndexBuffer * ib);
 
 void buffer_quad_centered_at(Vector2f center, float radius, float depth, VertexBuffer * vb, IndexBuffer * ib);
@@ -474,6 +476,9 @@ int get_objects_colliding_at(Vector2f position, Object objects[], int max_collis
 	return num_objects;
 }
 
+Object objects[64];
+int num_objects = 0;
+
 void game(WindowData * window_data, Keyboard * keyboard, Keyboard * previous_keyboard, GraphicsBuffer * graphics_buffer, TextureManager * texture_manager, float dt) { // @Redundant dt is now also in WindowData
 	
 	Keyboard *  m_previous_keyboard = previous_keyboard;
@@ -646,21 +651,59 @@ void game(WindowData * window_data, Keyboard * keyboard, Keyboard * previous_key
 
 
 		if(!m_keyboard->mouse_left && m_previous_keyboard->mouse_left) {
-			log_print("mouse_testing", "Mouse left pressed at (%0.6f, %0.6f) and released at (%0.6f, %0.6f)", m_keyboard->mouse_left_pressed_position.x, m_keyboard->mouse_left_pressed_position.y, m_keyboard->mouse_position.x, m_keyboard->mouse_position.y);
+			// log_print("mouse_testing", "Mouse left pressed at (%0.6f, %0.6f) and released at (%0.6f, %0.6f)", m_keyboard->mouse_left_pressed_position.x, m_keyboard->mouse_left_pressed_position.y, m_keyboard->mouse_position.x, m_keyboard->mouse_position.y);
 
 			Vector2f game_space_position;
 			game_space_position.x = TILES_PER_ROW   * m_keyboard->mouse_left_pressed_position.x - TILES_PER_ROW/2 + camera_offset.x;
 			game_space_position.y = ROWS_PER_SCREEN * m_keyboard->mouse_left_pressed_position.y - ROWS_PER_SCREEN/2 + camera_offset.y;
 
-			Object objects[64];
-			int num_objects = get_objects_colliding_at(game_space_position, objects, 64);
+			// Object objects[64];
+			num_objects = get_objects_colliding_at(game_space_position, objects, 64);
 
-			for(int i = 0; i < num_objects; i++) {
-				if(objects[i].type == TILE) {
-					log_print("editor_mouse_collision", "Colliding with object of type TILE at (%d, %d)", objects[i].tile->local_x, objects[i].tile->local_y);
-				}
-				else if(objects[i].type == ENTITY) {
-					log_print("editor_mouse_collision", "Colliding with object of type ENTITY named %s at (%0.3f, %0.3f)", objects[i].entity->name, objects[i].entity->position.x, objects[i].entity->position.y);
+			editor_entity_selection_menu_open = true;
+		}
+
+		if(editor_entity_selection_menu_open) {
+			float EDITOR_MENU_PADDING = 0.004f;
+
+			float EDITOR_MENU_WIDTH = 0.15f;
+			float EDITOR_MENU_ROW_HEIGHT = EDITOR_MENU_PADDING * 2 * m_window_data->aspect_ratio + 12.0f / m_window_data->height; // @Temporary Current distance from baseline to top of capital letter is 12px
+
+			// Buffer menu background
+			{
+				VertexBuffer vb;
+				IndexBuffer ib;
+				buffer_colored_quad(m_keyboard->mouse_left_pressed_position, TOP_LEFT, EDITOR_MENU_WIDTH, EDITOR_MENU_ROW_HEIGHT * num_objects, DEBUG_OVERLAY_BACKGROUND_Z, Color4f(0.1f, 0.1f, 0.1f, 0.8f), &vb, &ib);
+
+				m_graphics_buffer->vertex_buffers.push_back(vb);
+				m_graphics_buffer->index_buffers.push_back(ib);
+
+				// @Temporary Required because otherwise, the texture buffer is no longer synced with the other buffers
+				m_graphics_buffer->texture_id_buffer.push_back("placeholder");
+
+				m_graphics_buffer->shaders.push_back(colored_shader);
+			}
+
+			{
+				float x = m_keyboard->mouse_left_pressed_position.x + EDITOR_MENU_PADDING;
+				float y = m_keyboard->mouse_left_pressed_position.y + EDITOR_MENU_PADDING * m_window_data->aspect_ratio;
+
+				// Buffer strings
+				for(int i = 0; i < num_objects; i++) {
+					if(objects[i].type == TILE) {
+						// log_print("editor_mouse_collision", "Colliding with object of type TILE at (%d, %d)", objects[i].tile->local_x, objects[i].tile->local_y);
+						char tile_name[64];
+						snprintf(tile_name, 64, "Tile%d_%d", objects[i].tile->local_x, objects[i].tile->local_y);
+
+						buffer_string(tile_name, x, y, DEBUG_OVERLAY_Z, my_font, TOP_LEFT);
+
+					}
+					else if(objects[i].type == ENTITY) {
+						// log_print("editor_mouse_collision", "Colliding with object of type ENTITY named %s at (%0.3f, %0.3f)", objects[i].entity->name, objects[i].entity->position.x, objects[i].entity->position.y);
+						buffer_string(objects[i].entity->name, x, y, DEBUG_OVERLAY_Z, my_font, TOP_LEFT);
+					}
+
+					y += EDITOR_MENU_ROW_HEIGHT;
 				}
 			}
 		}
