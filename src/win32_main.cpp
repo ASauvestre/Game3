@@ -1,5 +1,10 @@
 #include "win32_main.h"
 
+// From "windowsx.h" 
+// Gets Low short and high short from LPARAM
+#define GET_X_LPARAM(lp) ((int)(short)LOWORD(lp))
+#define GET_Y_LPARAM(lp) ((int)(short)HIWORD(lp))
+
 struct ShaderInputFormat {
 	ID3D11InputLayout *layout;
 	D3D11_INPUT_ELEMENT_DESC * layout_desc;
@@ -195,6 +200,74 @@ LRESULT CALLBACK WndProc(HWND window_handle, UINT message, WPARAM w_param, LPARA
 			}
 			break;
 		}	
+		case WM_MOUSEMOVE : {
+			if(window_data.width == 0) {
+				keyboard.mouse_position.x = 0.0f;
+			} else {
+				keyboard.mouse_position.x = (float)GET_X_LPARAM(l_param) / window_data.width;
+			}
+
+			if(window_data.height == 0) {
+				keyboard.mouse_position.y = 0.0f;
+			} else {
+				keyboard.mouse_position.y = (float)GET_Y_LPARAM(l_param) / window_data.height;
+			}
+
+			break;
+		}
+		case WM_LBUTTONDOWN : {
+			keyboard.mouse_left = true;
+
+			// SetCapture allows us to detect mouse up if the cursor leaves the window.
+			SetCapture(window_handle);
+
+
+			// Store the position at which the button was pressed @Pasted
+			if(window_data.width == 0) {
+				keyboard.mouse_left_pressed_position.x = 0.0f;
+			} else {
+				keyboard.mouse_left_pressed_position.x = (float)GET_X_LPARAM(l_param) / window_data.width;
+			}
+
+			if(window_data.height == 0) {
+				keyboard.mouse_left_pressed_position.y = 0.0f;
+			} else {
+				keyboard.mouse_left_pressed_position.y = (float)GET_Y_LPARAM(l_param) / window_data.height;
+			}
+
+			break;
+		}
+		case WM_LBUTTONUP : {
+			keyboard.mouse_left = false;
+			ReleaseCapture();
+			break;
+		}
+		case WM_RBUTTONDOWN : {
+			keyboard.mouse_right = true;
+
+			// SetCapture allows us to detect mouse up if the cursor leaves the window.
+			SetCapture(window_handle);
+
+			// Store the position at which the button was pressed @Pasted
+			if(window_data.width == 0) {
+				keyboard.mouse_right_pressed_position.x = 0.0f;
+			} else {
+				keyboard.mouse_right_pressed_position.x = (float)GET_X_LPARAM(l_param) / window_data.width;
+			}
+
+			if(window_data.height == 0) {
+				keyboard.mouse_right_pressed_position.y = 0.0f;
+			} else {
+				keyboard.mouse_right_pressed_position.y = (float)GET_Y_LPARAM(l_param) / window_data.height;
+			}
+
+			break;
+		}
+		case WM_RBUTTONUP : {
+			keyboard.mouse_right= false;
+			ReleaseCapture();
+			break;
+		}
 	}
 	return DefWindowProc(window_handle, message, w_param, l_param);
 }

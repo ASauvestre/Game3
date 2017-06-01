@@ -33,9 +33,13 @@ struct Rectangle {
 
 struct Entity {
 	Entity() {}
+	char * name;
+
+	char * texture;
+
 	Vector2f position;
 	Vector2f velocity;
-	char * texture;
+	
 	bool is_player;
 	float size; // relative to tile
 };
@@ -52,6 +56,19 @@ struct Tile {
 	Rectangle collision_box;
 
 	bool collision_enabled = false;
+};
+
+enum ObjectType {
+	TILE,
+	ENTITY
+};
+
+struct Object {
+	ObjectType type;
+	union {
+		Tile * tile;
+		Entity * entity;
+	};
 };
 
 struct Room {
@@ -161,6 +178,7 @@ static float tile_height = 1.0f/ROWS_PER_SCREEN; // @Incomplete, handle aspect r
 
 static GameMode game_mode;
 static bool debug_overlay_enabled = false;
+static bool editor_entity_selection_menu_open = false;
 
 int find_tile_index_from_coords(int x, int y, Room * room) {
 	return (x + 1) * room->width + y - 1;
@@ -256,6 +274,7 @@ void init_game(TextureManager * texture_manager) {
 
 	// Init player
 	{
+		player.name = "player";
 		player.position.x = 0;
 		player.position.y = 0;
 		player.texture = "megaperson.png";
@@ -295,16 +314,12 @@ void init_game(TextureManager * texture_manager) {
 
 	// TEST Init trees
 	{
-		for(int i = 0; i < array_size(trees)/2; i++) {
+		for(int i = 0; i < array_size(trees); i++) {
+			char name [64];
+			snprintf(name, 64, "tree%d", i);
+			trees[i].name = name;
 			trees[i].position.x = (int)(8.9*i)%(current_room->width-2);
 			trees[i].position.y = (int)(2.3*i)%(current_room->height-2);
-			trees[i].texture = "tree.png";
-			trees[i].is_player = false;
-			trees[i].size = 3;
-		}
-		for(int i = array_size(trees)/2; i < array_size(trees); i++) {
-			trees[i].position.x = (int)(5.5*i)%(current_room->width-2);
-			trees[i].position.y = (int)(4.1*i)%(current_room->height-2);
 			trees[i].texture = "tree.png";
 			trees[i].is_player = false;
 			trees[i].size = 3;
@@ -433,6 +448,30 @@ void init_textures() {
 
 void init_fonts() {
 	my_font = load_font("Inconsolata.ttf");
+}
+
+int get_objects_colliding_at(Vector2f position, Object objects[], int max_collisions) {
+
+	int num_objects = 0;
+
+	// @Optimisation We can probably infer the tiles we collide with from the player's x and y coordinates and information about the room's size
+	for(int i = 0; i < current_room->num_tiles; i++) {
+		Tile tile = current_room->tiles[i];
+
+		if((position.x <= tile.local_x + 1) && (position.x >= tile.local_x) &&
+		   (position.y <= tile.local_y + 1) && (position.y >= tile.local_y)) {
+			objects[num_objects].type = TILE;
+			objects[num_objects].tile = &current_room->tiles[i];
+
+			num_objects++;
+
+			if(num_objects == max_collisions) {
+				break;
+			}
+		}
+	}
+
+	return num_objects;
 }
 
 void game(WindowData * window_data, Keyboard * keyboard, Keyboard * previous_keyboard, GraphicsBuffer * graphics_buffer, TextureManager * texture_manager, float dt) { // @Redundant dt is now also in WindowData
@@ -604,6 +643,27 @@ void game(WindowData * window_data, Keyboard * keyboard, Keyboard * previous_key
 	// Editor overlays
 	if(game_mode == EDITOR) {
 		buffer_editor_tile_overlay(current_room);
+
+
+		if(!m_keyboard->mouse_left && m_previous_keyboard->mouse_left) {
+			log_print("mouse_testing", "Mouse left pressed at (%0.6f, %0.6f) and released at (%0.6f, %0.6f)", m_keyboard->mouse_left_pressed_position.x, m_keyboard->mouse_left_pressed_position.y, m_keyboard->mouse_position.x, m_keyboard->mouse_position.y);
+
+			Vector2f game_space_position;
+			game_space_position.x = TILES_PER_ROW   * m_keyboard->mouse_left_pressed_position.x - TILES_PER_ROW/2 + camera_offset.x;
+			game_space_position.y = ROWS_PER_SCREEN * m_keyboard->mouse_left_pressed_position.y - ROWS_PER_SCREEN/2 + camera_offset.y;
+
+			Object objects[64];
+			int num_objects = get_objects_colliding_at(game_space_position, objects, 64);
+
+			for(int i = 0; i < num_objects; i++) {
+				if(objects[i].type == TILE) {
+					log_print("editor_mouse_collision", "Colliding with object of type TILE at (%d, %d)", objects[i].tile->local_x, objects[i].tile->local_y);
+				}
+				else if(objects[i].type == ENTITY) {
+					log_print("editor_mouse_collision", "Colliding with object of type ENTITY named %s at (%0.3f, %0.3f)", objects[i].entity->name, objects[i].entity->position.x, objects[i].entity->position.y);
+				}
+			}
+		}
 	}
 
 	// Debug overlay 
@@ -704,6 +764,30 @@ float buffer_string(char * text, float x, float y, float z,  Font * font, Aligne
 	return text_width;
 }
 
+void buffer_colored_quad(Vector2f position, Alignement alignement, float width, float height, float depth, Color4f color, VertexBuffer * vb, IndexBuffer * ib) {
+	
+	Vertex v1;
+	Vertex v2;
+	Vertex v3;
+	Vertex v4;
+
+	if(alignement == TOP_LEFT) {
+		v1 = {position.x 	   , position.y 		, depth, color};
+		v2 = {position.x + width, position.y + height, depth, color};
+		v3 = {position.x 	   , position.y + height, depth, color};
+		v4 = {position.x + width, position.y 		, depth, color};
+	}
+	else if(alignement == TOP_RIGHT) {
+		v1 = {position.x - width, position.y 		, depth, color};
+		v2 = {position.x 	   , position.y + height, depth, color};
+		v3 = {position.x - width, position.y + height, depth, color};
+		v4 = {position.x 	   , position.y 		, depth, color};
+	}
+	convert_top_left_coords_to_centered(&v1, &v2, &v3, &v4);
+	buffer_quad(v1, v2, v3, v4, vb, ib);
+
+}
+
 void buffer_debug_overlay() {
 	float DEBUG_OVERLAY_PADDING = 0.004f;
 
@@ -715,8 +799,10 @@ void buffer_debug_overlay() {
 	// Buffer debug overlay background
 	{
 		for(int i = 0; i < DEBUG_OVERLAY_NUM_ROWS; i++) {
+			Vector2f position;
 
-			float y = i * DEBUG_OVERLAY_ROW_HEIGHT;
+			position.x = 1.0f - DEBUG_OVERLAY_WIDTH;
+			position.y = i * DEBUG_OVERLAY_ROW_HEIGHT;
 
 			VertexBuffer vb;
 			IndexBuffer  ib;
@@ -729,13 +815,7 @@ void buffer_debug_overlay() {
 				color = Color4f(0.3f, 0.3f, 0.3f, 0.7f);
 			}
 
-			Vertex v1 = {1.0f - DEBUG_OVERLAY_WIDTH, y 							 , DEBUG_OVERLAY_BACKGROUND_Z, color};
-			Vertex v2 = {1.0f 					   , y + DEBUG_OVERLAY_ROW_HEIGHT, DEBUG_OVERLAY_BACKGROUND_Z, color};
-			Vertex v3 = {1.0f - DEBUG_OVERLAY_WIDTH, y + DEBUG_OVERLAY_ROW_HEIGHT, DEBUG_OVERLAY_BACKGROUND_Z, color};
-			Vertex v4 = {1.0f 					   , y 							 , DEBUG_OVERLAY_BACKGROUND_Z, color};
-
-			convert_top_left_coords_to_centered(&v1, &v2, &v3, &v4);
-			buffer_quad(v1, v2, v3, v4, &vb, &ib);
+			buffer_colored_quad(position, TOP_LEFT, DEBUG_OVERLAY_WIDTH, DEBUG_OVERLAY_ROW_HEIGHT, DEBUG_OVERLAY_BACKGROUND_Z, color, &vb, &ib);
 		
 			m_graphics_buffer->vertex_buffers.push_back(vb);
 			m_graphics_buffer->index_buffers.push_back(ib);

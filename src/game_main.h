@@ -89,6 +89,10 @@ struct VertexTextureInfo {
 };
 
 struct Vertex {
+	Vertex() {
+		// Default constructor
+	}
+
 	Vertex(	float x, float y, float z, float u, float v, int texid) {
 		this->position = Vector3f(x, y, z);
 		this->tex_info.tex_coord = Vector2f(u,v);
@@ -137,6 +141,15 @@ struct Keyboard {
 	bool key_F1	= false;
 	bool key_F2	= false;
 	bool key_F3	= false;
+
+	// Mouse input
+	Vector2f mouse_position;
+
+	bool mouse_left = false;
+	bool mouse_right = false;
+
+	Vector2f mouse_left_pressed_position;
+	Vector2f mouse_right_pressed_position;
 };
 
 struct WindowData {
