@@ -692,7 +692,13 @@ void handle_user_input() {
 							}	
 						}
 						
-						log_print("editor_click_menu", "The element no. %d of the click menu was clicked", element_number);
+						// log_print("editor_click_menu", "The element no. %d of the click menu was clicked", element_number);
+
+						if(strcmp(objects[element_number].tile->texture, "grass.png") == 0) {
+							objects[element_number].tile->texture = "dirt.png"; // = m_texture_manager->find_texture("dirt.png");
+						} else {
+							objects[element_number].tile->texture = "grass.png"; // = m_texture_manager->find_texture("dirt.png");
+						}
 					} 
 
 					editor_click_menu_open = false;
