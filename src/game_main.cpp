@@ -112,6 +112,10 @@ void init_textures();
 
 void init_fonts();
 
+void handle_user_input();
+
+void buffer_editor_overlay();
+
 Texture * create_texture(char * name, unsigned char * data, int width, int height, int bytes_per_pixel);
 Texture * create_texture(char * name, unsigned char * data, int width, int height);
 
@@ -130,9 +134,10 @@ void buffer_debug_overlay();
 
 void buffer_editor_tile_overlay(Room * room);
 
-void buffer_title_block();
+int get_objects_colliding_at(Vector2f position, Object objects[], int max_collisions);
 
 void buffer_colored_quad(Vector2f position, Alignement alignement, float width, float height, float depth, Color4f color, VertexBuffer * vb, IndexBuffer * ib);
+void buffer_colored_quad(float x, float y, Alignement alignement, float width, float height, float depth, Color4f color, VertexBuffer * vb, IndexBuffer * ib);
 
 void buffer_quad(Vertex v1, Vertex v2, Vertex v3, Vertex v4, VertexBuffer * vb, IndexBuffer * ib);
 
@@ -140,6 +145,8 @@ void buffer_quad_centered_at(Vector2f center, float radius, float depth, VertexB
 void buffer_quad_centered_at(float radius, float depth, VertexBuffer * vb, IndexBuffer * ib);
 
 void convert_top_left_coords_to_centered(Vertex * v1, Vertex * v2, Vertex * v3, Vertex * v4);
+
+inline float max(float a, float b);
 
 // Constants
 const int TILES_PER_ROW		= 32;
@@ -161,6 +168,7 @@ static WindowData 		* m_window_data;
 static Keyboard 		* m_keyboard;
 static GraphicsBuffer 	* m_graphics_buffer;
 static TextureManager 	* m_texture_manager;
+static Keyboard 		*  m_previous_keyboard;
 
 static Font * my_font;
 
@@ -180,7 +188,10 @@ static float tile_height = 1.0f/ROWS_PER_SCREEN; // @Incomplete, handle aspect r
 
 static GameMode game_mode;
 static bool debug_overlay_enabled = false;
-static bool editor_entity_selection_menu_open = false;
+
+static bool editor_click_menu_open = false;
+static bool editor_click_menu_was_open = false;
+static Vector2f editor_click_menu_position;
 
 int find_tile_index_from_coords(int x, int y, Room * room) {
 	return (x + 1) * room->width + y - 1;
@@ -440,7 +451,6 @@ void load_texture(char * name) {
 }
 
 void init_textures() {
-	load_texture("title_screen_logo.png");
 	load_texture("grass.png");
 	load_texture("dirt.png");
 	load_texture("megaperson.png");
@@ -452,42 +462,43 @@ void init_fonts() {
 	my_font = load_font("Inconsolata.ttf");
 }
 
-int get_objects_colliding_at(Vector2f position, Object objects[], int max_collisions) {
-
-	int num_objects = 0;
-
-	// @Optimisation We can probably infer the tiles we collide with from the player's x and y coordinates and information about the room's size
-	for(int i = 0; i < current_room->num_tiles; i++) {
-		Tile tile = current_room->tiles[i];
-
-		if((position.x <= tile.local_x + 1) && (position.x >= tile.local_x) &&
-		   (position.y <= tile.local_y + 1) && (position.y >= tile.local_y)) {
-			objects[num_objects].type = TILE;
-			objects[num_objects].tile = &current_room->tiles[i];
-
-			num_objects++;
-
-			if(num_objects == max_collisions) {
-				break;
-			}
-		}
-	}
-
-	return num_objects;
-}
-
-Object objects[64];
-int num_objects = 0;
-
-void game(WindowData * window_data, Keyboard * keyboard, Keyboard * previous_keyboard, GraphicsBuffer * graphics_buffer, TextureManager * texture_manager, float dt) { // @Redundant dt is now also in WindowData
+void game(WindowData * window_data, Keyboard * keyboard, Keyboard * previous_keyboard, GraphicsBuffer * graphics_buffer, TextureManager * texture_manager) {
 	
-	Keyboard *  m_previous_keyboard = previous_keyboard;
+	m_previous_keyboard = previous_keyboard;
 
 	m_window_data 	  = window_data;
 	m_keyboard 		  = keyboard;
 	m_graphics_buffer = graphics_buffer;
 	m_texture_manager = texture_manager;
 
+	handle_user_input();
+
+	buffer_tiles(current_room);
+	
+	buffer_trees();	
+
+	buffer_player();
+
+	// Editor overlays
+	if(game_mode == EDITOR) {
+		buffer_editor_overlay();
+	}
+
+	// Debug overlay 
+	if(debug_overlay_enabled) {
+		buffer_debug_overlay();
+	}
+}
+
+Object objects[64];
+int num_objects = 0;
+
+float EDITOR_MENU_PADDING = 0.004f;
+
+float EDITOR_CLICK_MENU_WIDTH = 0.15f;
+float EDITOR_CLICK_MENU_ROW_HEIGHT; // Value assigned in buffer_editor_click_menu
+
+void handle_user_input() {
 	if(m_keyboard->key_F1 && !m_previous_keyboard->key_F1) {
 		if(game_mode == GAME) {
 			game_mode = EDITOR;
@@ -510,17 +521,17 @@ void game(WindowData * window_data, Keyboard * keyboard, Keyboard * previous_key
 		{
 			float speed = 0.006f;
 
-			if(keyboard->key_shift) speed = 0.02f;
+			if(m_keyboard->key_shift) speed = 0.02f;
 
-			float position_delta = speed * dt;
+			float position_delta = speed * m_window_data->frame_time;
 
 			//
 			// @Incomplete Need to use and normalize velocity vector
 			//
-			if(keyboard->key_left) 	player.position.x -= position_delta;
-			if(keyboard->key_right)	player.position.x += position_delta;
-			if(keyboard->key_up)	player.position.y -= position_delta;
-			if(keyboard->key_down) 	player.position.y += position_delta;
+			if(m_keyboard->key_left)  player.position.x -= position_delta;
+			if(m_keyboard->key_right) player.position.x += position_delta;
+			if(m_keyboard->key_up)	  player.position.y -= position_delta;
+			if(m_keyboard->key_down)  player.position.y += position_delta;
 		}
 
 		// Early collision detection, find current tile
@@ -595,7 +606,6 @@ void game(WindowData * window_data, Keyboard * keyboard, Keyboard * previous_key
 
 	// Camera logic
 	{
-
 		if(game_mode == GAME) {
 			camera_offset.x = player.position.x;
 			camera_offset.y = player.position.y;
@@ -624,94 +634,156 @@ void game(WindowData * window_data, Keyboard * keyboard, Keyboard * previous_key
 
 			float speed = 0.006f;
 
-			if(keyboard->key_shift) speed = 0.02f;
+			if(m_keyboard->key_shift) speed = 0.02f;
 
-			float position_delta = speed * dt;
+			float position_delta = speed * m_window_data->frame_time;
 
 			//
 			// @Incomplete Need to use and normalize velocity vector
 			//
-			if(keyboard->key_left) 	camera_offset.x -= position_delta;
-			if(keyboard->key_right)	camera_offset.x += position_delta;
-			if(keyboard->key_up)	camera_offset.y -= position_delta;
-			if(keyboard->key_down) 	camera_offset.y += position_delta;
+			if(m_keyboard->key_left)  camera_offset.x -= position_delta;
+			if(m_keyboard->key_right) camera_offset.x += position_delta;
+			if(m_keyboard->key_up)	  camera_offset.y -= position_delta;
+			if(m_keyboard->key_down)  camera_offset.y += position_delta;
 		}
 		// log_print("[game_camera]", "Camera offset is (%f, %f)", camera_offset.x, camera_offset.y);
 	}
 
-	buffer_tiles(current_room);
-	
-	buffer_trees();	
+	// Editor controls
+	{
+		if(game_mode == EDITOR) {
+			if(!m_keyboard->mouse_left && m_previous_keyboard->mouse_left) { // Mouse left up
+				if(editor_click_menu_was_open) { // This mouse click was used to close the menu.
+					editor_click_menu_was_open = false;
+				} else {
+					// log_print("mouse_testing", "Mouse left pressed at (%0.6f, %0.6f) and released at (%0.6f, %0.6f)", m_keyboard->mouse_left_pressed_position.x, m_keyboard->mouse_left_pressed_position.y, m_keyboard->mouse_position.x, m_keyboard->mouse_position.y);
+					Vector2f game_space_position;
+					game_space_position.x = TILES_PER_ROW   * m_keyboard->mouse_left_pressed_position.x -   TILES_PER_ROW/2 + camera_offset.x;
+					game_space_position.y = ROWS_PER_SCREEN * m_keyboard->mouse_left_pressed_position.y - ROWS_PER_SCREEN/2 + camera_offset.y;
 
-	buffer_player();
+					// Object objects[64];
+					num_objects = get_objects_colliding_at(game_space_position, objects, 64);
 
-	// Editor overlays
-	if(game_mode == EDITOR) {
-		buffer_editor_tile_overlay(current_room);
+					editor_click_menu_position = m_keyboard->mouse_position;
 
-
-		if(!m_keyboard->mouse_left && m_previous_keyboard->mouse_left) {
-			// log_print("mouse_testing", "Mouse left pressed at (%0.6f, %0.6f) and released at (%0.6f, %0.6f)", m_keyboard->mouse_left_pressed_position.x, m_keyboard->mouse_left_pressed_position.y, m_keyboard->mouse_position.x, m_keyboard->mouse_position.y);
-
-			Vector2f game_space_position;
-			game_space_position.x = TILES_PER_ROW   * m_keyboard->mouse_left_pressed_position.x - TILES_PER_ROW/2 + camera_offset.x;
-			game_space_position.y = ROWS_PER_SCREEN * m_keyboard->mouse_left_pressed_position.y - ROWS_PER_SCREEN/2 + camera_offset.y;
-
-			// Object objects[64];
-			num_objects = get_objects_colliding_at(game_space_position, objects, 64);
-
-			editor_entity_selection_menu_open = true;
-		}
-
-		if(editor_entity_selection_menu_open) {
-			float EDITOR_MENU_PADDING = 0.004f;
-
-			float EDITOR_MENU_WIDTH = 0.15f;
-			float EDITOR_MENU_ROW_HEIGHT = EDITOR_MENU_PADDING * 2 * m_window_data->aspect_ratio + 12.0f / m_window_data->height; // @Temporary Current distance from baseline to top of capital letter is 12px
-
-			// Buffer menu background
-			{
-				VertexBuffer vb;
-				IndexBuffer ib;
-				buffer_colored_quad(m_keyboard->mouse_left_pressed_position, TOP_LEFT, EDITOR_MENU_WIDTH, EDITOR_MENU_ROW_HEIGHT * num_objects, DEBUG_OVERLAY_BACKGROUND_Z, Color4f(0.1f, 0.1f, 0.1f, 0.8f), &vb, &ib);
-
-				m_graphics_buffer->vertex_buffers.push_back(vb);
-				m_graphics_buffer->index_buffers.push_back(ib);
-
-				// @Temporary Required because otherwise, the texture buffer is no longer synced with the other buffers
-				m_graphics_buffer->texture_id_buffer.push_back("placeholder");
-
-				m_graphics_buffer->shaders.push_back(colored_shader);
+					editor_click_menu_open = true;
+				}
 			}
 
-			{
-				float x = m_keyboard->mouse_left_pressed_position.x + EDITOR_MENU_PADDING;
-				float y = m_keyboard->mouse_left_pressed_position.y + EDITOR_MENU_PADDING * m_window_data->aspect_ratio;
+			if(m_keyboard->mouse_left && !m_previous_keyboard->mouse_left) { // Mouse left down
+				Vector2f position = m_keyboard->mouse_position;
 
-				// Buffer strings
-				for(int i = 0; i < num_objects; i++) {
-					if(objects[i].type == TILE) {
-						// log_print("editor_mouse_collision", "Colliding with object of type TILE at (%d, %d)", objects[i].tile->local_x, objects[i].tile->local_y);
-						char tile_name[64];
-						snprintf(tile_name, 64, "Tile%d_%d", objects[i].tile->local_x, objects[i].tile->local_y);
+				if(editor_click_menu_open) {
+					if((position.x <= editor_click_menu_position.x + EDITOR_CLICK_MENU_WIDTH) 
+						&& (position.x >= editor_click_menu_position.x) 
+						&& (position.y <= editor_click_menu_position.y + EDITOR_CLICK_MENU_ROW_HEIGHT * num_objects) 
+		   			    && (position.y >= editor_click_menu_position.y)) {
 
-						buffer_string(tile_name, x, y, DEBUG_OVERLAY_Z, my_font, TOP_LEFT);
+						int element_number = 0;
+						float element_y = (position.y - editor_click_menu_position.y);
+						
+						while(true) {
+							element_y -= EDITOR_CLICK_MENU_ROW_HEIGHT;
 
-					}
-					else if(objects[i].type == ENTITY) {
-						// log_print("editor_mouse_collision", "Colliding with object of type ENTITY named %s at (%0.3f, %0.3f)", objects[i].entity->name, objects[i].entity->position.x, objects[i].entity->position.y);
-						buffer_string(objects[i].entity->name, x, y, DEBUG_OVERLAY_Z, my_font, TOP_LEFT);
-					}
+							if(element_y > 0) {
+								element_number++;
+							} else {
+								break;
+							}	
+						}
+						
+						log_print("editor_click_menu", "The element no. %d of the click menu was clicked", element_number);
+					} 
 
-					y += EDITOR_MENU_ROW_HEIGHT;
+					editor_click_menu_open = false;
+					editor_click_menu_was_open = true;
 				}
 			}
 		}
 	}
+}
 
-	// Debug overlay 
-	if(debug_overlay_enabled) {
-		buffer_debug_overlay();
+int get_objects_colliding_at(Vector2f position, Object objects[], int max_collisions) {
+
+	int num_objects = 0;
+
+	// @Optimisation We can probably infer the tiles we collide with from the player's x and y coordinates and information about the room's size
+	for(int i = 0; i < current_room->num_tiles; i++) {
+		Tile tile = current_room->tiles[i];
+
+		if((position.x <= tile.local_x + 1) && (position.x >= tile.local_x) &&
+		   (position.y <= tile.local_y + 1) && (position.y >= tile.local_y)) {
+			objects[num_objects].type = TILE;
+			objects[num_objects].tile = &current_room->tiles[i];
+
+			num_objects++;
+
+			if(num_objects == max_collisions) {
+				break;
+			}
+		}
+	}
+
+	return num_objects;
+}
+
+void buffer_editor_click_menu() {
+	EDITOR_CLICK_MENU_ROW_HEIGHT = EDITOR_MENU_PADDING * 2 * m_window_data->aspect_ratio + 12.0f / m_window_data->height; // @Temporary Current distance from baseline to top of capital letter is 12px
+
+	float x = editor_click_menu_position.x;
+	float y = editor_click_menu_position.y;
+
+
+	for(int i = 0; i < num_objects; i++) {
+		// Buffer menu background
+		{
+			VertexBuffer vb;
+			IndexBuffer ib;
+
+			Color4f color;
+			if(i % 2 == 0) {
+				color = Color4f(0.1f, 0.1f, 0.1f, 0.8f);
+			} else {
+				color = Color4f(0.3f, 0.3f, 0.3f, 0.7f);
+			}
+
+			buffer_colored_quad(x, y, TOP_LEFT, EDITOR_CLICK_MENU_WIDTH, EDITOR_CLICK_MENU_ROW_HEIGHT, DEBUG_OVERLAY_BACKGROUND_Z, color, &vb, &ib);
+
+			m_graphics_buffer->vertex_buffers.push_back(vb);
+			m_graphics_buffer->index_buffers.push_back(ib);
+
+			// @Temporary Required because otherwise, the texture buffer is no longer synced with the other buffers
+			m_graphics_buffer->texture_id_buffer.push_back("placeholder");
+
+			m_graphics_buffer->shaders.push_back(colored_shader);
+		}
+
+		// Buffer strings
+		{
+			if(objects[i].type == TILE) {
+				// log_print("editor_mouse_collision", "Colliding with object of type TILE at (%d, %d)", objects[i].tile->local_x, objects[i].tile->local_y);
+				char tile_name[64];
+				snprintf(tile_name, 64, "Tile%d_%d", objects[i].tile->local_x, objects[i].tile->local_y);
+
+				buffer_string(tile_name, x + EDITOR_MENU_PADDING, y + EDITOR_MENU_PADDING * m_window_data->aspect_ratio, DEBUG_OVERLAY_Z, my_font, TOP_LEFT);
+
+			}
+			else if(objects[i].type == ENTITY) {
+				// log_print("editor_mouse_collision", "Colliding with object of type ENTITY named %s at (%0.3f, %0.3f)", objects[i].entity->name, objects[i].entity->position.x, objects[i].entity->position.y);
+				buffer_string(objects[i].entity->name, x, y, DEBUG_OVERLAY_Z, my_font, TOP_LEFT);
+			}
+		}
+
+		y += EDITOR_CLICK_MENU_ROW_HEIGHT;
+	}
+}
+
+void buffer_editor_overlay() {
+
+	buffer_editor_tile_overlay(current_room);
+
+	if(editor_click_menu_open) {
+		buffer_editor_click_menu();
 	}
 }
 
@@ -721,115 +793,6 @@ const int FRAME_TIME_UPDATE_DELAY = 15; // in frames
 
 float displayed_frame_time = 0.0f;
 float summed_frame_rate = 0.0f;
-
-float buffer_string(char * text, float x, float y, float z,  Font * font) {
-	return buffer_string(text, x, y, z, font, TOP_LEFT);
-}
-
-float buffer_string(char * text, float x, float y, float z,  Font * font, Alignement alignement) {
-	VertexBuffer vb;
-	IndexBuffer ib;
-
-	float pixel_x = x * m_window_data->width;
-	float pixel_y = y * m_window_data->height;
-
-	
-	float text_width = 0.0f;
-	float text_height = 0.0f;
-
-	// Compute height
-	if(alignement == TOP_RIGHT || alignement == TOP_LEFT) {
-		float zero_x = 0.0f;
-		float zero_y = 0.0f;
-
-		stbtt_aligned_quad q;
-		stbtt_GetBakedQuad(font->char_data, font->texture->width, font->texture->height, 'A' - 32, &zero_x, &zero_y, &q, 1);
-		
-		text_height = (float) ((int)(-q.y0 + 0.5f)) / m_window_data->height;
-
-		pixel_y += text_height * m_window_data->height;
-	}
-
-	// Compute width
-	{
-		char * original_text = text;
-		float original_pixel_x = pixel_x;
-		float original_pixel_y = pixel_y;
-
-		// First pass to determine width and height
-		while (*text) {
-			// Make sure it's an ascii character
-			if (*text >= 32 && *text < 128) {
-				stbtt_aligned_quad q;
-				stbtt_GetBakedQuad(font->char_data, font->texture->width, font->texture->height, *text - 32, &pixel_x, &pixel_y, &q, 1);
-			}
-			++text;
-		}
-
-		text_width = (float) ((int)(pixel_x - original_pixel_x + 0.5f)) / m_window_data->width;
-
-		text = original_text;
-		pixel_x = original_pixel_x;
-		pixel_y = original_pixel_y;
-	}
-
-	while(*text) {
-		// Make sure it's an ascii character
-		if (*text >= 32 && *text < 128) {
-			stbtt_aligned_quad q;
-			stbtt_GetBakedQuad(font->char_data, font->texture->width, font->texture->height, *text-32, &pixel_x, &pixel_y, &q, 1);
-		
-			Vertex v1 = {q.x0/m_window_data->width, q.y0/m_window_data->height, z, q.s0, q.t0, 0};
-			Vertex v2 = {q.x1/m_window_data->width, q.y1/m_window_data->height, z, q.s1, q.t1, 0};
-			Vertex v3 = {q.x0/m_window_data->width, q.y1/m_window_data->height, z, q.s0, q.t1, 0};
-			Vertex v4 = {q.x1/m_window_data->width, q.y0/m_window_data->height, z, q.s1, q.t0, 0};
-
-			if(alignement == TOP_RIGHT) {
-				v1.position.x -= text_width;
-				v2.position.x -= text_width;
-				v3.position.x -= text_width;
-				v4.position.x -= text_width;
-			}
-
-			convert_top_left_coords_to_centered(&v1, &v2, &v3, &v4);
-
-			buffer_quad(v1, v2, v3, v4, &vb, &ib);
-
-		}
-		++text;
-	}
-
-   	m_graphics_buffer->vertex_buffers.push_back(vb);
-	m_graphics_buffer->index_buffers.push_back(ib);
-	m_graphics_buffer->texture_id_buffer.push_back(font->texture->name);
-	m_graphics_buffer->shaders.push_back(font_shader);
-
-	return text_width;
-}
-
-void buffer_colored_quad(Vector2f position, Alignement alignement, float width, float height, float depth, Color4f color, VertexBuffer * vb, IndexBuffer * ib) {
-	
-	Vertex v1;
-	Vertex v2;
-	Vertex v3;
-	Vertex v4;
-
-	if(alignement == TOP_LEFT) {
-		v1 = {position.x 	   , position.y 		, depth, color};
-		v2 = {position.x + width, position.y + height, depth, color};
-		v3 = {position.x 	   , position.y + height, depth, color};
-		v4 = {position.x + width, position.y 		, depth, color};
-	}
-	else if(alignement == TOP_RIGHT) {
-		v1 = {position.x - width, position.y 		, depth, color};
-		v2 = {position.x 	   , position.y + height, depth, color};
-		v3 = {position.x - width, position.y + height, depth, color};
-		v4 = {position.x 	   , position.y 		, depth, color};
-	}
-	convert_top_left_coords_to_centered(&v1, &v2, &v3, &v4);
-	buffer_quad(v1, v2, v3, v4, vb, ib);
-
-}
 
 void buffer_debug_overlay() {
 	float DEBUG_OVERLAY_PADDING = 0.004f;
@@ -916,7 +879,6 @@ void buffer_debug_overlay() {
 
 		y += DEBUG_OVERLAY_ROW_HEIGHT;
 	}
-
 }
 
 void buffer_editor_tile_overlay(Room * room) {
@@ -1012,11 +974,6 @@ void buffer_player() {
 	buffer_entity(player);
 }
 
-inline float max(float a, float b) {
-	if(a > b) return a;
-	return b;
-}
-
 void buffer_entity(Entity entity) {
 
 		Vector2f screen_pos;
@@ -1096,8 +1053,116 @@ void buffer_tiles(Room * room) {
 	}
 }
 
-void buffer_title_block() {
+float buffer_string(char * text, float x, float y, float z,  Font * font) {
+	return buffer_string(text, x, y, z, font, TOP_LEFT);
+}
 
+float buffer_string(char * text, float x, float y, float z,  Font * font, Alignement alignement) {
+	VertexBuffer vb;
+	IndexBuffer ib;
+
+	float pixel_x = x * m_window_data->width;
+	float pixel_y = y * m_window_data->height;
+
+	
+	float text_width = 0.0f;
+	float text_height = 0.0f;
+
+	// Compute height
+	if(alignement == TOP_RIGHT || alignement == TOP_LEFT) {
+		float zero_x = 0.0f;
+		float zero_y = 0.0f;
+
+		stbtt_aligned_quad q;
+		stbtt_GetBakedQuad(font->char_data, font->texture->width, font->texture->height, 'A' - 32, &zero_x, &zero_y, &q, 1);
+		
+		text_height = (float) ((int)(-q.y0 + 0.5f)) / m_window_data->height;
+
+		pixel_y += text_height * m_window_data->height;
+	}
+
+	// Compute width
+	{
+		char * original_text = text;
+		float original_pixel_x = pixel_x;
+		float original_pixel_y = pixel_y;
+
+		// First pass to determine width and height
+		while (*text) {
+			// Make sure it's an ascii character
+			if (*text >= 32 && *text < 128) {
+				stbtt_aligned_quad q;
+				stbtt_GetBakedQuad(font->char_data, font->texture->width, font->texture->height, *text - 32, &pixel_x, &pixel_y, &q, 1);
+			}
+			++text;
+		}
+
+		text_width = (float) ((int)(pixel_x - original_pixel_x + 0.5f)) / m_window_data->width;
+
+		text = original_text;
+		pixel_x = original_pixel_x;
+		pixel_y = original_pixel_y;
+	}
+
+	while(*text) {
+		// Make sure it's an ascii character
+		if (*text >= 32 && *text < 128) {
+			stbtt_aligned_quad q;
+			stbtt_GetBakedQuad(font->char_data, font->texture->width, font->texture->height, *text-32, &pixel_x, &pixel_y, &q, 1);
+		
+			Vertex v1 = {q.x0/m_window_data->width, q.y0/m_window_data->height, z, q.s0, q.t0, 0};
+			Vertex v2 = {q.x1/m_window_data->width, q.y1/m_window_data->height, z, q.s1, q.t1, 0};
+			Vertex v3 = {q.x0/m_window_data->width, q.y1/m_window_data->height, z, q.s0, q.t1, 0};
+			Vertex v4 = {q.x1/m_window_data->width, q.y0/m_window_data->height, z, q.s1, q.t0, 0};
+
+			if(alignement == TOP_RIGHT) {
+				v1.position.x -= text_width;
+				v2.position.x -= text_width;
+				v3.position.x -= text_width;
+				v4.position.x -= text_width;
+			}
+
+			convert_top_left_coords_to_centered(&v1, &v2, &v3, &v4);
+
+			buffer_quad(v1, v2, v3, v4, &vb, &ib);
+
+		}
+		++text;
+	}
+
+   	m_graphics_buffer->vertex_buffers.push_back(vb);
+	m_graphics_buffer->index_buffers.push_back(ib);
+	m_graphics_buffer->texture_id_buffer.push_back(font->texture->name);
+	m_graphics_buffer->shaders.push_back(font_shader);
+
+	return text_width;
+}
+
+void buffer_colored_quad(Vector2f position, Alignement alignement, float width, float height, float depth, Color4f color, VertexBuffer * vb, IndexBuffer * ib) {
+	buffer_colored_quad(position.x, position.y, alignement, width, height, depth, color, vb, ib);
+}
+
+void buffer_colored_quad(float x, float y, Alignement alignement, float width, float height, float depth, Color4f color, VertexBuffer * vb, IndexBuffer * ib) {
+
+	Vertex v1;
+	Vertex v2;
+	Vertex v3;
+	Vertex v4;
+
+	if(alignement == TOP_LEFT) {
+		v1 = {x 	   , y 		   , depth, color};
+		v2 = {x + width, y + height, depth, color};
+		v3 = {x 	   , y + height, depth, color};
+		v4 = {x + width, y 		   , depth, color};
+	}
+	else if(alignement == TOP_RIGHT) {
+		v1 = {x - width, y 		   , depth, color};
+		v2 = {x 	   , y + height, depth, color};
+		v3 = {x - width, y + height, depth, color};
+		v4 = {x 	   , y 		   , depth, color};
+	}
+	convert_top_left_coords_to_centered(&v1, &v2, &v3, &v4);
+	buffer_quad(v1, v2, v3, v4, vb, ib);
 }
 
 void buffer_quad_centered_at(float radius, float depth, VertexBuffer * vb, IndexBuffer * ib) {
@@ -1154,4 +1219,9 @@ void convert_top_left_coords_to_centered(Vertex * v1, Vertex * v2, Vertex * v3, 
 	v2->position.y += 1.0f;
 	v3->position.y += 1.0f;
 	v4->position.y += 1.0f;
+}
+
+inline float max(float a, float b) {
+	if(a > b) return a;
+	return b;
 }

@@ -580,57 +580,6 @@ void draw_frame() {
 	graphics_buffer.shaders.clear();
 }
 
-// Texture code, moved to game_main.cpp
-// void do_load_texture(Texture * texture) {
-
-// 	char path[512];
-// 	snprintf(path, 512, "textures/%s", texture->name);
-	
-// 	int x,y,n;
-// 	texture->bitmap = stbi_load(path, &x, &y, &n, 4);
-
-// 	if(texture->bitmap == NULL) {
-// 		log_print("do_load_texture", "Failed to load texture \"%s\"", texture->name);
-// 		return;
-// 	}
-
-// 	if(n != 4) {
-// 		log_print("do_load_texture", "Loaded texture \"%s\", it has %d bit depth, please convert to 32 bit depth", texture->name, n*8);
-// 		n = 4;
-// 	} else {
-// 		log_print("do_load_texture", "Loaded texture \"%s\"", texture->name);
-
-// 	}
-
-// 	texture->width 				= x;
-// 	texture->height 			= y;
-// 	texture->bytes_per_pixel 	= n;
-// 	texture->width_in_bytes		= x * n;
-// 	texture->num_bytes	 		= texture->width_in_bytes * y;
-// }
-
-// void load_texture(char * name) {
-// 	Texture * texture = texture_manager.get_new_texture_slot();
-
-// 	texture->platform_info = (PlatformTextureInfo *) malloc(sizeof(PlatformTextureInfo));
-
-// 	texture->name = name;
-
-// 	do_load_texture(texture);
-// 	bind_srv_to_texture(texture);
-
-// 	texture_manager.register_texture(texture);
-// }
-
-// void init_textures() {
-// 	load_texture("title_screen_logo.png");
-// 	load_texture("grass.png");
-// 	load_texture("dirt.png");
-// 	load_texture("megaperson.png");
-// 	load_texture("tree.png");
-// 	load_texture("tree_window.png");
-// }
-
 void bind_srv_to_texture(Texture * texture) {
 	D3D11_TEXTURE2D_DESC texture_desc;
 						 texture_desc.Width 				= texture->width;
@@ -647,8 +596,7 @@ void bind_srv_to_texture(Texture * texture) {
 
 	// Our fonts are greyscale, so let's make a special case for those
 	if(texture->bytes_per_pixel == 1) {
-		texture_desc.Format = DXGI_FORMAT_A8_UNORM
-		;
+		texture_desc.Format = DXGI_FORMAT_A8_UNORM;
 	}
 
 	D3D11_SUBRESOURCE_DATA texture_subresource;
@@ -659,7 +607,6 @@ void bind_srv_to_texture(Texture * texture) {
 	ID3D11Texture2D * d3d_texture;
 
 	d3d_device->CreateTexture2D(&texture_desc, &texture_subresource, &d3d_texture);
-
 
 	D3D11_SHADER_RESOURCE_VIEW_DESC srv_desc;
 									srv_desc.Format 						= DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -872,7 +819,7 @@ void main() {
 
 		update_window_events();
 
-		game(&window_data, &keyboard, &previous_keyboard, &graphics_buffer, &texture_manager, frame_time);
+		game(&window_data, &keyboard, &previous_keyboard, &graphics_buffer, &texture_manager);
 		draw_frame();
 
 		previous_keyboard = keyboard; // @Framerate
