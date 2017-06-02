@@ -153,10 +153,12 @@ const int TILES_PER_ROW		= 32;
 const int ROWS_PER_SCREEN	= 18;
 const int TILES_PER_SCREEN	= TILES_PER_ROW * ROWS_PER_SCREEN;
 
-const float DEBUG_OVERLAY_Z  			= 0.000000f;
-const float DEBUG_OVERLAY_BACKGROUND_Z  = 0.000001f;
-const float EDITOR_OVERLAY_Z  			= 0.000010f;
-const float MIN_ENTITY_Z  				= 0.000100f;
+const float DEBUG_OVERLAY_Z  			   = 0.0000000f;
+const float DEBUG_OVERLAY_BACKGROUND_Z     = 0.0000001f;
+const float EDITOR_OVERLAY_Z  			   = 0.0000010f;
+const float EDITOR_LEFT_PANEL_BACKGROUND_Z = 0.0000009f;
+const float EDITOR_LEFT_PANEL_CONTENT_Z    = 0.0000008f;
+const float MIN_ENTITY_Z  				   = 0.0000100f;
 
 // Extern Globals
 extern Shader * font_shader;
@@ -410,7 +412,6 @@ void do_load_texture(Texture * texture) {
 		n = 4;
 	} else {
 		log_print("do_load_texture", "Loaded texture \"%s\"", texture->name);
-
 	}
 
 	texture->width 				= x;
@@ -496,7 +497,21 @@ int num_objects = 0;
 float EDITOR_MENU_PADDING = 0.004f;
 
 float EDITOR_CLICK_MENU_WIDTH = 0.15f;
-float EDITOR_CLICK_MENU_ROW_HEIGHT; // Value assigned in buffer_editor_click_menu
+float EDITOR_CLICK_MENU_ROW_HEIGHT; // @Temporary Value assigned in buffer_editor_click_menu
+
+enum EditorLeftPanelMode {
+	MAIN,
+	TILE_INFO,
+};
+
+float EDITOR_LEFT_PANEL_WIDTH = 0.18f;
+float EDITOR_LEFT_PANEL_PADDING = 0.02f;
+float EDITOR_LEFT_PANEL_MAIN_ROW_HEIGHT = 0.18f;
+float EDITOR_LEFT_PANEL_ROW_HEIGHT; // @Temporary Value assigned in buffer_editor_left_panel
+
+EditorLeftPanelMode editor_left_panel_mode = TILE_INFO;
+
+Object editor_left_panel_displayed_object;
 
 void handle_user_input() {
 	if(m_keyboard->key_F1 && !m_previous_keyboard->key_F1) {
@@ -661,7 +676,6 @@ void handle_user_input() {
 					game_space_position.x = TILES_PER_ROW   * m_keyboard->mouse_left_pressed_position.x -   TILES_PER_ROW/2 + camera_offset.x;
 					game_space_position.y = ROWS_PER_SCREEN * m_keyboard->mouse_left_pressed_position.y - ROWS_PER_SCREEN/2 + camera_offset.y;
 
-					// Object objects[64];
 					num_objects = get_objects_colliding_at(game_space_position, objects, 64);
 
 					editor_click_menu_position = m_keyboard->mouse_position;
@@ -699,6 +713,8 @@ void handle_user_input() {
 						} else {
 							objects[element_number].tile->texture = "grass.png"; // = m_texture_manager->find_texture("dirt.png");
 						}
+
+						editor_left_panel_displayed_object = objects[element_number];
 					} 
 
 					editor_click_menu_open = false;
@@ -731,6 +747,64 @@ int get_objects_colliding_at(Vector2f position, Object objects[], int max_collis
 	}
 
 	return num_objects;
+}
+
+void buffer_editor_left_panel() {
+
+	// Background
+	{
+		VertexBuffer vb;
+		IndexBuffer ib;
+
+		Color4f color = Color4f(0.0f, 0.0f, 0.0f, 0.8f);
+		buffer_colored_quad(0.0f, 0.0f, TOP_LEFT, EDITOR_LEFT_PANEL_WIDTH, 1.0f, EDITOR_LEFT_PANEL_BACKGROUND_Z, color, &vb, &ib);
+
+		m_graphics_buffer->vertex_buffers.push_back(vb);
+		m_graphics_buffer->index_buffers.push_back(ib);
+
+		// @Temporary Required because otherwise, the texture buffer is no longer synced with the other buffers
+		m_graphics_buffer->texture_id_buffer.push_back("placeholder");
+
+		m_graphics_buffer->shaders.push_back(colored_shader);
+	}
+
+	if(editor_left_panel_mode == TILE_INFO) {
+		if(editor_left_panel_displayed_object.tile != NULL) {
+
+			float y = 0.0f;
+
+			// Texture display
+			{
+				float texture_display_size = 0.7f * EDITOR_LEFT_PANEL_WIDTH;
+				float texture_side_padding = 0.15f * EDITOR_LEFT_PANEL_WIDTH;
+
+				float aspect_ratio = m_window_data->aspect_ratio;
+
+				Vertex v1 = {texture_side_padding						, y + EDITOR_LEFT_PANEL_PADDING										 , EDITOR_LEFT_PANEL_CONTENT_Z, 0.0f, 0.0f};
+				Vertex v2 = {texture_side_padding + texture_display_size, y + EDITOR_LEFT_PANEL_PADDING + texture_display_size * aspect_ratio, EDITOR_LEFT_PANEL_CONTENT_Z, 1.0f, 1.0f};
+				Vertex v3 = {texture_side_padding						, y + EDITOR_LEFT_PANEL_PADDING + texture_display_size * aspect_ratio, EDITOR_LEFT_PANEL_CONTENT_Z, 0.0f, 1.0f};
+				Vertex v4 = {texture_side_padding + texture_display_size, y + EDITOR_LEFT_PANEL_PADDING										 , EDITOR_LEFT_PANEL_CONTENT_Z, 1.0f, 0.0f};
+
+				convert_top_left_coords_to_centered(&v1, &v2, &v3, &v4);
+
+				VertexBuffer vb;
+				IndexBuffer ib;
+
+				buffer_quad(v1, v2, v3, v4, &vb, &ib);
+
+				m_graphics_buffer->vertex_buffers.push_back(vb);
+				m_graphics_buffer->index_buffers.push_back(ib);
+				m_graphics_buffer->texture_id_buffer.push_back(editor_left_panel_displayed_object.tile->texture);
+				m_graphics_buffer->shaders.push_back(textured_shader);
+
+				y += texture_display_size * aspect_ratio + 2 * EDITOR_LEFT_PANEL_PADDING;
+			}
+
+			buffer_string(editor_left_panel_displayed_object.tile->texture, EDITOR_LEFT_PANEL_PADDING, y, EDITOR_LEFT_PANEL_CONTENT_Z, my_font);
+
+		}
+	}
+
 }
 
 void buffer_editor_click_menu() {
@@ -787,6 +861,7 @@ void buffer_editor_click_menu() {
 void buffer_editor_overlay() {
 
 	buffer_editor_tile_overlay(current_room);
+	buffer_editor_left_panel();
 
 	if(editor_click_menu_open) {
 		buffer_editor_click_menu();
@@ -995,16 +1070,16 @@ void buffer_entity(Entity entity) {
 		float z = max(MIN_ENTITY_Z, 1.0f - (entity.position.y + entity.size)/current_room->height);
 
 		Vertex v1 = {tile_width * (screen_pos.x + 0), tile_height * (screen_pos.y  + 0), 
-					 z, 0.0f, 0.0f, 0};
+					 z, 0.0f, 0.0f};
 
 		Vertex v2 = {tile_width * (screen_pos.x + entity.size), tile_height * (screen_pos.y + entity.size),
-					 z, 1.0f, 1.0f, 0};
+					 z, 1.0f, 1.0f};
 
 		Vertex v3 = {tile_width * (screen_pos.x + 0), tile_height * (screen_pos.y  + entity.size), 
-					 z, 0.0f, 1.0f, 0};
+					 z, 0.0f, 1.0f};
 
 		Vertex v4 = {tile_width * (screen_pos.x + entity.size), tile_height * (screen_pos.y  + 0), 
-					 z, 1.0f, 0.0f, 0};
+					 z, 1.0f, 0.0f};
 
 		
 		convert_top_left_coords_to_centered(&v1, &v2, &v3, &v4);
@@ -1038,12 +1113,10 @@ void buffer_tiles(Room * room) {
 		if (row < 0) 			 continue;
 	 	if (row >= room->height) continue;
 
-		int texture_index = m_texture_manager->find_texture_index(tile.texture);
-
-		Vertex v1 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 0), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 0), 0.99f, 0.0f, 0.0f, texture_index};
-		Vertex v2 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 1), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 1), 0.99f, 1.0f, 1.0f, texture_index};
-		Vertex v3 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 0), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 1), 0.99f, 0.0f, 1.0f, texture_index};
-		Vertex v4 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 1), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 0), 0.99f, 1.0f, 0.0f, texture_index};
+		Vertex v1 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 0), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 0), 0.99f, 0.0f, 0.0f};
+		Vertex v2 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 1), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 1), 0.99f, 1.0f, 1.0f};
+		Vertex v3 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 0), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 1), 0.99f, 0.0f, 1.0f};
+		Vertex v4 = {tile_width * (col - camera_offset.x + TILES_PER_ROW/2.0f + 1), tile_height * (row - camera_offset.y + ROWS_PER_SCREEN/2.0f + 0), 0.99f, 1.0f, 0.0f};
 
 		convert_top_left_coords_to_centered(&v1, &v2, &v3, &v4);
 
@@ -1116,10 +1189,10 @@ float buffer_string(char * text, float x, float y, float z,  Font * font, Aligne
 			stbtt_aligned_quad q;
 			stbtt_GetBakedQuad(font->char_data, font->texture->width, font->texture->height, *text-32, &pixel_x, &pixel_y, &q, 1);
 		
-			Vertex v1 = {q.x0/m_window_data->width, q.y0/m_window_data->height, z, q.s0, q.t0, 0};
-			Vertex v2 = {q.x1/m_window_data->width, q.y1/m_window_data->height, z, q.s1, q.t1, 0};
-			Vertex v3 = {q.x0/m_window_data->width, q.y1/m_window_data->height, z, q.s0, q.t1, 0};
-			Vertex v4 = {q.x1/m_window_data->width, q.y0/m_window_data->height, z, q.s1, q.t0, 0};
+			Vertex v1 = {q.x0/m_window_data->width, q.y0/m_window_data->height, z, q.s0, q.t0};
+			Vertex v2 = {q.x1/m_window_data->width, q.y1/m_window_data->height, z, q.s1, q.t1};
+			Vertex v3 = {q.x0/m_window_data->width, q.y1/m_window_data->height, z, q.s0, q.t1};
+			Vertex v4 = {q.x1/m_window_data->width, q.y0/m_window_data->height, z, q.s1, q.t0};
 
 			if(alignement == TOP_RIGHT) {
 				v1.position.x -= text_width;
@@ -1179,10 +1252,10 @@ void buffer_quad_centered_at(float radius, float depth, VertexBuffer * vb, Index
 float ENTITY_MIMINUM_DEPTH = 0.0000f;
 
 void buffer_quad_centered_at(Vector2f center, float radius, float depth, VertexBuffer * vb, IndexBuffer * ib) {
-	Vertex v1 = {center.x - radius, center.y + radius*m_window_data->aspect_ratio, max(depth, ENTITY_MIMINUM_DEPTH), 0.0f, 0.0f, 0};
-	Vertex v2 = {center.x + radius, center.y - radius*m_window_data->aspect_ratio, max(depth, ENTITY_MIMINUM_DEPTH), 1.0f, 1.0f, 0};
-	Vertex v3 = {center.x - radius, center.y - radius*m_window_data->aspect_ratio, max(depth, ENTITY_MIMINUM_DEPTH), 0.0f, 1.0f, 0};
-	Vertex v4 = {center.x + radius, center.y + radius*m_window_data->aspect_ratio, max(depth, ENTITY_MIMINUM_DEPTH), 1.0f, 0.0f, 0};
+	Vertex v1 = {center.x - radius, center.y + radius*m_window_data->aspect_ratio, max(depth, ENTITY_MIMINUM_DEPTH), 0.0f, 0.0f};
+	Vertex v2 = {center.x + radius, center.y - radius*m_window_data->aspect_ratio, max(depth, ENTITY_MIMINUM_DEPTH), 1.0f, 1.0f};
+	Vertex v3 = {center.x - radius, center.y - radius*m_window_data->aspect_ratio, max(depth, ENTITY_MIMINUM_DEPTH), 0.0f, 1.0f};
+	Vertex v4 = {center.x + radius, center.y + radius*m_window_data->aspect_ratio, max(depth, ENTITY_MIMINUM_DEPTH), 1.0f, 0.0f};
 
 	buffer_quad(v1, v2, v3, v4, vb, ib);
 }

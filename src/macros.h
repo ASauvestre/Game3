@@ -10,3 +10,5 @@
 
 
 #define array_size(array)  (sizeof(array)/sizeof(array[0]))
+
+#define VNAME(x) #x

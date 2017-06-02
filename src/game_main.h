@@ -93,7 +93,7 @@ struct Vertex {
 		// Default constructor
 	}
 
-	Vertex(	float x, float y, float z, float u, float v, int texid) {
+	Vertex(	float x, float y, float z, float u, float v) {
 		this->position = Vector3f(x, y, z);
 		this->tex_info.tex_coord = Vector2f(u,v);
 	}
