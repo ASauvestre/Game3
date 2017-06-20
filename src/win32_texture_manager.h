@@ -1,5 +1,5 @@
 struct PlatformTextureInfo {
-	void * srv;
+    void * srv;
 };
 
 #include "texture_manager.h"

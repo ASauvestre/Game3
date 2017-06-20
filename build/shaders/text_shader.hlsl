@@ -21,11 +21,15 @@ float4 PS(VS_OUTPUT input) : SV_TARGET
 {
     float4 textureColor =  m_texture.Sample( m_sampler_state, input.tex_coord);
 
+    // Discard black background pixels
+    if(textureColor.r  == 0.0) {    
+        discard;
+    }
+
     textureColor.r = 1.0;
     textureColor.g = 1.0;
     textureColor.b = 1.0;
-
-    // textureColor.a = 1.0;
+    textureColor.a = 1.0;
 
     return textureColor;
 } 
