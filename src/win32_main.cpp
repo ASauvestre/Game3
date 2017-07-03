@@ -789,7 +789,7 @@ void main() {
     QueryPerformanceCounter(&start_time);
 
     window_data.width   = 1280;
-    window_data.height  = 720;
+    window_data.height  = 960;
 
     // window_data.width    = 1920;
     // window_data.height   = 1080;
