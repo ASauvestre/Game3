@@ -1,7 +1,9 @@
+#pragma once
+
 #include <stdlib.h>
 #include <cstring>
 
-#pragma once
+#include "macros.h"
 
 struct PlatformTextureInfo;
 

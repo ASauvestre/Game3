@@ -1,10 +1,8 @@
+#include <assert.h>
+
 #include "game_main.h"
+#include "macros.h"
 
-#define STBI_ONLY_PNG
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
-
-#define STB_TRUETYPE_IMPLEMENTATION
 #include "stb_truetype.h"
 
 enum GameMode {
@@ -26,10 +24,7 @@ enum Alignement {
     BOTTOM_LEFT
 };
 
-struct Rectangle {
-    float x, y;
-    float width, height;
-};
+struct Font;
 
 struct Entity {
     Entity() {}
@@ -53,7 +48,7 @@ struct Tile {
     int room_target_id;         // Used if type is SWITCH_ROOM
     Vector2 target_tile_coords; // Used if type is SWITCH_ROOM
 
-    Rectangle collision_box;
+    Vector2f collision_box;
 
     bool collision_enabled = false;
 };
@@ -99,12 +94,6 @@ struct Room {
     Tile * outer_tiles; // Border tiles, used for teleport triggers
 };
 
-struct Font {
-    char * name;
-    Texture * texture;
-    stbtt_bakedchar char_data[96]; // 96 ASCII characters
-};
-
 struct Camera {
     Vector2f size;
     Vector2f offset;
@@ -141,17 +130,12 @@ void buffer_editor_tile_overlay(Room * room);
 
 int get_objects_colliding_at(Vector2f position, Object objects[], int max_collisions);
 
-void buffer_colored_quad(Vector2f position, Alignement alignement, float width, float height, float depth, Color4f color, VertexBuffer * vb, IndexBuffer * ib);
-void buffer_colored_quad(float x, float y, Alignement alignement, float width, float height, float depth, Color4f color, VertexBuffer * vb, IndexBuffer * ib);
-
-void buffer_quad(Vertex v1, Vertex v2, Vertex v3, Vertex v4, VertexBuffer * vb, IndexBuffer * ib);
-
-void buffer_quad_centered_at(Vector2f center, float radius, float depth, VertexBuffer * vb, IndexBuffer * ib);
-void buffer_quad_centered_at(float radius, float depth, VertexBuffer * vb, IndexBuffer * ib);
+void buffer_colored_quad(Vector2f position, Alignement alignement, float width, float height, float depth, Color4f color);
+void buffer_colored_quad(float x, float y, Alignement alignement, float width, float height, float depth, Color4f color);
 
 void convert_top_left_coords_to_centered(Vertex * v1, Vertex * v2, Vertex * v3, Vertex * v4);
 
-inline float max(float a, float b);
+// inline float max(float a, float b);
 
 // Constants
 const float DEBUG_OVERLAY_Z                = 0.0000000f;
@@ -168,14 +152,12 @@ extern Shader * font_shader;
 extern Shader * textured_shader;
 extern Shader * colored_shader;
 
-// Globals
-static WindowData       * m_window_data;
-static Keyboard         * m_keyboard;
-static GraphicsBuffer   * m_graphics_buffer;
-static TextureManager   * m_texture_manager;
-static Keyboard         * m_previous_keyboard;
+extern Font * my_font;
 
-static Font * my_font;
+// Globals
+static WindowData * m_window_data;
+static Keyboard   * m_keyboard;
+static Keyboard   * m_previous_keyboard;
 
 static float square_size = 0.5f;
 
@@ -287,18 +269,12 @@ Room * generate_room(char * name, int width, int height) {
     return room;
 }
 
-void init_game(TextureManager * texture_manager) {
-    m_texture_manager = texture_manager;
+void init_game() {
 
     // Init camera
     main_camera.size.x = 32.0f;
     main_camera.offset.x = 0.0f;
     main_camera.offset.y = 0.0f;
-    
-    // Load textures
-    init_textures();
-
-    init_fonts();
 
     // Init player
     {
@@ -357,138 +333,12 @@ void init_game(TextureManager * texture_manager) {
     }
 }
 
-Font * load_font(char * name) {
-    Font * font = (Font *) malloc(sizeof(Font));
-
-    font->name = name;
-
-    char path[512];
-    snprintf(path, 512, "fonts/%s", font->name);
-
-    FILE * font_file = fopen(path, "rb");
-
-    if(font_file == NULL) {
-        log_print("load_font", "Font %s not found at %s", name, path)
-        free(font);
-        return NULL;
-    }
-
-    int font_file_size = get_file_size(font_file);
-
-    unsigned char * font_file_buffer = (unsigned char *) malloc(font_file_size);
-
-    // log_print("font_loading", "Font file for %s is %d bytes long", my_font->name, font_file_size);
-
-    fread(font_file_buffer, 1, font_file_size, font_file);
-
-    // We no longer need the file
-    fclose(font_file);
-
-    unsigned char * bitmap = (unsigned char *) malloc(256*256*4); // Our bitmap is 512x512 pixels and each pixel takes 4 bytes @Robustness, make sure the bitmap is big enough for the font
-
-    int result = stbtt_BakeFontBitmap(font_file_buffer, 0, 16.0, bitmap, 512, 512, 32, 96, font->char_data); // From stb_truetype.h : "no guarantee this fits!""
-
-    if(result <= 0) {
-        log_print("load_font", "The font %s could not be loaded, it is too large to fit in a 512x512 bitmap", name);
-    }
-
-    font->texture = create_texture(font->name, bitmap, 512, 512, 1);
-
-    free(font_file_buffer);
-
-    log_print("load_font", "Loaded font %s", font->name);
-
-    return font;
-}
-
-int get_file_size(FILE * file) {
-    fseek (file , 0 , SEEK_END);
-    int size = ftell (file);
-    fseek (file , 0 , SEEK_SET);
-    return size;
-}
-
-// Texture loading
-void do_load_texture(Texture * texture) {
-
-    char path[512];
-    snprintf(path, 512, "textures/%s", texture->name);
-    
-    int x,y,n;
-    texture->bitmap = stbi_load(path, &x, &y, &n, 4);
-
-    if(texture->bitmap == NULL) {
-        log_print("do_load_texture", "Failed to load texture \"%s\"", texture->name);
-        return;
-    }
-
-    if(n != 4) {
-        log_print("do_load_texture", "Loaded texture \"%s\", it has %d bit depth, please convert to 32 bit depth", texture->name, n*8);
-        n = 4;
-    } else {
-        log_print("do_load_texture", "Loaded texture \"%s\"", texture->name);
-    }
-
-    texture->width              = x;
-    texture->height             = y;
-    texture->bytes_per_pixel    = n;
-    texture->width_in_bytes     = x * n;
-    texture->num_bytes          = texture->width_in_bytes * y;
-}
-
-Texture * create_texture(char * name, unsigned char * data, int width, int height, int bytes_per_pixel) {
-    Texture * texture = m_texture_manager->get_new_texture_slot();
-
-    texture->name               = name;
-    texture->bitmap             = data;
-    texture->width              = width;
-    texture->height             = height;
-    texture->bytes_per_pixel    = bytes_per_pixel;
-    texture->width_in_bytes     = texture->width * texture->bytes_per_pixel;
-    texture->num_bytes          = texture->width_in_bytes * texture->height;
-
-    m_texture_manager->register_texture(texture);
-
-    return texture;
-}
-
-Texture * create_texture(char * name, unsigned char * data, int width, int height) {
-    return create_texture(name, data, width, height, 4); // Default is 32-bit bitmap.
-}
-
-void load_texture(char * name) {
-    Texture * texture = m_texture_manager->get_new_texture_slot();
-
-    texture->name = name;
-
-    do_load_texture(texture);
-
-    m_texture_manager->register_texture(texture);
-}
-
-void init_textures() {
-    load_texture("grass1.png");
-    load_texture("grass2.png");
-    load_texture("grass3.png");
-    load_texture("dirt_road.png");
-    load_texture("dirt_road_bottom.png");
-    load_texture("dirt_road_top.png");
-    load_texture("megaperson.png");
-    load_texture("tree.png");
-}
-
-void init_fonts() {
-    my_font = load_font("Inconsolata.ttf");
-}
-
-void game(WindowData * window_data, Keyboard * keyboard, Keyboard * previous_keyboard, GraphicsBuffer * graphics_buffer, TextureManager * texture_manager) {
+void game(WindowData * window_data, Keyboard * keyboard, Keyboard * previous_keyboard) {
     
     m_previous_keyboard = previous_keyboard;
 
     m_window_data     = window_data;
     m_keyboard        = keyboard;
-    m_graphics_buffer = graphics_buffer;
-    m_texture_manager = texture_manager;
 
     main_camera.size.y = main_camera.size.x / m_window_data->aspect_ratio;
 
@@ -773,19 +623,8 @@ void buffer_editor_left_panel() {
 
     // Background
     {
-        VertexBuffer vb;
-        IndexBuffer ib;
-
         Color4f color = Color4f(0.0f, 0.0f, 0.0f, 0.8f);
-        buffer_colored_quad(0.0f, 0.0f, TOP_LEFT, EDITOR_LEFT_PANEL_WIDTH, 1.0f, EDITOR_LEFT_PANEL_BACKGROUND_Z, color, &vb, &ib);
-
-        m_graphics_buffer->vertex_buffers.push_back(vb);
-        m_graphics_buffer->index_buffers.push_back(ib);
-
-        // @Temporary Required because otherwise, the texture buffer is no longer synced with the other buffers
-        m_graphics_buffer->texture_id_buffer.push_back("placeholder");
-
-        m_graphics_buffer->shaders.push_back(colored_shader);
+        buffer_colored_quad(0.0f, 0.0f, TOP_LEFT, EDITOR_LEFT_PANEL_WIDTH, 1.0f, EDITOR_LEFT_PANEL_BACKGROUND_Z, color);
     }
 
     if(editor_left_panel_mode == TILE_INFO) {
@@ -808,15 +647,17 @@ void buffer_editor_left_panel() {
 
                 convert_top_left_coords_to_centered(&v1, &v2, &v3, &v4);
 
-                VertexBuffer vb;
-                IndexBuffer ib;
+                set_texture(editor_left_panel_displayed_object.tile->texture);
+                set_shader(textured_shader);
 
-                buffer_quad(v1, v2, v3, v4, &vb, &ib);
+                start_buffer();
 
-                m_graphics_buffer->vertex_buffers.push_back(vb);
-                m_graphics_buffer->index_buffers.push_back(ib);
-                m_graphics_buffer->texture_id_buffer.push_back(editor_left_panel_displayed_object.tile->texture);
-                m_graphics_buffer->shaders.push_back(textured_shader);
+                add_to_buffer(v1);
+                add_to_buffer(v2);
+                add_to_buffer(v3);
+                add_to_buffer(v4);
+
+                end_buffer();
 
                 y += texture_display_size * aspect_ratio + 2 * texture_top_padding;
             }
@@ -844,9 +685,6 @@ void buffer_editor_click_menu() {
     for(int i = 0; i < num_objects; i++) {
         // Buffer menu background
         {
-            VertexBuffer vb;
-            IndexBuffer ib;
-
             Color4f color;
             if(i % 2 == 0) {
                 color = Color4f(0.1f, 0.1f, 0.1f, 0.8f);
@@ -854,15 +692,7 @@ void buffer_editor_click_menu() {
                 color = Color4f(0.3f, 0.3f, 0.3f, 0.7f);
             }
 
-            buffer_colored_quad(x, y, TOP_LEFT, EDITOR_CLICK_MENU_WIDTH, EDITOR_CLICK_MENU_ROW_HEIGHT, DEBUG_OVERLAY_BACKGROUND_Z, color, &vb, &ib);
-
-            m_graphics_buffer->vertex_buffers.push_back(vb);
-            m_graphics_buffer->index_buffers.push_back(ib);
-
-            // @Temporary Required because otherwise, the texture buffer is no longer synced with the other buffers
-            m_graphics_buffer->texture_id_buffer.push_back("placeholder");
-
-            m_graphics_buffer->shaders.push_back(colored_shader);
+            buffer_colored_quad(x, y, TOP_LEFT, EDITOR_CLICK_MENU_WIDTH, EDITOR_CLICK_MENU_ROW_HEIGHT, DEBUG_OVERLAY_BACKGROUND_Z, color);
         }
 
         // Buffer strings
@@ -918,9 +748,6 @@ void buffer_debug_overlay() {
             position.x = 1.0f - DEBUG_OVERLAY_WIDTH;
             position.y = i * DEBUG_OVERLAY_ROW_HEIGHT;
 
-            VertexBuffer vb;
-            IndexBuffer  ib;
-
             Color4f color;
 
             if(i % 2 == 0) {
@@ -929,15 +756,7 @@ void buffer_debug_overlay() {
                 color = Color4f(0.3f, 0.3f, 0.3f, 0.7f);
             }
 
-            buffer_colored_quad(position, TOP_LEFT, DEBUG_OVERLAY_WIDTH, DEBUG_OVERLAY_ROW_HEIGHT, DEBUG_OVERLAY_BACKGROUND_Z, color, &vb, &ib);
-        
-            m_graphics_buffer->vertex_buffers.push_back(vb);
-            m_graphics_buffer->index_buffers.push_back(ib);
-
-            // @Temporary Required because otherwise, the texture buffer is no longer synced with the other buffers
-            m_graphics_buffer->texture_id_buffer.push_back("placeholder");
-
-            m_graphics_buffer->shaders.push_back(colored_shader);
+            buffer_colored_quad(position, TOP_LEFT, DEBUG_OVERLAY_WIDTH, DEBUG_OVERLAY_ROW_HEIGHT, DEBUG_OVERLAY_BACKGROUND_Z, color);
         }
 
     }
@@ -989,7 +808,7 @@ void buffer_debug_overlay() {
     }
 }
 
-void do_buffer_editor_tile_overlay(Tile * tiles, int num_tiles, VertexBuffer * vb, IndexBuffer * ib) {
+void do_buffer_editor_tile_overlay(Tile * tiles, int num_tiles) {
     for(int tile_index = 0; tile_index < num_tiles; tile_index++) {
         Tile tile = tiles[tile_index];
         int col = tile.local_x;
@@ -1025,24 +844,23 @@ void do_buffer_editor_tile_overlay(Tile * tiles, int num_tiles, VertexBuffer * v
         Vertex v4 = {tile_offset.x + tile_size.x, tile_offset.y              , EDITOR_OVERLAY_Z, color};
 
         convert_top_left_coords_to_centered(&v1, &v2, &v3, &v4);
-        buffer_quad(v1, v2, v3, v4, vb, ib);
+
+        set_shader(colored_shader);
+
+        start_buffer();
+
+        add_to_buffer(v1);
+        add_to_buffer(v2);
+        add_to_buffer(v3);
+        add_to_buffer(v4);
+
+        end_buffer();
     }
 }
 
 void buffer_editor_tile_overlay(Room * room) {
-    VertexBuffer vb;
-    IndexBuffer ib;
-
-    do_buffer_editor_tile_overlay(room->tiles, room->num_tiles, &vb, &ib);
-    do_buffer_editor_tile_overlay(room->outer_tiles, room->num_outer_tiles, &vb, &ib);
-
-    m_graphics_buffer->vertex_buffers.push_back(vb);
-    m_graphics_buffer->index_buffers.push_back(ib);
-
-    // @Temporary Required because otherwise, the texture buffer is no longer synced with the other buffers
-    m_graphics_buffer->texture_id_buffer.push_back("placeholder");
-
-    m_graphics_buffer->shaders.push_back(colored_shader);
+    do_buffer_editor_tile_overlay(room->tiles, room->num_tiles);
+    do_buffer_editor_tile_overlay(room->outer_tiles, room->num_outer_tiles);
 }
 
 void buffer_entities() {
@@ -1086,15 +904,17 @@ void buffer_entity(Entity entity) {
 
         convert_top_left_coords_to_centered(&v1, &v2, &v3, &v4);
 
-        VertexBuffer vb;
-        IndexBuffer ib;
+        set_texture(entity.texture);
+        set_shader(textured_shader);
 
-        buffer_quad(v1, v2, v3, v4, &vb, &ib);
+        start_buffer();
 
-        m_graphics_buffer->vertex_buffers.push_back(vb);
-        m_graphics_buffer->index_buffers.push_back(ib);
-        m_graphics_buffer->texture_id_buffer.push_back(entity.texture);
-        m_graphics_buffer->shaders.push_back(textured_shader);
+        add_to_buffer(v1);
+        add_to_buffer(v2);
+        add_to_buffer(v3);
+        add_to_buffer(v4);
+
+        end_buffer();
 }
 
 void buffer_tiles(Room * room) {
@@ -1126,15 +946,17 @@ void buffer_tiles(Room * room) {
 
         convert_top_left_coords_to_centered(&v1, &v2, &v3, &v4);
 
-        VertexBuffer vb;
-        IndexBuffer ib;
+        set_texture(tile.texture);
+        set_shader(textured_shader);
 
-        buffer_quad(v1, v2, v3, v4, &vb, &ib);
+        start_buffer();
 
-        m_graphics_buffer->vertex_buffers.push_back(vb);
-        m_graphics_buffer->index_buffers.push_back(ib);
-        m_graphics_buffer->texture_id_buffer.push_back(tile.texture);
-        m_graphics_buffer->shaders.push_back(textured_shader);
+        add_to_buffer(v1);
+        add_to_buffer(v2);
+        add_to_buffer(v3);
+        add_to_buffer(v4);
+
+        end_buffer();
     }
 }
 
@@ -1143,9 +965,6 @@ float buffer_string(char * text, float x, float y, float z,  Font * font) {
 }
 
 float buffer_string(char * text, float x, float y, float z,  Font * font, Alignement alignement) {
-    VertexBuffer vb;
-    IndexBuffer ib;
-
     float pixel_x = x * m_window_data->width;
     float pixel_y = y * m_window_data->height;
 
@@ -1189,6 +1008,11 @@ float buffer_string(char * text, float x, float y, float z,  Font * font, Aligne
         pixel_y = original_pixel_y;
     }
 
+    set_texture(font->texture->name);
+    set_shader(font_shader);
+
+    start_buffer();
+
     while(*text) {
         // Make sure it's an ascii character
         if (*text >= 32 && *text < 128) {
@@ -1209,25 +1033,24 @@ float buffer_string(char * text, float x, float y, float z,  Font * font, Aligne
 
             convert_top_left_coords_to_centered(&v1, &v2, &v3, &v4);
 
-            buffer_quad(v1, v2, v3, v4, &vb, &ib);
-
+            add_to_buffer(v1);
+            add_to_buffer(v2);
+            add_to_buffer(v3);
+            add_to_buffer(v4);
         }
         ++text;
     }
 
-    m_graphics_buffer->vertex_buffers.push_back(vb);
-    m_graphics_buffer->index_buffers.push_back(ib);
-    m_graphics_buffer->texture_id_buffer.push_back(font->texture->name);
-    m_graphics_buffer->shaders.push_back(font_shader);
+    end_buffer();
 
     return text_width;
 }
 
-void buffer_colored_quad(Vector2f position, Alignement alignement, float width, float height, float depth, Color4f color, VertexBuffer * vb, IndexBuffer * ib) {
-    buffer_colored_quad(position.x, position.y, alignement, width, height, depth, color, vb, ib);
+void buffer_colored_quad(Vector2f position, Alignement alignement, float width, float height, float depth, Color4f color) {
+    buffer_colored_quad(position.x, position.y, alignement, width, height, depth, color);
 }
 
-void buffer_colored_quad(float x, float y, Alignement alignement, float width, float height, float depth, Color4f color, VertexBuffer * vb, IndexBuffer * ib) {
+void buffer_colored_quad(float x, float y, Alignement alignement, float width, float height, float depth, Color4f color) {
 
     Vertex v1;
     Vertex v2;
@@ -1247,41 +1070,20 @@ void buffer_colored_quad(float x, float y, Alignement alignement, float width, f
         v4 = {x        , y         , depth, color};
     }
     convert_top_left_coords_to_centered(&v1, &v2, &v3, &v4);
-    buffer_quad(v1, v2, v3, v4, vb, ib);
-}
 
-void buffer_quad_centered_at(float radius, float depth, VertexBuffer * vb, IndexBuffer * ib) {
-    Vector2f center = {0.0f, 0.0f};
-    buffer_quad_centered_at(center, radius, depth, vb, ib);
+    set_shader(colored_shader);
+
+    start_buffer();
+
+    add_to_buffer(v1);
+    add_to_buffer(v2);
+    add_to_buffer(v3);
+    add_to_buffer(v4);
+
+    end_buffer(); 
 }
 
 float ENTITY_MIMINUM_DEPTH = 0.0000f;
-
-void buffer_quad_centered_at(Vector2f center, float radius, float depth, VertexBuffer * vb, IndexBuffer * ib) {
-    Vertex v1 = {center.x - radius, center.y + radius*m_window_data->aspect_ratio, max(depth, ENTITY_MIMINUM_DEPTH), 0.0f, 0.0f};
-    Vertex v2 = {center.x + radius, center.y - radius*m_window_data->aspect_ratio, max(depth, ENTITY_MIMINUM_DEPTH), 1.0f, 1.0f};
-    Vertex v3 = {center.x - radius, center.y - radius*m_window_data->aspect_ratio, max(depth, ENTITY_MIMINUM_DEPTH), 0.0f, 1.0f};
-    Vertex v4 = {center.x + radius, center.y + radius*m_window_data->aspect_ratio, max(depth, ENTITY_MIMINUM_DEPTH), 1.0f, 0.0f};
-
-    buffer_quad(v1, v2, v3, v4, vb, ib);
-}
-
-void buffer_quad(Vertex v1, Vertex v2, Vertex v3, Vertex v4, VertexBuffer * vb, IndexBuffer * ib) {
-
-    int first_index = vb->vertices.size();
-
-    vb->vertices.push_back(v1);
-    vb->vertices.push_back(v2);
-    vb->vertices.push_back(v3);
-    vb->vertices.push_back(v4);
-    
-    ib->indices.push_back(first_index);
-    ib->indices.push_back(first_index+1);
-    ib->indices.push_back(first_index+2);
-    ib->indices.push_back(first_index);
-    ib->indices.push_back(first_index+3);
-    ib->indices.push_back(first_index+1);
-}
 
 void convert_top_left_coords_to_centered(Vertex * v1, Vertex * v2, Vertex * v3, Vertex * v4) {
 
@@ -1306,7 +1108,7 @@ void convert_top_left_coords_to_centered(Vertex * v1, Vertex * v2, Vertex * v3, 
     v4->position.y += 1.0f;
 }
 
-inline float max(float a, float b) {
-    if(a > b) return a;
-    return b;
-}
+// inline float max(float a, float b) {
+//     if(a > b) return a;
+//     return b;
+// }
