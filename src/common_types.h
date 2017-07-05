@@ -12,14 +12,34 @@ struct Color4f;
 struct VertexBuffer;
 struct IndexBuffer;
 
+struct Texture;
+
 struct VertexTextureInfo;
 struct Vertex;
 
 enum BufferMode;
 
+struct PlatformTextureInfo;
+
 #ifdef COMMON_TYPES_IMPLEMENTATION
+#undef COMMON_TYPES_IMPLEMENTATION
 
 #include "stb_truetype.h"
+
+struct Texture {
+    char * name;
+
+    int width;
+    int height;
+
+    int bytes_per_pixel;
+
+    unsigned char * bitmap;
+    int width_in_bytes;
+    int num_bytes;
+
+    PlatformTextureInfo * platform_info; // Point to data structure containing platform specific fields
+};
 
 struct Font {
     char * name;

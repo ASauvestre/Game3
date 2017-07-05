@@ -1,15 +1,13 @@
 #include "win32_main.h"
 #include "macros.h"
 
-#include "d3d_renderer.h"
-
 // From "windowsx.h" 
 // Gets Low short and high short from LPARAM
 #define GET_X_LPARAM(lp) ((int)(short)LOWORD(lp))
 #define GET_Y_LPARAM(lp) ((int)(short)HIWORD(lp))
 
 // Globals
-extern HWND handle;
+HWND handle;
 
 static HDC device_context;
 
@@ -272,7 +270,7 @@ void main() {
 
     create_window(window_data.width, window_data.height, window_name);
 
-    init_renderer(window_data.width, window_data.height);
+    init_renderer(window_data.width, window_data.height, (void *) handle);
 
     init_game();
 
@@ -286,12 +284,12 @@ void main() {
         QueryPerformanceFrequency(&frequency);
         QueryPerformanceCounter(&start_time);
 
-        check_shader_files_modification();
-
         update_window_events();
 
         game(&window_data, &keyboard, &previous_keyboard);
-        draw_frame();
+        
+        draw();
+        clear_buffers();
 
         previous_keyboard = keyboard; // @Framerate
 

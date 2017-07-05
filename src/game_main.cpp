@@ -1,9 +1,9 @@
 #include <assert.h>
 
+#define STB_TRUETYPE_IMPLEMENTATION
+
 #include "game_main.h"
 #include "macros.h"
-
-#include "stb_truetype.h"
 
 enum GameMode {
     TITLE_SCREEN,
@@ -148,9 +148,9 @@ const float MIN_ENTITY_Z                   = 0.0000100f;
 const int MAX_NUMBER_ENTITIES = 1;
 
 // Extern Globals
-extern Shader * font_shader;
-extern Shader * textured_shader;
-extern Shader * colored_shader;
+DLLIMPORT Shader * font_shader;
+DLLIMPORT Shader * textured_shader;
+DLLIMPORT Shader * colored_shader;
 
 extern Font * my_font;
 

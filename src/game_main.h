@@ -1,6 +1,9 @@
 #include <stdio.h>
 
-#include "d3d_renderer.h" // @Temporary!!!!!!!! Replace by dll.
+#include "renderer.h"
+
+#define COMMON_TYPES_IMPLEMENTATION
+#include "common_types.h"
 
 // Structs
 struct Tile;
@@ -14,7 +17,7 @@ struct Color4f;
 struct Vertex;
 struct VertexBuffer;
 struct IndexBuffer;
-struct GraphicsBuffer;
+// struct GraphicsBuffer;
 
 struct Shader; // Platform specific definition
 

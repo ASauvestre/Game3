@@ -11,4 +11,8 @@
 
 #define array_size(array)  (sizeof(array)/sizeof(array[0]))
 
+#define DLLIMPORT __declspec(dllimport)
+#define DLLEXPORT __declspec(dllexport)
+
 #define VNAME(x) #x
+

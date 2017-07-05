@@ -1,26 +1,14 @@
 #pragma once
 
-#include <stdlib.h>
+#include <stdio.h>
 #include <cstring>
 
 #include "macros.h"
 
+#define COMMON_TYPES_IMPLEMENTATION
+#include "common_types.h"
+
 struct PlatformTextureInfo;
-
-struct Texture {
-    char * name;
-
-    int width;
-    int height;
-
-    int bytes_per_pixel;
-
-    unsigned char * bitmap;
-    int width_in_bytes;
-    int num_bytes;
-
-    PlatformTextureInfo * platform_info; // Point to data structure containing platform specific fields
-};
 
 // Maps a string to an integer
 // TODO: Maybe templatize this if we end up needing it.
