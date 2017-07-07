@@ -15,7 +15,7 @@ void draw();
 void clear_buffers();
 
 // Buffering process
-void set_shader(Shader * shader);
+void set_shader(Shader ** shader);
 void set_texture(char * texture);
 void set_buffer_mode(BufferMode buffer_mode);
 

@@ -80,6 +80,8 @@ static ID3D11Buffer * d3d_texture_index_map_buffer;
 
 static ID3D11BlendState * transparent_blend_state;
 
+static Shader * dummy_shader;
+
 // State variables
 static GraphicsBuffer graphics_buffer;
 static int num_buffers;
@@ -245,8 +247,6 @@ void draw_frame(GraphicsBuffer * graphics_buffer, int num_buffers, TextureManage
     d3d_dc->ClearRenderTargetView(render_target_view, color_array);
     d3d_dc->ClearDepthStencilView(depth_stencil_view, D3D11_CLEAR_DEPTH|D3D11_CLEAR_STENCIL, 1.0f, 0);
 
-    switch_to_shader(graphics_buffer->shaders[0]);
-
     for(int i = 0; i < num_buffers; i++) {
         // Draw buffer
         draw_buffer(graphics_buffer, i, texture_manager);
@@ -257,7 +257,7 @@ void draw_frame(GraphicsBuffer * graphics_buffer, int num_buffers, TextureManage
 
 static void draw_buffer(GraphicsBuffer * graphics_buffer, int buffer_index, TextureManager * texture_manager) {
 
-    switch_to_shader(graphics_buffer->shaders[buffer_index]);
+    switch_to_shader(*graphics_buffer->shaders[buffer_index]);
 
     if(d3d_shader.input_mode == POS_TEXCOORD) {
 
@@ -370,9 +370,9 @@ static void bind_srv_to_texture(Texture * texture) {
 
 // Shaders
 void init_platform_shaders() {
-    font_shader = (Shader *) malloc(sizeof(Shader));
+    font_shader     = (Shader *) malloc(sizeof(Shader));
     textured_shader = (Shader *) malloc(sizeof(Shader));
-    colored_shader = (Shader *) malloc(sizeof(Shader));
+    colored_shader  = (Shader *) malloc(sizeof(Shader));
 
     // Pixel formats
     D3D11_INPUT_ELEMENT_DESC font_shader_layout_desc[] = {

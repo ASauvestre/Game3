@@ -10,10 +10,21 @@
 
 #include "macros.h"
 
+#include "windows.h" // Very @Temporary
+
 // DLL functions
-DLLIMPORT void init_platform_renderer(Vector2f rendering_resolution, void * handle);
-DLLIMPORT void init_platform_shaders();
-DLLIMPORT void draw_frame(GraphicsBuffer * graphics_buffer, int num_buffers, TextureManager * texture_manager);
+typedef void (*INIT_PLATFORM_RENDERER_FUNC)(Vector2f, void*);
+typedef void (*INIT_PLATFORM_SHADERS_FUNC)();
+typedef void (*DRAW_FRAME_FUNC)(GraphicsBuffer*, int, TextureManager*);
+
+INIT_PLATFORM_RENDERER_FUNC init_platform_renderer;
+INIT_PLATFORM_SHADERS_FUNC init_platform_shaders;
+DRAW_FRAME_FUNC draw_frame;
+
+// DLL variables
+Shader ** font_shader;
+Shader ** colored_shader;
+Shader ** textured_shader;
 
 // Extern globals
 Font * my_font;
@@ -28,7 +39,7 @@ static void do_load_texture(Texture * texture);
 
 // Globals
 static BufferMode current_buffer_mode = QUADS;
-static Shader * current_shader;
+static Shader ** current_shader;
 static char * current_texture;
 
 static VertexBuffer current_vb;
@@ -44,11 +55,23 @@ static Vector2f rendering_resolution;
 
 static TextureManager texture_manager;
 
+// @Temporary move this out of here
+void load_graphics_dll() {
+	HMODULE graphics_library_dll = LoadLibrary("d3d_renderer.dll"); //@Temporary use file manager //@Robustness Handle failed loading
+	init_platform_renderer = (INIT_PLATFORM_RENDERER_FUNC) GetProcAddress(graphics_library_dll, "init_platform_renderer");
+	init_platform_shaders = (INIT_PLATFORM_SHADERS_FUNC) GetProcAddress(graphics_library_dll, "init_platform_shaders");
+	draw_frame = (DRAW_FRAME_FUNC) GetProcAddress(graphics_library_dll, "draw_frame");
+
+	font_shader = (Shader **)GetProcAddress(graphics_library_dll, "font_shader");
+	colored_shader = (Shader **)GetProcAddress(graphics_library_dll, "colored_shader");
+	textured_shader = (Shader **)GetProcAddress(graphics_library_dll, "textured_shader");
+}
+
 void init_renderer(int width, int height, void * handle) {
 	rendering_resolution.width = width;
 	rendering_resolution.height = height;
 
-	// load_dll("d3d_renderer.dll");
+	load_graphics_dll();
 
 	// From platform renderer
     init_platform_renderer(rendering_resolution, handle);
@@ -79,7 +102,7 @@ void draw() {
 	draw_frame(&graphics_buffer, num_buffers, &texture_manager);
 }
 
-void set_shader(Shader * shader) {
+void set_shader(Shader ** shader) {
     current_shader = shader;
 }
 

@@ -11,7 +11,6 @@ FOR %%A IN (%*) DO (
 	echo --------------------- Compiling DLLs ---------------------
 	cl /nologo /LD /Zi /EHsc /Fe:d3d_renderer ..\src\d3d_renderer.cpp /link D3Dcompiler.lib d3d11.lib
 	echo --------------------- DLLs Compiled ----------------------
-	echo.
 	echo __________________________________________________________
 	echo.
    )	
@@ -19,11 +18,11 @@ FOR %%A IN (%*) DO (
 
 REM main files
 echo ------------------ Compiling Main files ------------------
-cl /Zi /EHsc /Fe:win32_game ^
+cl /Zi /EHsc /D WIN32 /Fe:win32_game ^
 ..\src\win32_main.cpp ^
 ..\src\game_main.cpp ^
 ..\src\renderer.cpp ^
-/link /nologo user32.lib Gdi32.lib d3d11.lib D3DCompiler.lib Winmm.lib d3d_renderer.lib
+/link /nologo user32.lib Gdi32.lib d3d11.lib D3DCompiler.lib Winmm.lib
 echo ------------------ Main files Compiled -------------------
 
 echo.
