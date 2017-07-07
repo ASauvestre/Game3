@@ -10,7 +10,7 @@
 
 #include "macros.h"
 
-#include "windows.h" // Very @Temporary
+#include "windows.h" // Very @Temporary, used to load the dll
 
 // DLL functions
 typedef void (*INIT_PLATFORM_RENDERER_FUNC)(Vector2f, void*);

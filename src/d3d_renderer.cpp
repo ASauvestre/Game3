@@ -7,7 +7,6 @@
 #include "graphics_buffer.h"
 
 #define COMMON_TYPES_IMPLEMENTATION
-#define STB_TRUETYPE_IMPLEMENTATION // library included in common_types.h if COMMON_TYPES_IMPLEMENTATION is defined
 #include "common_types.h"
 
 #include "d3d_renderer.h"
@@ -41,7 +40,7 @@ struct Shader {
 };
 
 // Private functions
-static void check_shader_files_modification(); // @Temporary, move to hotloader
+static void check_shader_files_modification(); // @Temporary, move to hotloader.
 
 static void bind_srv_to_texture(Texture * texture);
 

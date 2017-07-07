@@ -29,7 +29,12 @@ echo.
 echo ==========================================================
 echo.
 
-REM Cleanup
+REM Cleanup if flag is set
+REM if the dll flag is set, recompile the dlls
+FOR %%A IN (%*) DO (
+    IF "%%A"=="/cleanup" (
+	del *.obj *.pdb *.ilk *.exp *.lib
+   )	
+)
 
-REM del *.obj *.pdb *.ilk
 popd
