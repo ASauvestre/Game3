@@ -7,6 +7,8 @@
 
 #include "os/layer.h"
 
+#include "os/win32/hotloader.h" // @Temporary
+
 enum GameMode {
     TITLE_SCREEN,
     GAME,
@@ -1143,6 +1145,8 @@ void main() {
 
     init_game();
 
+    init_hotloader();
+
     log_print("perf_counter", "Startup time : %.3f seconds", os_specific_get_time());
 
     bool should_quit = false;
@@ -1159,5 +1163,7 @@ void main() {
         
         draw();
         clear_buffers();
+
+        check_hotloader_modifications();
     }
 }

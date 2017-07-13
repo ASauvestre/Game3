@@ -56,7 +56,7 @@ static Vector2f rendering_resolution;
 static TextureManager texture_manager;
 
 void load_graphics_dll() {
-    void * graphics_library_dll = os_specific_load_dll("d3d_renderer.dll"); //@Temporary use file manager ? //@Robustness Handle failed loading
+    void * graphics_library_dll = os_specific_load_dll("d3d_renderer.dll"); //@Temporary use file manager ? //@Robustness Handle failed loading (maybe try another dll or at least die gracefully)
 
     init_platform_renderer = (INIT_PLATFORM_RENDERER_FUNC) os_specific_get_address_from_dll(graphics_library_dll, "init_platform_renderer");
     init_platform_shaders =  (INIT_PLATFORM_SHADERS_FUNC)  os_specific_get_address_from_dll(graphics_library_dll, "init_platform_shaders");

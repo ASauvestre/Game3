@@ -22,6 +22,7 @@ cl /Zi /EHsc /D WINDOWS /I ..\src /Fe:win32_game ^
 ..\src\game_main.cpp ^
 ..\src\renderer.cpp ^
 ..\src\os\win32\core.cpp ^
+..\src\os\win32\hotloader.cpp ^
 /link /nologo user32.lib Gdi32.lib d3d11.lib D3DCompiler.lib Winmm.lib
 echo ------------------ Main files Compiled -------------------
 
