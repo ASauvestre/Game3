@@ -280,3 +280,11 @@ double win32_get_time() {
 void win32_sleep(int ms) {
     Sleep(ms);
 }
+
+// DLL
+void * win32_load_dll(char * name) {
+    return (void *) LoadLibrary(name);
+}
+void * win32_get_address_from_dll(void * dll, char * name) {
+    return GetProcAddress((HMODULE) dll, name);
+}

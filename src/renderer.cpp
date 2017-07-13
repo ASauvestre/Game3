@@ -10,7 +10,7 @@
 
 #include "macros.h"
 
-#include "windows.h" // Very @Temporary, used to load the dll
+#include "os/layer.h"
 
 // DLL functions
 typedef void (*INIT_PLATFORM_RENDERER_FUNC)(Vector2f, void*);
@@ -55,16 +55,16 @@ static Vector2f rendering_resolution;
 
 static TextureManager texture_manager;
 
-// @Temporary move this out of here
 void load_graphics_dll() {
-	HMODULE graphics_library_dll = LoadLibrary("d3d_renderer.dll"); //@Temporary use file manager //@Robustness Handle failed loading
-	init_platform_renderer = (INIT_PLATFORM_RENDERER_FUNC) GetProcAddress(graphics_library_dll, "init_platform_renderer");
-	init_platform_shaders = (INIT_PLATFORM_SHADERS_FUNC) GetProcAddress(graphics_library_dll, "init_platform_shaders");
-	draw_frame = (DRAW_FRAME_FUNC) GetProcAddress(graphics_library_dll, "draw_frame");
+    void * graphics_library_dll = os_specific_load_dll("d3d_renderer.dll"); //@Temporary use file manager ? //@Robustness Handle failed loading
 
-	font_shader = (Shader **)GetProcAddress(graphics_library_dll, "font_shader");
-	colored_shader = (Shader **)GetProcAddress(graphics_library_dll, "colored_shader");
-	textured_shader = (Shader **)GetProcAddress(graphics_library_dll, "textured_shader");
+    init_platform_renderer = (INIT_PLATFORM_RENDERER_FUNC) os_specific_get_address_from_dll(graphics_library_dll, "init_platform_renderer");
+    init_platform_shaders =  (INIT_PLATFORM_SHADERS_FUNC)  os_specific_get_address_from_dll(graphics_library_dll, "init_platform_shaders");
+    draw_frame =             (DRAW_FRAME_FUNC)             os_specific_get_address_from_dll(graphics_library_dll, "draw_frame");
+
+    font_shader =     (Shader **) os_specific_get_address_from_dll(graphics_library_dll, "font_shader");
+    colored_shader =  (Shader **) os_specific_get_address_from_dll(graphics_library_dll, "colored_shader");
+    textured_shader = (Shader **) os_specific_get_address_from_dll(graphics_library_dll, "textured_shader");
 }
 
 void init_renderer(int width, int height, void * handle) {
