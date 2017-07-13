@@ -178,7 +178,7 @@ Font * load_font(char * name) {
     font->name = name;
 
     char path[512];
-    snprintf(path, 512, "fonts/%s", font->name);
+    snprintf(path, 512, "data/fonts/%s", font->name);
 
     FILE * font_file = fopen(path, "rb");
 
@@ -256,7 +256,7 @@ void load_texture(char * name) {
 static void do_load_texture(Texture * texture) {
 
     char path[512];
-    snprintf(path, 512, "textures/%s", texture->name);
+    snprintf(path, 512, "data/textures/%s", texture->name);
     
     int x,y,n;
     texture->bitmap = stbi_load(path, &x, &y, &n, 4);

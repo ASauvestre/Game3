@@ -19,6 +19,8 @@ struct Vertex;
 
 enum BufferMode;
 
+struct Keyboard;
+
 struct PlatformTextureInfo;
 
 #ifdef COMMON_TYPES_IMPLEMENTATION
@@ -157,5 +159,29 @@ struct Vertex {
 
 enum BufferMode {
     QUADS
-}; 
+};
+
+struct Keyboard {
+    bool key_left  = false;
+    bool key_right = false;
+    bool key_up    = false;
+    bool key_down  = false;
+
+    bool key_shift = false;
+    bool key_space = false;
+
+    bool key_F1 = false;
+    bool key_F2 = false;
+    bool key_F3 = false;
+
+    // Mouse input
+    Vector2f mouse_position;
+
+    bool mouse_left = false;
+    bool mouse_right = false;
+
+    Vector2f mouse_left_pressed_position;
+    Vector2f mouse_right_pressed_position;
+};
+
 #endif

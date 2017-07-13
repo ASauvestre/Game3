@@ -5,6 +5,8 @@
 #include "game_main.h"
 #include "macros.h"
 
+#include "os/layer.h"
+
 enum GameMode {
     TITLE_SCREEN,
     GAME,
@@ -135,8 +137,6 @@ void buffer_colored_quad(float x, float y, Alignement alignement, float width, f
 
 void convert_top_left_coords_to_centered(Vertex * v1, Vertex * v2, Vertex * v3, Vertex * v4);
 
-// inline float max(float a, float b);
-
 // Constants
 const float DEBUG_OVERLAY_Z                = 0.0000000f;
 const float DEBUG_OVERLAY_BACKGROUND_Z     = 0.0000001f;
@@ -144,6 +144,8 @@ const float EDITOR_OVERLAY_Z               = 0.0000010f;
 const float EDITOR_LEFT_PANEL_BACKGROUND_Z = 0.0000009f;
 const float EDITOR_LEFT_PANEL_CONTENT_Z    = 0.0000008f;
 const float MIN_ENTITY_Z                   = 0.0000100f;
+
+const int TARGET_FPS = 60;
 
 const int MAX_NUMBER_ENTITIES = 1;
 
@@ -155,16 +157,17 @@ extern Shader ** colored_shader;
 extern Font * my_font;
 
 // Globals
-static WindowData * m_window_data;
-static Keyboard   * m_keyboard;
-static Keyboard   * m_previous_keyboard;
+static WindowData window_data;
+    
+static Keyboard keyboard;
+static Keyboard previous_keyboard;
 
-static float square_size = 0.5f;
+static float last_time = 0.0f;
 
 static Entity player;
 static Entity entities[MAX_NUMBER_ENTITIES];
 
-Room * rooms[2];
+static Room * rooms[2];
 
 static Room * current_room;
 
@@ -333,14 +336,8 @@ void init_game() {
     }
 }
 
-void game(WindowData * window_data, Keyboard * keyboard, Keyboard * previous_keyboard) {
-    
-    m_previous_keyboard = previous_keyboard;
-
-    m_window_data     = window_data;
-    m_keyboard        = keyboard;
-
-    main_camera.size.y = main_camera.size.x / m_window_data->aspect_ratio;
+void game() {
+    main_camera.size.y = main_camera.size.x / window_data.aspect_ratio;
 
     handle_user_input();
 
@@ -383,7 +380,7 @@ EditorLeftPanelMode editor_left_panel_mode = TILE_INFO;
 Object editor_left_panel_displayed_object;
 
 void handle_user_input() {
-    if(m_keyboard->key_F1 && !m_previous_keyboard->key_F1) {
+    if(keyboard.key_F1 && !previous_keyboard.key_F1) {
         if(game_mode == GAME) {
             game_mode = EDITOR;
         }
@@ -392,30 +389,30 @@ void handle_user_input() {
         }
     }
 
-    if(m_keyboard->key_F2 && !m_previous_keyboard->key_F2) {
+    if(keyboard.key_F2 && !previous_keyboard.key_F2) {
         debug_overlay_enabled = !debug_overlay_enabled;
     }
 
-    if(m_keyboard->key_F3 && !m_previous_keyboard->key_F3) {
-        m_window_data->locked_fps = !m_window_data->locked_fps;
+    if(keyboard.key_F3 && !previous_keyboard.key_F3) {
+        window_data.locked_fps = !window_data.locked_fps;
     }
 
     if(game_mode == GAME) {
         // Handle player movement
         {
-            float speed = 0.006f;
+            float speed = 6.0f;
 
-            if(m_keyboard->key_shift) speed = 0.02f;
+            if(keyboard.key_shift) speed = 20.0f;
 
-            float position_delta = speed * m_window_data->frame_time;
+            float position_delta = speed * window_data.current_dt;
 
             //
             // @Incomplete Need to use and normalize velocity vector
             //
-            if(m_keyboard->key_left)  player.position.x -= position_delta;
-            if(m_keyboard->key_right) player.position.x += position_delta;
-            if(m_keyboard->key_up)    player.position.y -= position_delta;
-            if(m_keyboard->key_down)  player.position.y += position_delta;
+            if(keyboard.key_left)  player.position.x -= position_delta;
+            if(keyboard.key_right) player.position.x += position_delta;
+            if(keyboard.key_up)    player.position.y -= position_delta;
+            if(keyboard.key_down)  player.position.y += position_delta;
         }
 
         // Early collision detection, find current tile
@@ -515,19 +512,20 @@ void handle_user_input() {
         } else if (game_mode == EDITOR) {
             //  @Refactor Same code as player movement
 
-            float speed = 0.006f;
+            float speed = 6.0f;
 
-            if(m_keyboard->key_shift) speed = 0.02f;
+            if(keyboard.key_shift) speed = 20.0f;
 
-            float position_delta = speed * m_window_data->frame_time;
+            float position_delta = speed * window_data.current_dt
+            ;
 
             //
             // @Incomplete Need to use and normalize velocity vector
             //
-            if(m_keyboard->key_left)  main_camera.offset.x -= position_delta;
-            if(m_keyboard->key_right) main_camera.offset.x += position_delta;
-            if(m_keyboard->key_up)    main_camera.offset.y -= position_delta;
-            if(m_keyboard->key_down)  main_camera.offset.y += position_delta;
+            if(keyboard.key_left)  main_camera.offset.x -= position_delta;
+            if(keyboard.key_right) main_camera.offset.x += position_delta;
+            if(keyboard.key_up)    main_camera.offset.y -= position_delta;
+            if(keyboard.key_down)  main_camera.offset.y += position_delta;
         }
         // log_print("[game_camera]", "Camera offset is (%f, %f)", camera_offset.x, camera_offset.y);
     }
@@ -535,25 +533,25 @@ void handle_user_input() {
     // Editor controls
     {
         if(game_mode == EDITOR) {
-            if(!m_keyboard->mouse_left && m_previous_keyboard->mouse_left) { // Mouse left up
+            if(!keyboard.mouse_left && previous_keyboard.mouse_left) { // Mouse left up
                 if(editor_click_menu_was_open) { // This mouse click should close the menu.
                     editor_click_menu_was_open = false;
                 } else {
-                    // log_print("mouse_testing", "Mouse left pressed at (%0.6f, %0.6f) and released at (%0.6f, %0.6f)", m_keyboard->mouse_left_pressed_position.x, m_keyboard->mouse_left_pressed_position.y, m_keyboard->mouse_position.x, m_keyboard->mouse_position.y);
+                    // log_print("mouse_testing", "Mouse left pressed at (%0.6f, %0.6f) and released at (%0.6f, %0.6f)", keyboard.mouse_left_pressed_position.x, keyboard.mouse_left_pressed_position.y, keyboard.mouse_position.x, keyboard.mouse_position.y);
                     Vector2f game_space_position;
-                    game_space_position.x = main_camera.size.x * (m_keyboard->mouse_left_pressed_position.x - 0.5f) + main_camera.offset.x;
-                    game_space_position.y = main_camera.size.y * (m_keyboard->mouse_left_pressed_position.y - 0.5f) + main_camera.offset.y;
+                    game_space_position.x = main_camera.size.x * (keyboard.mouse_left_pressed_position.x - 0.5f) + main_camera.offset.x;
+                    game_space_position.y = main_camera.size.y * (keyboard.mouse_left_pressed_position.y - 0.5f) + main_camera.offset.y;
 
                     num_objects = get_objects_colliding_at(game_space_position, objects, 64);
 
-                    editor_click_menu_position = m_keyboard->mouse_position;
+                    editor_click_menu_position = keyboard.mouse_position;
 
                     editor_click_menu_open = true;
                 }
             }
 
-            if(m_keyboard->mouse_left && !m_previous_keyboard->mouse_left) { // Mouse left down
-                Vector2f position = m_keyboard->mouse_position;
+            if(keyboard.mouse_left && !previous_keyboard.mouse_left) { // Mouse left down
+                Vector2f position = keyboard.mouse_position;
 
                 if(editor_click_menu_open) {
                     if((position.x <= editor_click_menu_position.x + EDITOR_CLICK_MENU_WIDTH) 
@@ -619,7 +617,7 @@ int get_objects_colliding_at(Vector2f position, Object objects[], int max_collis
 
 void buffer_editor_left_panel() {
 
-    EDITOR_LEFT_PANEL_ROW_HEIGHT = EDITOR_LEFT_PANEL_PADDING * 2 * m_window_data->aspect_ratio + 12.0f / m_window_data->height; // @Temporary Current distance from baseline to top of capital letter is 12px
+    EDITOR_LEFT_PANEL_ROW_HEIGHT = EDITOR_LEFT_PANEL_PADDING * 2 * window_data.aspect_ratio + 12.0f / window_data.height; // @Temporary Current distance from baseline to top of capital letter is 12px
 
     // Background
     {
@@ -638,7 +636,7 @@ void buffer_editor_left_panel() {
                 float texture_side_padding = 0.15f * EDITOR_LEFT_PANEL_WIDTH;
                 float texture_top_padding = texture_side_padding / 2.0f;
 
-                float aspect_ratio = m_window_data->aspect_ratio;
+                float aspect_ratio = window_data.aspect_ratio;
 
                 Vertex v1 = {texture_side_padding                       , y + texture_top_padding                                      , EDITOR_LEFT_PANEL_CONTENT_Z, 0.0f, 0.0f};
                 Vertex v2 = {texture_side_padding + texture_display_size, y + texture_top_padding + texture_display_size * aspect_ratio, EDITOR_LEFT_PANEL_CONTENT_Z, 1.0f, 1.0f};
@@ -676,7 +674,7 @@ void buffer_editor_left_panel() {
 }
 
 void buffer_editor_click_menu() {
-    EDITOR_CLICK_MENU_ROW_HEIGHT = EDITOR_MENU_PADDING * 2 * m_window_data->aspect_ratio + 12.0f / m_window_data->height; // @Temporary Current distance from baseline to top of capital letter is 12px
+    EDITOR_CLICK_MENU_ROW_HEIGHT = EDITOR_MENU_PADDING * 2 * window_data.aspect_ratio + 12.0f / window_data.height; // @Temporary Current distance from baseline to top of capital letter is 12px
 
     float x = editor_click_menu_position.x;
     float y = editor_click_menu_position.y;
@@ -702,7 +700,7 @@ void buffer_editor_click_menu() {
                 char tile_name[64];
                 snprintf(tile_name, 64, "Tile%d_%d", objects[i].tile->local_x, objects[i].tile->local_y);
 
-                buffer_string(tile_name, x + EDITOR_MENU_PADDING, y + EDITOR_MENU_PADDING * m_window_data->aspect_ratio, DEBUG_OVERLAY_Z, my_font, TOP_LEFT);
+                buffer_string(tile_name, x + EDITOR_MENU_PADDING, y + EDITOR_MENU_PADDING * window_data.aspect_ratio, DEBUG_OVERLAY_Z, my_font, TOP_LEFT);
 
             }
             else if(objects[i].type == ENTITY) {
@@ -736,7 +734,7 @@ void buffer_debug_overlay() {
     float DEBUG_OVERLAY_PADDING = 0.004f;
 
     float DEBUG_OVERLAY_WIDTH = 0.15f;
-    float DEBUG_OVERLAY_ROW_HEIGHT = DEBUG_OVERLAY_PADDING * 2 * m_window_data->aspect_ratio + 12.0f / m_window_data->height; // @Temporary Current distance from baseline to top of capital letter is 12px
+    float DEBUG_OVERLAY_ROW_HEIGHT = DEBUG_OVERLAY_PADDING * 2 * window_data.aspect_ratio + 12.0f / window_data.height; // @Temporary Current distance from baseline to top of capital letter is 12px
 
     float DEBUG_OVERLAY_NUM_ROWS = 4;
 
@@ -771,7 +769,7 @@ void buffer_debug_overlay() {
         frame_time_print_counter = FRAME_TIME_UPDATE_DELAY;
     }
 
-    summed_frame_rate += m_window_data->frame_time;
+    summed_frame_rate += window_data.current_dt;
     frame_time_print_counter--;
 
     float left_x = 1.0f - DEBUG_OVERLAY_WIDTH + DEBUG_OVERLAY_PADDING;
@@ -781,13 +779,13 @@ void buffer_debug_overlay() {
     {
         char buffer[64];
 
-        snprintf(buffer, sizeof(buffer), "%.3f", displayed_frame_time);
+        snprintf(buffer, sizeof(buffer), "%.3f", displayed_frame_time * 1000);
 
-        buffer_string("Frame Time :", left_x, y + DEBUG_OVERLAY_PADDING * m_window_data->aspect_ratio, DEBUG_OVERLAY_Z, my_font, TOP_LEFT); 
+        buffer_string("Frame Time (ms):", left_x, y + DEBUG_OVERLAY_PADDING * window_data.aspect_ratio, DEBUG_OVERLAY_Z, my_font, TOP_LEFT); 
 
         y += DEBUG_OVERLAY_ROW_HEIGHT;
 
-        buffer_string(buffer, right_x, y  + DEBUG_OVERLAY_PADDING * m_window_data->aspect_ratio, DEBUG_OVERLAY_Z, my_font, TOP_RIGHT);
+        buffer_string(buffer, right_x, y  + DEBUG_OVERLAY_PADDING * window_data.aspect_ratio, DEBUG_OVERLAY_Z, my_font, TOP_RIGHT);
 
         y += DEBUG_OVERLAY_ROW_HEIGHT;
     }
@@ -798,11 +796,11 @@ void buffer_debug_overlay() {
 
         snprintf(buffer, sizeof(buffer), "%s", current_room->name);
 
-        buffer_string("Current World :", left_x, y + DEBUG_OVERLAY_PADDING * m_window_data->aspect_ratio, DEBUG_OVERLAY_Z, my_font, TOP_LEFT); 
+        buffer_string("Current World :", left_x, y + DEBUG_OVERLAY_PADDING * window_data.aspect_ratio, DEBUG_OVERLAY_Z, my_font, TOP_LEFT); 
 
         y += DEBUG_OVERLAY_ROW_HEIGHT;
 
-        buffer_string(buffer, right_x, y  + DEBUG_OVERLAY_PADDING * m_window_data->aspect_ratio, DEBUG_OVERLAY_Z, my_font, TOP_RIGHT);
+        buffer_string(buffer, right_x, y  + DEBUG_OVERLAY_PADDING * window_data.aspect_ratio, DEBUG_OVERLAY_Z, my_font, TOP_RIGHT);
 
         y += DEBUG_OVERLAY_ROW_HEIGHT;
     }
@@ -965,8 +963,8 @@ float buffer_string(char * text, float x, float y, float z,  Font * font) {
 }
 
 float buffer_string(char * text, float x, float y, float z,  Font * font, Alignement alignement) {
-    float pixel_x = x * m_window_data->width;
-    float pixel_y = y * m_window_data->height;
+    float pixel_x = x * window_data.width;
+    float pixel_y = y * window_data.height;
 
     
     float text_width = 0.0f;
@@ -980,9 +978,9 @@ float buffer_string(char * text, float x, float y, float z,  Font * font, Aligne
         stbtt_aligned_quad q;
         stbtt_GetBakedQuad(font->char_data, font->texture->width, font->texture->height, 'A' - 32, &zero_x, &zero_y, &q, 1);
         
-        text_height = (float) ((int)(-q.y0 + 0.5f)) / m_window_data->height;
+        text_height = (float) ((int)(-q.y0 + 0.5f)) / window_data.height;
 
-        pixel_y += text_height * m_window_data->height;
+        pixel_y += text_height * window_data.height;
     }
 
     // Compute width
@@ -1001,7 +999,7 @@ float buffer_string(char * text, float x, float y, float z,  Font * font, Aligne
             ++text;
         }
 
-        text_width = (float) ((int)(pixel_x - original_pixel_x + 0.5f)) / m_window_data->width;
+        text_width = (float) ((int)(pixel_x - original_pixel_x + 0.5f)) / window_data.width;
 
         text = original_text;
         pixel_x = original_pixel_x;
@@ -1019,10 +1017,10 @@ float buffer_string(char * text, float x, float y, float z,  Font * font, Aligne
             stbtt_aligned_quad q;
             stbtt_GetBakedQuad(font->char_data, font->texture->width, font->texture->height, *text-32, &pixel_x, &pixel_y, &q, 1);
         
-            Vertex v1 = {q.x0/m_window_data->width, q.y0/m_window_data->height, z, q.s0, q.t0};
-            Vertex v2 = {q.x1/m_window_data->width, q.y1/m_window_data->height, z, q.s1, q.t1};
-            Vertex v3 = {q.x0/m_window_data->width, q.y1/m_window_data->height, z, q.s0, q.t1};
-            Vertex v4 = {q.x1/m_window_data->width, q.y0/m_window_data->height, z, q.s1, q.t0};
+            Vertex v1 = {q.x0/window_data.width, q.y0/window_data.height, z, q.s0, q.t0};
+            Vertex v2 = {q.x1/window_data.width, q.y1/window_data.height, z, q.s1, q.t1};
+            Vertex v3 = {q.x0/window_data.width, q.y1/window_data.height, z, q.s0, q.t1};
+            Vertex v4 = {q.x1/window_data.width, q.y0/window_data.height, z, q.s1, q.t0};
 
             if(alignement == TOP_RIGHT) {
                 v1.position.x -= text_width;
@@ -1108,7 +1106,58 @@ void convert_top_left_coords_to_centered(Vertex * v1, Vertex * v2, Vertex * v3, 
     v4->position.y += 1.0f;
 }
 
-// inline float max(float a, float b) {
-//     if(a > b) return a;
-//     return b;
-// }
+void update_time() {
+    double now = os_specific_get_time();
+    float current_dt = now - last_time;
+
+    if (window_data.locked_fps) {
+        while (current_dt < 1.0f / TARGET_FPS) {
+           os_specific_sleep(0);
+
+            now = os_specific_get_time();
+            current_dt = now - last_time;
+        }
+    }
+
+    window_data.current_dt = current_dt;
+    window_data.current_time = now;
+
+    last_time = now;
+}   
+
+void main() {
+    os_specific_init_clock();
+
+    window_data.width   = 1280;
+    window_data.height  = 960;
+
+    // window_data.width    = 1920;
+    // window_data.height   = 1080;
+
+    window_data.aspect_ratio = (float) window_data.width/window_data.height;
+    char * window_name = "Game3";
+
+    window_data.handle = os_specific_create_window(window_data.width, window_data.height, window_name);
+
+    init_renderer(window_data.width, window_data.height, window_data.handle);
+
+    init_game();
+
+    log_print("perf_counter", "Startup time : %.3f seconds", os_specific_get_time());
+
+    bool should_quit = false;
+    while(!should_quit) {
+
+        update_time();
+
+        should_quit = os_specific_update_window_events(window_data.handle);
+
+        previous_keyboard = keyboard;
+        keyboard = os_specific_update_keyboard();
+
+        game();
+        
+        draw();
+        clear_buffers();
+    }
+}

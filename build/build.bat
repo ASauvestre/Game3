@@ -18,10 +18,10 @@ FOR %%A IN (%*) DO (
 
 REM main files
 echo ------------------ Compiling Main files ------------------
-cl /Zi /EHsc /D WIN32 /Fe:win32_game ^
-..\src\win32_main.cpp ^
+cl /Zi /EHsc /D WINDOWS /I ..\src /Fe:win32_game ^
 ..\src\game_main.cpp ^
 ..\src\renderer.cpp ^
+..\src\os\win32\core.cpp ^
 /link /nologo user32.lib Gdi32.lib d3d11.lib D3DCompiler.lib Winmm.lib
 echo ------------------ Main files Compiled -------------------
 
@@ -30,7 +30,6 @@ echo ==========================================================
 echo.
 
 REM Cleanup if flag is set
-REM if the dll flag is set, recompile the dlls
 FOR %%A IN (%*) DO (
     IF "%%A"=="/cleanup" (
 	del *.obj *.pdb *.ilk *.exp *.lib

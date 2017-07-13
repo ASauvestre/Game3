@@ -73,17 +73,9 @@ static ID3D11Buffer * d3d_index_buffer_interface;
 
 static ID3D11SamplerState * default_sampler_state;
 
-static ID3D11Texture2D * d3d_texture_array;
-static ID3D11ShaderResourceView * d3d_texture_array_srv;
-static ID3D11Buffer * d3d_texture_index_map_buffer;
-
 static ID3D11BlendState * transparent_blend_state;
 
 static Shader * dummy_shader;
-
-// State variables
-static GraphicsBuffer graphics_buffer;
-static int num_buffers;
 
 static Shader d3d_shader;
 
@@ -201,17 +193,6 @@ void init_platform_renderer(Vector2f rendering_resolution, void * handle) {
                         sampler_desc.MaxLOD         = D3D11_FLOAT32_MAX;
 
     d3d_device->CreateSamplerState(&sampler_desc, &default_sampler_state);
-
-    // Texture index map buffer
-    D3D11_BUFFER_DESC texture_map_index_buffer_desc;
-    texture_map_index_buffer_desc.ByteWidth             = sizeof(int) * MAX_TEXTURE_INDEX_MAP_SIZE;
-    texture_map_index_buffer_desc.Usage                 = D3D11_USAGE_DYNAMIC;
-    texture_map_index_buffer_desc.BindFlags             = D3D11_BIND_CONSTANT_BUFFER;
-    texture_map_index_buffer_desc.CPUAccessFlags        = D3D11_CPU_ACCESS_WRITE;
-    texture_map_index_buffer_desc.MiscFlags             = 0;
-    texture_map_index_buffer_desc.StructureByteStride   = 0;
-
-    d3d_device->CreateBuffer( &texture_map_index_buffer_desc, NULL, &d3d_texture_index_map_buffer );
 
     // Blending 
     D3D11_RENDER_TARGET_BLEND_DESC render_target_blend_desc;
@@ -492,7 +473,7 @@ static bool create_shader(char * filename, char * vs_name, char * ps_name, D3D11
     memcpy(shader->input_format.layout_desc, layout_desc, sizeof(D3D11_INPUT_ELEMENT_DESC) * num_shader_inputs);
 
     char path[512];;
-    snprintf(path, 512, "shaders/%s", shader->filename);
+    snprintf(path, 512, "data/shaders/%s", shader->filename);
 
     shader->file_handle = CreateFile(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     GetFileTime(shader->file_handle, NULL, NULL, &shader->last_modified);
@@ -514,7 +495,7 @@ static void check_specific_shader_file_modification(Shader * shader) {
 
         // Get new handle
         char path[512];;
-        snprintf(path, 512, "shaders/%s", shader->filename);
+        snprintf(path, 512, "data/shaders/%s", shader->filename);
 
         shader->file_handle = CreateFile(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 
@@ -546,4 +527,17 @@ static void switch_to_shader(Shader * shader) {
     d3d_dc->IASetInputLayout(d3d_shader.input_format.layout);
     d3d_dc->VSSetShader(d3d_shader.VS, NULL, 0);    
     d3d_dc->PSSetShader(d3d_shader.PS, NULL, 0);
+}
+
+
+// From bottom-left (0,0) z out of screen (right-handed) to bottom-left(-1,-1) z into screen (left-handed)
+static void convert_coords_to_d3d(Vertex * v) {
+    v->position.z *= -1.0f;
+    v->position.z += 1.0f;
+    
+    v->position.x *= 2.0f;
+    v->position.y *= 2.0f;
+
+    v->position.x -= 1.0f;
+    v->position.y -= 1.0f;
 }

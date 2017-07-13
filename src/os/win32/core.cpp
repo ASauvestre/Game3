@@ -1,31 +1,35 @@
-#include "win32_main.h"
+#include "windows.h"
+
+#include "os/win32/core.h"
+
 #include "macros.h"
+
+#define COMMON_TYPES_IMPLEMENTATION
+#include "common_types.h" // For Keyboard
 
 // From "windowsx.h" 
 // Gets Low short and high short from LPARAM
 #define GET_X_LPARAM(lp) ((int)(short)LOWORD(lp))
 #define GET_Y_LPARAM(lp) ((int)(short)HIWORD(lp))
 
-// Globals
-HWND handle;
+static Keyboard local_keyboard;
+static bool local_should_quit; // @Temoporary, probably shouldn't get that from here.
 
-static HDC device_context;
+static int window_width = 0;
+static int window_height = 0;
 
-static bool should_quit = false;
+Keyboard win32_update_keyboard() {
+	return local_keyboard;
+}
 
-static Keyboard keyboard = {};
-static WindowData window_data = {};
-
-// Perf counters
-LARGE_INTEGER start_time, end_time;
-LARGE_INTEGER frequency;
-
-void update_window_events() {
+bool win32_update_window_events(void * handle) {
     MSG message;
-    while(PeekMessage(&message, handle, 0, 0, PM_REMOVE)) {
+    while(PeekMessage(&message, (HWND) handle, 0, 0, PM_REMOVE)) {
         TranslateMessage(&message);
         DispatchMessage(&message);
     }
+
+    return local_should_quit;
 }
 
 LRESULT CALLBACK WndProc(HWND window_handle, UINT message, WPARAM w_param, LPARAM l_param) {
@@ -33,52 +37,52 @@ LRESULT CALLBACK WndProc(HWND window_handle, UINT message, WPARAM w_param, LPARA
         case WM_QUIT :
         case WM_CLOSE :
         case WM_DESTROY : {
-            should_quit = true;
+            local_should_quit = true;
             break;
         }
         case WM_KEYDOWN : {
 
             // if(l_param & 0x40000000) { break; } // Bit 30 "The previous key state. The value is 1 if the key is down 
-                                                // before the message is sent, or it is zero if the key is up." (MSDN)
+                                                   // before the message is sent, or it is zero if the key is up." (MSDN)
 
             switch(w_param) {
                 case VK_LEFT : {
-                    keyboard.key_left = true;
+                    local_keyboard.key_left = true;
                     break;
                 }
                 case VK_RIGHT : {
-                    keyboard.key_right = true;
+                    local_keyboard.key_right = true;
                     break;
                 }
                 case VK_UP : {
-                    keyboard.key_up = true;
+                    local_keyboard.key_up = true;
                     break;
                 }
                 case VK_DOWN : {
-                    keyboard.key_down = true;
+                    local_keyboard.key_down = true;
                     break;
                 }
                 case VK_SHIFT : {
-                    keyboard.key_shift = true;
+                    local_keyboard.key_shift = true;
                     break;
                 }
                 case VK_CONTROL : {
                     break;
                 }
                 case VK_SPACE : {
-                    keyboard.key_space = true;
+                    local_keyboard.key_space = true;
                     break;
                 }
                 case VK_F1 : {
-                    keyboard.key_F1 = true;
+                    local_keyboard.key_F1 = true;
                     break;
                 }
                 case VK_F2 : {
-                    keyboard.key_F2 = true;
+                    local_keyboard.key_F2 = true;
                     break;
                 }
                 case VK_F3 : {
-                    keyboard.key_F3 = true;
+                    local_keyboard.key_F3 = true;
                     break;
                 }
                 case VK_ESCAPE : {
@@ -93,42 +97,42 @@ LRESULT CALLBACK WndProc(HWND window_handle, UINT message, WPARAM w_param, LPARA
         case WM_KEYUP : {
             switch(w_param) {
                 case VK_LEFT : {
-                    keyboard.key_left = false;
+                    local_keyboard.key_left = false;
                     break;
                 }
                 case VK_RIGHT : {
-                    keyboard.key_right = false;
+                    local_keyboard.key_right = false;
                     break;
                 }
                 case VK_UP : {
-                    keyboard.key_up = false;
+                    local_keyboard.key_up = false;
                     break;
                 }
                 case VK_DOWN : {
-                    keyboard.key_down = false;
+                    local_keyboard.key_down = false;
                     break;
                 }
                 case VK_SHIFT : {
-                    keyboard.key_shift = false;
+                    local_keyboard.key_shift = false;
                     break;
                 }
                 case VK_CONTROL : {
                     break;
                 }
                 case VK_SPACE : {
-                    keyboard.key_space = false;
+                    local_keyboard.key_space = false;
                     break;
                 }
                 case VK_F1 : {
-                    keyboard.key_F1 = false;
+                    local_keyboard.key_F1 = false;
                     break;
                 }
                 case VK_F2 : {
-                    keyboard.key_F2 = false;
+                    local_keyboard.key_F2 = false;
                     break;
                 }
                 case VK_F3 : {
-                    keyboard.key_F3 = false;
+                    local_keyboard.key_F3 = false;
                     break;
                 }
                 case VK_ESCAPE : {
@@ -142,70 +146,70 @@ LRESULT CALLBACK WndProc(HWND window_handle, UINT message, WPARAM w_param, LPARA
             break;
         }   
         case WM_MOUSEMOVE : {
-            if(window_data.width == 0) {
-                keyboard.mouse_position.x = 0.0f;
+            if(window_width == 0) {
+                local_keyboard.mouse_position.x = 0.0f;
             } else {
-                keyboard.mouse_position.x = (float)GET_X_LPARAM(l_param) / window_data.width;
+                local_keyboard.mouse_position.x = (float)GET_X_LPARAM(l_param) / window_width;
             }
 
-            if(window_data.height == 0) {
-                keyboard.mouse_position.y = 0.0f;
+            if(window_height == 0) {
+                local_keyboard.mouse_position.y = 0.0f;
             } else {
-                keyboard.mouse_position.y = (float)GET_Y_LPARAM(l_param) / window_data.height;
+                local_keyboard.mouse_position.y = (float)GET_Y_LPARAM(l_param) / window_height;
             }
 
             break;
         }
         case WM_LBUTTONDOWN : {
-            keyboard.mouse_left = true;
+            local_keyboard.mouse_left = true;
 
             // SetCapture allows us to detect mouse up if the cursor leaves the window.
             SetCapture(window_handle);
 
 
             // Store the position at which the button was pressed @Pasted
-            if(window_data.width == 0) {
-                keyboard.mouse_left_pressed_position.x = 0.0f;
+            if(window_width == 0) {
+                local_keyboard.mouse_left_pressed_position.x = 0.0f;
             } else {
-                keyboard.mouse_left_pressed_position.x = (float)GET_X_LPARAM(l_param) / window_data.width;
+                local_keyboard.mouse_left_pressed_position.x = (float)GET_X_LPARAM(l_param) / window_width;
             }
 
-            if(window_data.height == 0) {
-                keyboard.mouse_left_pressed_position.y = 0.0f;
+            if(window_height == 0) {
+                local_keyboard.mouse_left_pressed_position.y = 0.0f;
             } else {
-                keyboard.mouse_left_pressed_position.y = (float)GET_Y_LPARAM(l_param) / window_data.height;
+                local_keyboard.mouse_left_pressed_position.y = (float)GET_Y_LPARAM(l_param) / window_height;
             }
 
             break;
         }
         case WM_LBUTTONUP : {
-            keyboard.mouse_left = false;
+            local_keyboard.mouse_left = false;
             ReleaseCapture();
             break;
         }
         case WM_RBUTTONDOWN : {
-            keyboard.mouse_right = true;
+            local_keyboard.mouse_right = true;
 
             // SetCapture allows us to detect mouse up if the cursor leaves the window.
             SetCapture(window_handle);
 
             // Store the position at which the button was pressed @Pasted
-            if(window_data.width == 0) {
-                keyboard.mouse_right_pressed_position.x = 0.0f;
+            if(window_width == 0) {
+                local_keyboard.mouse_right_pressed_position.x = 0.0f;
             } else {
-                keyboard.mouse_right_pressed_position.x = (float)GET_X_LPARAM(l_param) / window_data.width;
+                local_keyboard.mouse_right_pressed_position.x = (float)GET_X_LPARAM(l_param) / window_width;
             }
 
-            if(window_data.height == 0) {
-                keyboard.mouse_right_pressed_position.y = 0.0f;
+            if(window_height == 0) {
+                local_keyboard.mouse_right_pressed_position.y = 0.0f;
             } else {
-                keyboard.mouse_right_pressed_position.y = (float)GET_Y_LPARAM(l_param) / window_data.height;
+                local_keyboard.mouse_right_pressed_position.y = (float)GET_Y_LPARAM(l_param) / window_height;
             }
 
             break;
         }
         case WM_RBUTTONUP : {
-            keyboard.mouse_right= false;
+            local_keyboard.mouse_right= false;
             ReleaseCapture();
             break;
         }
@@ -213,7 +217,12 @@ LRESULT CALLBACK WndProc(HWND window_handle, UINT message, WPARAM w_param, LPARA
     return DefWindowProc(window_handle, message, w_param, l_param);
 }
 
-bool create_window(int width, int height, char * name) {
+void * win32_create_window(int width, int height, char * name) {
+	HWND handle;
+    window_width = width; // @Temporary eh.
+    window_height = height;
+
+
     HINSTANCE instance = GetModuleHandle(NULL);
     WNDCLASSEX  window_class = {};
                 window_class.cbSize         = sizeof(WNDCLASSEX);
@@ -237,76 +246,37 @@ bool create_window(int width, int height, char * name) {
         int centered_y = (GetSystemMetrics(SM_CYSCREEN)-height)/2;
 
         handle = CreateWindowEx(0, window_class.lpszClassName, (LPCTSTR) name, window_style, centered_x, 
-                                centered_y, window_dimensions.right - window_dimensions.left, 
-                                window_dimensions.bottom - window_dimensions.top, NULL, NULL, instance, NULL);
+                                                     centered_y, window_dimensions.right - window_dimensions.left, 
+                                                     window_dimensions.bottom - window_dimensions.top, NULL, NULL, instance, NULL);
 
         if(handle) {
-            device_context = GetDC(handle);
+            HDC device_context = GetDC((HWND) handle);
             if(device_context) {
                 //ShowCursor(false);
-                ShowWindow(handle, 1);
-                UpdateWindow(handle);
-
+                ShowWindow((HWND) handle, 1);
+                UpdateWindow((HWND) handle);
             }
         }
     }
-    return false;
+
+    return (void *)handle;
 }
 
-const int TARGET_FPS = 60;
+// Time functions
+LARGE_INTEGER start_time;
+LARGE_INTEGER frequency;
 
-void main() {
+void win32_init_clock() {
     QueryPerformanceFrequency(&frequency);
     QueryPerformanceCounter(&start_time);
+}
 
-    window_data.width   = 1280;
-    window_data.height  = 960;
+double win32_get_time() {
+    LARGE_INTEGER time;
+    QueryPerformanceCounter(&time);
+    return (time.QuadPart - start_time.QuadPart) / (double)frequency.QuadPart;
+}
 
-    // window_data.width    = 1920;
-    // window_data.height   = 1080;
-
-    window_data.aspect_ratio = (float) window_data.width/window_data.height;
-    char * window_name = "Game3";
-
-    create_window(window_data.width, window_data.height, window_name);
-
-    init_renderer(window_data.width, window_data.height, (void *) handle);
-
-    init_game();
-
-    Keyboard previous_keyboard;
-
-    QueryPerformanceCounter(&end_time);
-    float frame_time = ((float)(end_time.QuadPart - start_time.QuadPart)*1000/(float)frequency.QuadPart);
-    log_print("perf_counter", "Startup time : %.3f seconds", frame_time/1000.f);
-
-    while(!should_quit) {
-        QueryPerformanceFrequency(&frequency);
-        QueryPerformanceCounter(&start_time);
-
-        update_window_events();
-
-        game(&window_data, &keyboard, &previous_keyboard);
-        
-        draw();
-        clear_buffers();
-
-        previous_keyboard = keyboard; // @Framerate
-
-        QueryPerformanceCounter(&end_time);
-        
-        frame_time = ((float)(end_time.QuadPart - start_time.QuadPart)*1000/(float)frequency.QuadPart);
-
-        if (window_data.locked_fps) {
-            while (frame_time < 1000.0f / TARGET_FPS) {
-                Sleep(0);
-
-                QueryPerformanceCounter(&end_time);
-
-                frame_time = ((float)(end_time.QuadPart - start_time.QuadPart) * 1000 / (float)frequency.QuadPart);
-            }
-        }
-        window_data.frame_time = frame_time;
-        // log_print("perf_counter", "Frame time : %f", frame_time);
-    }
+void win32_sleep(int ms) {
+    Sleep(ms);
 }
