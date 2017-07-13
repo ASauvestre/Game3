@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <windows.h>
 #include <stdio.h>
+#include <vector>
 
 #include "macros.h"
 
@@ -19,8 +20,8 @@ enum AssetChangeAction {
 };
 
 struct AssetChange {
-    char * file_name;
-    char * full_path;
+    char * file_name; // Subset of full_path, no need to free
+    char * full_path; // Needs to be freed
 
     AssetChangeAction action;
 };
@@ -30,11 +31,21 @@ static void issue_read_directory(Directory * directory);
 
 static void handle_notifications();
 
+static char * find_char_from_right(char c, char * string);
+
+static FILE_NOTIFY_INFORMATION * bump_ptr_to_next_notification(FILE_NOTIFY_INFORMATION * notification);
+
 // Const
 const int NOTIFICATION_BUFFER_LENGTH = 10000; // @Temporary figure out how much space is actually reasonably required
 
 // Globals
 static Directory dir;
+
+static std::vector<AssetChange> asset_changes;
+
+void release(AssetChange * ac) {
+    free(ac->full_path);
+}
 
 void init_hotloader() {
     dir.name = "data";
@@ -71,6 +82,16 @@ void init_hotloader() {
 
 void check_hotloader_modifications() {
     handle_notifications();
+
+    for(int i = 0; i < asset_changes.size(); i++) {
+        AssetChange * change = &asset_changes[i];
+
+        log_print("check_hotloader_modifications", "Detected modication on file %s", change->file_name);
+
+        release(change);
+    }
+
+    asset_changes.clear();
 }
 
 static void handle_notifications() {
@@ -97,7 +118,7 @@ static void handle_notifications() {
         return;
     }
 
-    log_print("check_hotloader_modifications", "Hotloader notification, bytes_transferred = %d", bytes_transferred);
+    // log_print("check_hotloader_modifications", "Hotloader notification, bytes_transferred = %d", bytes_transferred);
 
     // Fill our own notification struct, AssetChange
     AssetChange change;
@@ -108,8 +129,8 @@ static void handle_notifications() {
         else if (notification->Action == FILE_ACTION_MODIFIED)         change.action = MODIFIED;
         else if (notification->Action == FILE_ACTION_RENAMED_NEW_NAME) change.action = ADDED;
         else {
-            log_print("check_hotloader_modifications", "Ignored action %d", notification->Action);
-            notification = NULL;
+            // log_print("check_hotloader_modifications", "Ignored action %d", notification->Action);
+            notification = bump_ptr_to_next_notification(notification);
             continue;
         }
 
@@ -131,12 +152,44 @@ static void handle_notifications() {
         // Adding 0-termination to the string
         change.full_path[result] = 0;
 
-        log_print("check_hotloader_modifications", "Detected action %d on file %s", change.action, change.full_path);
+        // log_print("check_hotloader_modifications", "Detected action %d on file %s", change.action, change.full_path);
 
-        notification = NULL;
-        // Let's take a break.
+        notification = bump_ptr_to_next_notification(notification);
+
+		char * t = find_char_from_right('/', change.full_path);
+		if (t) {
+			change.file_name = t + 1;
+		}
+		else {
+			change.file_name = change.full_path;
+		}
+
+        asset_changes.push_back(change);
+    }
+}
+
+static char * find_char_from_right(char c, char * string) {
+    char * cursor = string;
+    char * last_char_occurence = NULL;
+
+    // Compute length;
+    while(*cursor != '\0') {
+        if(*cursor == c) {
+            last_char_occurence = cursor;
+        }
+        cursor += 1; // Move to next character
     }
 
+    return last_char_occurence;
+}
+
+static FILE_NOTIFY_INFORMATION * bump_ptr_to_next_notification(FILE_NOTIFY_INFORMATION * notification) {
+    int offset = notification->NextEntryOffset;
+
+    // Last notification
+    if(offset == 0) return NULL;
+
+    return *(&notification + notification->NextEntryOffset);
 }
 
 static void issue_read_directory(Directory * directory) {
