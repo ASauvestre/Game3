@@ -40,6 +40,8 @@ struct Texture {
     int width_in_bytes;
     int num_bytes;
 
+    bool modified; // Was it changed this frame ?
+
     PlatformTextureInfo * platform_info; // Point to data structure containing platform specific fields
 };
 

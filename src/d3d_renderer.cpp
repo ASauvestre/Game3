@@ -54,9 +54,8 @@ static void draw_buffer(GraphicsBuffer * graphics_buffer, int buffer_index, Text
 static void switch_to_shader(Shader * shader);
 
 // Constants
-const int MAX_VERTEX_BUFFER_SIZE     = 4096;
-const int MAX_INDEX_BUFFER_SIZE      = 4096;
-const int MAX_TEXTURE_INDEX_MAP_SIZE = 2048;
+const int MAX_VERTEX_BUFFER_SIZE = 8192;
+const int MAX_INDEX_BUFFER_SIZE  = 8192;
 
 // Globals
 static IDXGISwapChain * swap_chain;
@@ -77,7 +76,11 @@ static ID3D11BlendState * transparent_blend_state;
 
 static Shader * dummy_shader;
 
+static Shader * last_shader_set;
+
 static Shader d3d_shader;
+
+static char * last_texture_set;
 
 void init_platform_renderer(Vector2f rendering_resolution, void * handle) {
 
@@ -214,6 +217,8 @@ void init_platform_renderer(Vector2f rendering_resolution, void * handle) {
     d3d_device->CreateBlendState(&blend_desc, &transparent_blend_state);
 
     d3d_dc->OMSetBlendState(transparent_blend_state, NULL, 0xffffffff);
+
+    d3d_dc->PSSetSamplers(0, 1, &default_sampler_state);
 }
 
 void draw_frame(GraphicsBuffer * graphics_buffer, int num_buffers, TextureManager * texture_manager) {
@@ -235,9 +240,16 @@ void draw_frame(GraphicsBuffer * graphics_buffer, int num_buffers, TextureManage
     swap_chain->Present(0, 0);  
 }
 
+
+// @Rewrite This is really ugly, rewrite and refactor things
 static void draw_buffer(GraphicsBuffer * graphics_buffer, int buffer_index, TextureManager * texture_manager) {
 
-    switch_to_shader(*graphics_buffer->shaders[buffer_index]);
+    Shader * shader = *graphics_buffer->shaders[buffer_index];
+
+    if(shader != last_shader_set) {
+        switch_to_shader(shader);
+        last_shader_set = shader;
+    }
 
     if(d3d_shader.input_mode == POS_TEXCOORD) {
 
@@ -264,6 +276,7 @@ static void draw_buffer(GraphicsBuffer * graphics_buffer, int buffer_index, Text
             log_print("draw_buffer", "Texture %s was not found in the catalog", texture_name);
             return;
         }
+
         Texture * texture = &texture_manager->textures[index];
         
         // This texture doesn't have its platform info, likely because it was create by the game, let's give it one
@@ -272,11 +285,29 @@ static void draw_buffer(GraphicsBuffer * graphics_buffer, int buffer_index, Text
             bind_srv_to_texture(texture);
         }
 
-        ID3D11ShaderResourceView * srv = (ID3D11ShaderResourceView *) texture->platform_info->srv;
+        // Send texture to shader if it's different from last time
 
-        d3d_dc->PSSetShaderResources(0, 1, &srv);
+		if (last_texture_set == NULL) {
+			ID3D11ShaderResourceView * srv = (ID3D11ShaderResourceView *)texture->platform_info->srv;
 
-        d3d_dc->PSSetSamplers(0, 1, &default_sampler_state);
+			d3d_dc->PSSetShaderResources(0, 1, &srv);
+
+			last_texture_set = texture_name;
+		}
+		else {
+
+			if (!(strcmp(last_texture_set, texture_name) == 0) || texture->modified) {
+				if (texture->modified) texture->modified = false;
+					
+					// @Refactor
+					ID3D11ShaderResourceView * srv = (ID3D11ShaderResourceView *)texture->platform_info->srv;
+
+					d3d_dc->PSSetShaderResources(0, 1, &srv);
+
+					last_texture_set = texture_name;
+
+			}
+		}
 
     } else if(d3d_shader.input_mode == POS_COL) {
 
@@ -294,8 +325,6 @@ static void draw_buffer(GraphicsBuffer * graphics_buffer, int buffer_index, Text
         d3d_dc->Map(d3d_index_buffer_interface, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
         memcpy(resource.pData, &ib->indices[0], sizeof( int ) *  ib->indices.size());
         d3d_dc->Unmap(d3d_index_buffer_interface, 0);
-
-        d3d_dc->PSSetSamplers(0, 1, &default_sampler_state);
 
     } else {
         log_print("draw_buffer", "Unsupported shader input mode");

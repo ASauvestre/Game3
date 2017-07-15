@@ -42,8 +42,10 @@ static BufferMode current_buffer_mode = QUADS;
 static Shader ** current_shader;
 static char * current_texture;
 
-static VertexBuffer current_vb;
-static IndexBuffer current_ib;
+static VertexBuffer * current_vb;
+static IndexBuffer * current_ib;
+
+static int first_vertex_index_in_buffer = 0;
 
 static GraphicsBuffer graphics_buffer;
 
@@ -107,6 +109,7 @@ void set_shader(Shader ** shader) {
 }
 
 void set_texture(char * texture) {
+    assert(buffering == false); // Can't change texture while we're buffering
     current_texture = texture; // @Temporary, find texture here ? At least check it exists.
 }
 
@@ -115,15 +118,61 @@ void set_buffer_mode(BufferMode buffer_mode) {
     current_buffer_mode = buffer_mode;
 }
 
+
+// Goal is to reduce the number of buffers by grouping those with similar shader and texture.
+void find_or_create_compatible_buffers(char * texture, Shader ** shader, VertexBuffer ** vb, IndexBuffer ** ib) {
+/*
+    if(num_buffers > 0) {
+        if(graphics_buffer.shaders[num_buffers - 1] == shader) {
+            if(shader == colored_shader) {
+                *vb = &graphics_buffer.vertex_buffers[num_buffers - 1];
+                *ib = &graphics_buffer.index_buffers[num_buffers - 1];
+
+                first_vertex_index_in_buffer = (*vb)->vertices.size();
+
+                return;
+            }
+
+            if((shader == font_shader) || (shader == textured_shader)) {
+                if (strcmp(texture, graphics_buffer.texture_id_buffer[num_buffers - 1]) == 0) {
+                    *vb = &graphics_buffer.vertex_buffers[num_buffers - 1];
+                    *ib = &graphics_buffer.index_buffers[num_buffers - 1];
+
+                    first_vertex_index_in_buffer = (*vb)->vertices.size();
+
+                    return;
+                }
+            }
+        }
+    }
+*/
+    VertexBuffer new_vb;
+    IndexBuffer new_ib;
+
+    graphics_buffer.shaders.push_back(shader);
+    graphics_buffer.texture_id_buffer.push_back(texture);
+    graphics_buffer.vertex_buffers.push_back(new_vb);
+    graphics_buffer.index_buffers.push_back(new_ib);
+
+    *vb = &graphics_buffer.vertex_buffers[num_buffers];
+    *ib = &graphics_buffer.index_buffers[num_buffers];
+
+    first_vertex_index_in_buffer = 0;
+
+    num_buffers++;
+}
+
 void start_buffer() {
     assert(buffering == false);
     buffering = true;
+
+    find_or_create_compatible_buffers(current_texture, current_shader, &current_vb, &current_ib);
 }
 
 void add_to_buffer(Vertex vertex) {
     assert(buffering == true);
 
-    current_vb.vertices.push_back(vertex);
+    current_vb->vertices.push_back(vertex);
 }
 
 void end_buffer() {
@@ -132,34 +181,26 @@ void end_buffer() {
     // Fill the index buffer
     if(current_buffer_mode == QUADS) {
 
-        assert(current_vb.vertices.size() % 4 == 0); // Assert we actually have Quads
+        assert(current_vb->vertices.size() % 4 == 0); // Assert we actually have Quads // @Temporary, we shouldn't crash here.
 
-        int first_index = 0;
+        int first_index = first_vertex_index_in_buffer;
 
-        for(int i = 0; i < current_vb.vertices.size() / 4; i++) {
-            current_ib.indices.push_back(first_index);
-            current_ib.indices.push_back(first_index+1);
-            current_ib.indices.push_back(first_index+2);
-            current_ib.indices.push_back(first_index);
-            current_ib.indices.push_back(first_index+3);
-            current_ib.indices.push_back(first_index+1);
+        for(int i = 0; i < (current_vb->vertices.size() - first_vertex_index_in_buffer) / 4; i++) {
+            current_ib->indices.push_back(first_index);
+            current_ib->indices.push_back(first_index+1);
+            current_ib->indices.push_back(first_index+2);
+            current_ib->indices.push_back(first_index);
+            current_ib->indices.push_back(first_index+3);
+            current_ib->indices.push_back(first_index+1);
 
             first_index += 4;
         } 
     }
 
-    // Add buffers
-    graphics_buffer.shaders.push_back(current_shader);
-    graphics_buffer.texture_id_buffer.push_back(current_texture);
-    graphics_buffer.vertex_buffers.push_back(current_vb);
-    graphics_buffer.index_buffers.push_back(current_ib);
-
-    // Reset buffers
-    current_vb.vertices.clear();
-    current_ib.indices.clear();
+    //current_ib = NULL;
+    //current_vb = NULL;
 
 	buffering = false;
-    num_buffers++;
 }
 
 void clear_buffers() {
