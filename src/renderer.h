@@ -1,5 +1,3 @@
-//#include "d3d_renderer.h" // @Temporary use .dll
-
 enum BufferMode;
 
 struct Shader;

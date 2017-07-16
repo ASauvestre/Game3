@@ -244,7 +244,7 @@ void draw_frame(GraphicsBuffer * graphics_buffer, int num_buffers, TextureManage
 // @Rewrite This is really ugly, rewrite and refactor things
 static void draw_buffer(GraphicsBuffer * graphics_buffer, int buffer_index, TextureManager * texture_manager) {
 
-    Shader * shader = *graphics_buffer->shaders[buffer_index];
+    Shader * shader = *graphics_buffer->batches[buffer_index].info.shader;
 
     if(shader != last_shader_set) {
         switch_to_shader(shader);
@@ -253,8 +253,8 @@ static void draw_buffer(GraphicsBuffer * graphics_buffer, int buffer_index, Text
 
     if(d3d_shader.input_mode == POS_TEXCOORD) {
 
-        VertexBuffer * vb = &graphics_buffer->vertex_buffers[buffer_index];
-        IndexBuffer * ib = &graphics_buffer->index_buffers[buffer_index];
+        VertexBuffer * vb = &graphics_buffer->batches[buffer_index].vb;
+        IndexBuffer * ib = &graphics_buffer->batches[buffer_index].ib;
 
         // Update vertex buffer
         D3D11_MAPPED_SUBRESOURCE resource = {};
@@ -268,7 +268,7 @@ static void draw_buffer(GraphicsBuffer * graphics_buffer, int buffer_index, Text
         memcpy(resource.pData, &ib->indices[0], sizeof( int ) *  ib->indices.size());
         d3d_dc->Unmap(d3d_index_buffer_interface, 0);
 
-        char * texture_name = graphics_buffer->texture_id_buffer[buffer_index];
+        char * texture_name = graphics_buffer->batches[buffer_index].info.texture;
 
         int index = texture_manager->find_texture_index(texture_name);
 
@@ -305,14 +305,13 @@ static void draw_buffer(GraphicsBuffer * graphics_buffer, int buffer_index, Text
 					d3d_dc->PSSetShaderResources(0, 1, &srv);
 
 					last_texture_set = texture_name;
-
 			}
 		}
 
     } else if(d3d_shader.input_mode == POS_COL) {
 
-        VertexBuffer * vb = &graphics_buffer->vertex_buffers[buffer_index];
-        IndexBuffer * ib = &graphics_buffer->index_buffers[buffer_index];
+        VertexBuffer * vb = &graphics_buffer->batches[buffer_index].vb;
+        IndexBuffer * ib = &graphics_buffer->batches[buffer_index].ib;
 
         // Update vertex buffer
         D3D11_MAPPED_SUBRESOURCE resource = {};
@@ -332,7 +331,7 @@ static void draw_buffer(GraphicsBuffer * graphics_buffer, int buffer_index, Text
     }
 
     
-    d3d_dc->DrawIndexed(graphics_buffer->index_buffers[buffer_index].indices.size(), 0, 0);
+    d3d_dc->DrawIndexed(graphics_buffer->batches[buffer_index].ib.indices.size(), 0, 0);
 }
 
 static void bind_srv_to_texture(Texture * texture) {

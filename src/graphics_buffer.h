@@ -1,8 +1,10 @@
 struct VertexBuffer;
 struct IndexBuffer;
 struct Shader;
+struct DrawBatch;
+struct DrawBatchInfo;
 
-struct GraphicsBuffer { // @Temporary Shouldn't be here
+/*struct GraphicsBuffer {
     GraphicsBuffer() {};
     ~GraphicsBuffer() {};
 
@@ -10,4 +12,21 @@ struct GraphicsBuffer { // @Temporary Shouldn't be here
     std::vector<VertexBuffer> vertex_buffers;
     std::vector<IndexBuffer> index_buffers;
     std::vector<char *> texture_id_buffer;
+};*/
+
+struct GraphicsBuffer {
+	std::vector<DrawBatch> batches;
 };
+
+struct DrawBatchInfo {
+	char * texture;
+	Shader ** shader;
+};
+
+struct DrawBatch {
+	VertexBuffer vb;
+	IndexBuffer ib;
+
+	DrawBatchInfo info;
+};
+

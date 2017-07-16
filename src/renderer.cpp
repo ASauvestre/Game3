@@ -39,11 +39,9 @@ static void do_load_texture(Texture * texture);
 
 // Globals
 static BufferMode current_buffer_mode = QUADS;
-static Shader ** current_shader;
-static char * current_texture;
 
-static VertexBuffer * current_vb;
-static IndexBuffer * current_ib;
+static DrawBatch current_batch;
+static DrawBatchInfo previous_batch_info;
 
 static int first_vertex_index_in_buffer = 0;
 
@@ -56,6 +54,8 @@ static int num_buffers = 0;
 static Vector2f rendering_resolution;
 
 static TextureManager texture_manager;
+
+static
 
 void load_graphics_dll() {
     void * graphics_library_dll = os_specific_load_dll("d3d_renderer.dll"); //@Temporary use file manager ? //@Robustness Handle failed loading (maybe try another dll or at least die gracefully)
@@ -100,17 +100,22 @@ static void init_fonts() {
 
 
 void draw() {
+    assert(!buffering);
+
+    // Add the last batch
+    graphics_buffer.batches.push_back(current_batch);
+
 	// From platfrom_renderer
 	draw_frame(&graphics_buffer, num_buffers, &texture_manager);
 }
 
 void set_shader(Shader ** shader) {
-    current_shader = shader;
+    current_batch.info.shader = shader;
 }
 
 void set_texture(char * texture) {
     assert(buffering == false); // Can't change texture while we're buffering
-    current_texture = texture; // @Temporary, find texture here ? At least check it exists.
+    current_batch.info.texture = texture; // @Temporary, find texture here ? At least check it exists.
 }
 
 void set_buffer_mode(BufferMode buffer_mode) {
@@ -118,44 +123,47 @@ void set_buffer_mode(BufferMode buffer_mode) {
     current_buffer_mode = buffer_mode;
 }
 
+//
+// Renderer optimization to begin making it group draw calls when two consecutive calls use the same
+// shader and texture (if applicable) -> Almost no performance impact due to drawing editor overlay,
+// but since our textures are quite varied (5 of 'em !) little impact on game mode perf. We could sort
+// those calls by texture, but then this would mess with the draw order, but we probably shouldn't
+// rely much on the order in which we draw things expect for transparent last.
+//
+// @Think @Optimization
+//
+void find_or_create_compatible_batch(DrawBatch * batch) {
 
-// Goal is to reduce the number of buffers by grouping those with similar shader and texture.
-void find_or_create_compatible_buffers(char * texture, Shader ** shader, VertexBuffer ** vb, IndexBuffer ** ib) {
-/*
     if(num_buffers > 0) {
-        if(graphics_buffer.shaders[num_buffers - 1] == shader) {
-            if(shader == colored_shader) {
-                *vb = &graphics_buffer.vertex_buffers[num_buffers - 1];
-                *ib = &graphics_buffer.index_buffers[num_buffers - 1];
+        if(previous_batch_info.shader == batch->info.shader) {
+            if(batch->info.shader == colored_shader) {
 
-                first_vertex_index_in_buffer = (*vb)->vertices.size();
-
+                first_vertex_index_in_buffer = batch->vb.vertices.size();
                 return;
             }
 
-            if((shader == font_shader) || (shader == textured_shader)) {
-                if (strcmp(texture, graphics_buffer.texture_id_buffer[num_buffers - 1]) == 0) {
-                    *vb = &graphics_buffer.vertex_buffers[num_buffers - 1];
-                    *ib = &graphics_buffer.index_buffers[num_buffers - 1];
+            if((batch->info.shader == font_shader) || (batch->info.shader == textured_shader)) {
+                if (strcmp(batch->info.texture, previous_batch_info.texture) == 0) {
 
-                    first_vertex_index_in_buffer = (*vb)->vertices.size();
-
+                    first_vertex_index_in_buffer = batch->vb.vertices.size();
                     return;
                 }
             }
         }
+
+        // No match found, add the previous batch to the buffer. @Cleanup, I don't like this system.
+        // Put back the previous_batch_info
+        DrawBatchInfo temp_info = batch->info;
+
+        batch->info = previous_batch_info;
+
+        graphics_buffer.batches.push_back(*batch);
+
+        batch->vb.vertices.clear();
+        batch->ib.indices.clear();
+
+        batch->info = temp_info;
     }
-*/
-    VertexBuffer new_vb;
-    IndexBuffer new_ib;
-
-    graphics_buffer.shaders.push_back(shader);
-    graphics_buffer.texture_id_buffer.push_back(texture);
-    graphics_buffer.vertex_buffers.push_back(new_vb);
-    graphics_buffer.index_buffers.push_back(new_ib);
-
-    *vb = &graphics_buffer.vertex_buffers[num_buffers];
-    *ib = &graphics_buffer.index_buffers[num_buffers];
 
     first_vertex_index_in_buffer = 0;
 
@@ -166,13 +174,13 @@ void start_buffer() {
     assert(buffering == false);
     buffering = true;
 
-    find_or_create_compatible_buffers(current_texture, current_shader, &current_vb, &current_ib);
+    find_or_create_compatible_batch(&current_batch);
 }
 
 void add_to_buffer(Vertex vertex) {
     assert(buffering == true);
 
-    current_vb->vertices.push_back(vertex);
+    current_batch.vb.vertices.push_back(vertex);
 }
 
 void end_buffer() {
@@ -181,34 +189,36 @@ void end_buffer() {
     // Fill the index buffer
     if(current_buffer_mode == QUADS) {
 
-        assert(current_vb->vertices.size() % 4 == 0); // Assert we actually have Quads // @Temporary, we shouldn't crash here.
+        assert(current_batch.vb.vertices.size() % 4 == 0); // Assert we actually have Quads // @Temporary, we shouldn't crash here.
 
         int first_index = first_vertex_index_in_buffer;
 
-        for(int i = 0; i < (current_vb->vertices.size() - first_vertex_index_in_buffer) / 4; i++) {
-            current_ib->indices.push_back(first_index);
-            current_ib->indices.push_back(first_index+1);
-            current_ib->indices.push_back(first_index+2);
-            current_ib->indices.push_back(first_index);
-            current_ib->indices.push_back(first_index+3);
-            current_ib->indices.push_back(first_index+1);
+        for(int i = 0; i < (current_batch.vb.vertices.size() - first_vertex_index_in_buffer) / 4; i++) {
+            current_batch.ib.indices.push_back(first_index);
+            current_batch.ib.indices.push_back(first_index+1);
+            current_batch.ib.indices.push_back(first_index+2);
+            current_batch.ib.indices.push_back(first_index);
+            current_batch.ib.indices.push_back(first_index+3);
+            current_batch.ib.indices.push_back(first_index+1);
 
             first_index += 4;
         } 
     }
 
-    //current_ib = NULL;
-    //current_vb = NULL;
+    previous_batch_info = current_batch.info;
 
 	buffering = false;
 }
 
 void clear_buffers() {
     // Clear buffer;
-    graphics_buffer.vertex_buffers.clear();
-    graphics_buffer.index_buffers.clear();
-    graphics_buffer.texture_id_buffer.clear();
-    graphics_buffer.shaders.clear();
+    graphics_buffer.batches.clear();
+
+    current_batch.vb.vertices.clear();
+    current_batch.ib.indices.clear();
+
+    previous_batch_info.shader = NULL;
+	previous_batch_info.texture = NULL;
 
     num_buffers = 0;
 }

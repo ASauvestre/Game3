@@ -777,7 +777,7 @@ void buffer_debug_overlay() {
     float left_x = 1.0f - DEBUG_OVERLAY_WIDTH + DEBUG_OVERLAY_PADDING;
     float right_x = 1.0f - DEBUG_OVERLAY_PADDING;
     float y = 0.0f;
-    // Buffer Frame time (text must always be bufferd last if it has AA / transparency);
+    // Buffer Frame time (text must always be buffered last if it has AA / transparency);
     {
         char buffer[64];
 
@@ -792,7 +792,7 @@ void buffer_debug_overlay() {
         y += DEBUG_OVERLAY_ROW_HEIGHT;
     }
 
-    // Buffer Current world (text must always be bufferd last if it has AA / transparency);
+    // Buffer Current world (text must always be buffered last if it has AA / transparency);
     {
         char buffer[64];
 
@@ -924,10 +924,10 @@ void buffer_tiles(Room * room) {
         int row = tile.local_y;
 
         // Don't buffer out of screen tiles
-        if (col + 1 < main_camera.offset.x - main_camera.size.x * 0.5f) continue;
-        if (col     > main_camera.offset.x + main_camera.size.x * 0.5f) continue;
-        if (row + 1 < main_camera.offset.y - main_camera.size.y * 0.5f) continue;
-        if (row     > main_camera.offset.y + main_camera.size.y * 0.5f) continue;
+        if (col + 1 <= main_camera.offset.x - main_camera.size.x * 0.5f) continue;
+        if (col     >= main_camera.offset.x + main_camera.size.x * 0.5f) continue;
+        if (row + 1 <= main_camera.offset.y - main_camera.size.y * 0.5f) continue;
+        if (row     >= main_camera.offset.y + main_camera.size.y * 0.5f) continue;
 
         Vector2f tile_size;
 
