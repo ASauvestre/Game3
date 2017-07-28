@@ -17,13 +17,5 @@ DLLEXPORT void init_platform_shaders();
 
 // Draw
 DLLEXPORT void draw_frame(GraphicsBuffer * graphics_buffer, int num_buffers, TextureManager * texture_manager);
-//   ^ Rename it to comething about the platform, also maybe rename platform to graphics_api or 
-//     something less confusing (the API isn't related to the platform(win32, osx, linux, ...))
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-// @Temporary @Cleanup
 
 }

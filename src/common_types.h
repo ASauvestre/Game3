@@ -12,6 +12,7 @@ struct Color4f;
 struct VertexBuffer;
 struct IndexBuffer;
 
+struct Asset;
 struct Texture;
 
 struct VertexTextureInfo;
@@ -28,15 +29,18 @@ struct PlatformTextureInfo;
 
 #include "stb_truetype.h"
 
-struct Texture {
+struct Asset {
     char * name;
+};
 
+struct Texture : Asset{
     int width;
     int height;
 
     int bytes_per_pixel;
 
     unsigned char * bitmap;
+
     int width_in_bytes;
     int num_bytes;
 
@@ -75,7 +79,7 @@ struct Vector2 {
 };
 
 struct Vector2f {
-    
+
     Vector2f() {};
     Vector2f(float x, float y) {
         this->x = x;

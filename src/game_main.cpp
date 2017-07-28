@@ -4,6 +4,7 @@
 
 #include "game_main.h"
 #include "macros.h"
+#include "texture_manager.h"
 
 #include "os/layer.h"
 
@@ -22,7 +23,7 @@ enum TileType {
 };
 
 enum Alignement {
-    TOP_LEFT, 
+    TOP_LEFT,
     TOP_RIGHT,
     BOTTOM_RIGHT,
     BOTTOM_LEFT
@@ -38,7 +39,7 @@ struct Entity {
 
     Vector2f position;
     Vector2f velocity;
-    
+
     bool is_player;
     float size; // relative to tile
 };
@@ -76,10 +77,10 @@ struct Room {
         width = w;
         height = h;
 
-        num_tiles = w*h;
+        num_tiles = w * h;
         num_outer_tiles = 2 * (w + h);
 
-        tiles = (Tile *) malloc(num_tiles*sizeof(Tile));
+        tiles = (Tile *) malloc(num_tiles * sizeof(Tile));
         outer_tiles = (Tile *) malloc(num_outer_tiles * sizeof(Tile));
     }
 
@@ -114,8 +115,7 @@ void handle_user_input();
 
 void buffer_editor_overlay();
 
-Texture * create_texture(char * name, unsigned char * data, int width, int height, int bytes_per_pixel);
-Texture * create_texture(char * name, unsigned char * data, int width, int height);
+Font * load_font(char * name);
 
 float buffer_string(char * text, float x, float y, float z,  Font * font, Alignement alignement);
 float buffer_string(char * text, float x, float y, float z,  Font * font);
@@ -160,7 +160,7 @@ extern Font * my_font;
 
 // Globals
 static WindowData window_data;
-    
+
 static Keyboard keyboard;
 static Keyboard previous_keyboard;
 
@@ -181,6 +181,74 @@ static bool debug_overlay_enabled = false;
 static bool editor_click_menu_open = false;
 static bool editor_click_menu_was_open = false;
 static Vector2f editor_click_menu_position;
+
+static TextureManager texture_manager;
+
+static void init_textures() {
+    texture_manager.load_texture("grass1.png");
+    texture_manager.load_texture("grass2.png");
+    texture_manager.load_texture("grass3.png");
+    texture_manager.load_texture("dirt_road.png");
+    texture_manager.load_texture("dirt_road_bottom.png");
+    texture_manager.load_texture("dirt_road_top.png");
+    texture_manager.load_texture("megaperson.png");
+    texture_manager.load_texture("tree.png");
+}
+
+static void init_fonts() {
+    my_font = load_font("Inconsolata.ttf");
+}
+
+Font * load_font(char * name) {
+    Font * font = (Font *) malloc(sizeof(Font));
+
+    font->name = name;
+
+    char path[512];
+    snprintf(path, 512, "data/fonts/%s", font->name);
+
+    FILE * font_file = fopen(path, "rb");
+
+    if(font_file == NULL) {
+        log_print("load_font", "Font %s not found at %s", name, path)
+        free(font);
+
+        return NULL;
+    }
+
+    int font_file_size = get_file_size(font_file);
+
+    unsigned char * font_file_buffer = (unsigned char *) malloc(font_file_size);
+    scope_exit(free(font_file_buffer));
+
+    // log_print("font_loading", "Font file for %s is %d bytes long", my_font->name, font_file_size);
+
+    fread(font_file_buffer, 1, font_file_size, font_file);
+
+    // We no longer need the file
+    fclose(font_file);
+
+    unsigned char * bitmap = (unsigned char *) malloc(256 * 256 * 4); // Our bitmap is 512x512 pixels and each pixel takes 4 bytes @Robustness, make sure the bitmap is big enough for the font
+
+    int result = stbtt_BakeFontBitmap(font_file_buffer, 0, 16.0, bitmap, 512, 512, 32, 96, font->char_data); // From stb_truetype.h : "no guarantee this fits!""
+
+    if(result <= 0) {
+        log_print("load_font", "The font %s could not be loaded, it is too large to fit in a 512x512 bitmap", name);
+    }
+
+    font->texture = texture_manager.create_texture(font->name, bitmap, 512, 512, 1);
+
+    log_print("load_font", "Loaded font %s", font->name);
+
+    return font;
+}
+
+static int get_file_size(FILE * file) {
+    fseek (file , 0 , SEEK_END);
+    int size = ftell (file);
+    fseek (file , 0 , SEEK_SET);
+    return size;
+}
 
 int find_tile_index_from_coords(int x, int y, Room * room) {
     return (x + 1) * room->width + y - 1;
@@ -223,7 +291,7 @@ Room * generate_room(char * name, int width, int height) {
         if((i % 7 == 0) || (i % 7 == 2)) {
             tile.texture = "grass1.png";
         } else if ((i % 7 == 1) || (i % 7 == 3) || (i % 7 == 6)) {
-            tile.texture = "grass2.png"; 
+            tile.texture = "grass2.png";
         } else {
             tile.texture = "grass3.png";
         }
@@ -288,12 +356,12 @@ void init_game() {
         player.position.y = 0;
         player.texture = "megaperson.png";
         player.is_player = true;
-        player.size = 1.0; 
+        player.size = 1.0;
     }
 
     // TEST Create test rooms
     {
-        
+
         Room * room = generate_room("main_room", 50, 30);
 
         room->outer_tiles[5].type = SWITCH_ROOM;
@@ -317,7 +385,7 @@ void init_game() {
         room->tiles[341].texture = "dirt_road_top.png";
 
         rooms[1] = room;
-    
+
     }
 
     current_room = rooms[0];
@@ -344,8 +412,8 @@ void game() {
     handle_user_input();
 
     buffer_tiles(current_room);
-    
-    buffer_entities();  
+
+    buffer_entities();
 
     buffer_player();
 
@@ -354,7 +422,7 @@ void game() {
         buffer_editor_overlay();
     }
 
-    // Debug overlay 
+    // Debug overlay
     if(debug_overlay_enabled) {
         buffer_debug_overlay();
     }
@@ -480,7 +548,7 @@ void handle_user_input() {
 
             if(player.position.y < 0) {
                 player.position.y = 0;
-            }   
+            }
             if(player.position.y >  current_room->height - 1)  {
                 player.position.y = current_room->height - 1;
             }
@@ -510,7 +578,7 @@ void handle_user_input() {
             }
             else if(main_camera.offset.y > current_room->height - main_camera.size.y/2.0f) { // See above
                 main_camera.offset.y = current_room->height - main_camera.size.y/2.0f;
-            }   
+            }
         } else if (game_mode == EDITOR) {
             //  @Refactor Same code as player movement
 
@@ -556,14 +624,14 @@ void handle_user_input() {
                 Vector2f position = keyboard.mouse_position;
 
                 if(editor_click_menu_open) {
-                    if((position.x <= editor_click_menu_position.x + EDITOR_CLICK_MENU_WIDTH) 
-                        && (position.x >= editor_click_menu_position.x) 
-                        && (position.y <= editor_click_menu_position.y + EDITOR_CLICK_MENU_ROW_HEIGHT * num_objects) 
+                    if((position.x <= editor_click_menu_position.x + EDITOR_CLICK_MENU_WIDTH)
+                        && (position.x >= editor_click_menu_position.x)
+                        && (position.y <= editor_click_menu_position.y + EDITOR_CLICK_MENU_ROW_HEIGHT * num_objects)
                         && (position.y >= editor_click_menu_position.y)) {
 
                         int element_number = 0;
                         float element_y = (position.y - editor_click_menu_position.y);
-                        
+
                         while(true) {
                             element_y -= EDITOR_CLICK_MENU_ROW_HEIGHT;
 
@@ -571,9 +639,9 @@ void handle_user_input() {
                                 element_number++;
                             } else {
                                 break;
-                            }   
+                            }
                         }
-                        
+
                         // log_print("editor_click_menu", "The element no. %d of the click menu was clicked", element_number);
 
                         // if(strcmp(objects[element_number].tile->texture, "grass.png") == 0) {
@@ -583,7 +651,7 @@ void handle_user_input() {
                         // }
 
                         editor_left_panel_displayed_object = objects[element_number];
-                    } 
+                    }
 
                     editor_click_menu_open = false;
                     editor_click_menu_was_open = true;
@@ -623,7 +691,7 @@ void buffer_editor_left_panel() {
 
     // Background
     {
-        Color4f color = Color4f(0.0f, 0.0f, 0.0f, 0.8f);
+        Color4f color = Color4f(0.1f, 0.1f, 0.2f, 0.8f);
         buffer_colored_quad(0.0f, 0.0f, TOP_LEFT, EDITOR_LEFT_PANEL_WIDTH, 1.0f, EDITOR_LEFT_PANEL_BACKGROUND_Z, color);
     }
 
@@ -687,9 +755,9 @@ void buffer_editor_click_menu() {
         {
             Color4f color;
             if(i % 2 == 0) {
-                color = Color4f(0.1f, 0.1f, 0.1f, 0.8f);
+                color = Color4f(0.2f, 0.2f, 0.3f, 0.8f);
             } else {
-                color = Color4f(0.3f, 0.3f, 0.3f, 0.7f);
+                color = Color4f(0.3f, 0.3f, 0.4f, 0.7f);
             }
 
             buffer_colored_quad(x, y, TOP_LEFT, EDITOR_CLICK_MENU_WIDTH, EDITOR_CLICK_MENU_ROW_HEIGHT, DEBUG_OVERLAY_BACKGROUND_Z, color);
@@ -751,9 +819,9 @@ void buffer_debug_overlay() {
             Color4f color;
 
             if(i % 2 == 0) {
-                color = Color4f(0.1f, 0.1f, 0.1f, 0.8f);
+                color = Color4f(0.2f, 0.2f, 0.3f, 0.8f);
             } else {
-                color = Color4f(0.3f, 0.3f, 0.3f, 0.7f);
+                color = Color4f(0.3f, 0.3f, 0.4f, 0.7f);
             }
 
             buffer_colored_quad(position, TOP_LEFT, DEBUG_OVERLAY_WIDTH, DEBUG_OVERLAY_ROW_HEIGHT, DEBUG_OVERLAY_BACKGROUND_Z, color);
@@ -783,7 +851,7 @@ void buffer_debug_overlay() {
 
         snprintf(buffer, sizeof(buffer), "%.3f", displayed_frame_time * 1000);
 
-        buffer_string("Frame Time (ms):", left_x, y + DEBUG_OVERLAY_PADDING * window_data.aspect_ratio, DEBUG_OVERLAY_Z, my_font, TOP_LEFT); 
+        buffer_string("Frame Time (ms):", left_x, y + DEBUG_OVERLAY_PADDING * window_data.aspect_ratio, DEBUG_OVERLAY_Z, my_font, TOP_LEFT);
 
         y += DEBUG_OVERLAY_ROW_HEIGHT;
 
@@ -798,7 +866,7 @@ void buffer_debug_overlay() {
 
         snprintf(buffer, sizeof(buffer), "%s", current_room->name);
 
-        buffer_string("Current World :", left_x, y + DEBUG_OVERLAY_PADDING * window_data.aspect_ratio, DEBUG_OVERLAY_Z, my_font, TOP_LEFT); 
+        buffer_string("Current World :", left_x, y + DEBUG_OVERLAY_PADDING * window_data.aspect_ratio, DEBUG_OVERLAY_Z, my_font, TOP_LEFT);
 
         y += DEBUG_OVERLAY_ROW_HEIGHT;
 
@@ -826,6 +894,9 @@ void do_buffer_editor_tile_overlay(Tile * tiles, int num_tiles) {
             color = Color4f(1.0f, 0.0f, 0.0f, 0.5f);
         } else if(tile.type == BLOCK) {
             color = Color4f(0.0f, 1.0f, 1.0f, 0.5f);
+        } else {
+            // No color for this tile type, so skip it.
+            return;
         }
 
         Vector2f tile_size;
@@ -938,7 +1009,7 @@ void buffer_tiles(Room * room) {
 
         tile_offset.x = tile_size.x * (col - main_camera.offset.x) + 0.5f;
         tile_offset.y = tile_size.y * (row - main_camera.offset.y) + 0.5f;
-    
+
         Vertex v1 = {tile_offset.x              , tile_offset.y              , 0.99f, 0.0f, 0.0f};
         Vertex v2 = {tile_offset.x + tile_size.x, tile_offset.y + tile_size.y, 0.99f, 1.0f, 1.0f};
         Vertex v3 = {tile_offset.x              , tile_offset.y + tile_size.y, 0.99f, 0.0f, 1.0f};
@@ -968,7 +1039,7 @@ float buffer_string(char * text, float x, float y, float z,  Font * font, Aligne
     float pixel_x = x * window_data.width;
     float pixel_y = y * window_data.height;
 
-    
+
     float text_width = 0.0f;
     float text_height = 0.0f;
 
@@ -979,7 +1050,7 @@ float buffer_string(char * text, float x, float y, float z,  Font * font, Aligne
 
         stbtt_aligned_quad q;
         stbtt_GetBakedQuad(font->char_data, font->texture->width, font->texture->height, 'A' - 32, &zero_x, &zero_y, &q, 1);
-        
+
         text_height = (float) ((int)(-q.y0 + 0.5f)) / window_data.height;
 
         pixel_y += text_height * window_data.height;
@@ -1018,7 +1089,7 @@ float buffer_string(char * text, float x, float y, float z,  Font * font, Aligne
         if (*text >= 32 && *text < 128) {
             stbtt_aligned_quad q;
             stbtt_GetBakedQuad(font->char_data, font->texture->width, font->texture->height, *text-32, &pixel_x, &pixel_y, &q, 1);
-        
+
             Vertex v1 = {q.x0/window_data.width, q.y0/window_data.height, z, q.s0, q.t0};
             Vertex v2 = {q.x1/window_data.width, q.y1/window_data.height, z, q.s1, q.t1};
             Vertex v3 = {q.x0/window_data.width, q.y1/window_data.height, z, q.s0, q.t1};
@@ -1080,7 +1151,7 @@ void buffer_colored_quad(float x, float y, Alignement alignement, float width, f
     add_to_buffer(v3);
     add_to_buffer(v4);
 
-    end_buffer(); 
+    end_buffer();
 }
 
 float ENTITY_MIMINUM_DEPTH = 0.0000f;
@@ -1125,27 +1196,36 @@ void update_time() {
     window_data.current_time = now;
 
     last_time = now;
-}   
+}
 
 void main() {
+    scope_exit(printf("Exiting."));
+
     os_specific_init_clock();
 
-    window_data.width   = 1280;
-    window_data.height  = 960;
+    window_data.width  = 960;
+    window_data.height = 720;
 
-    // window_data.width    = 1920;
-    // window_data.height   = 1080;
+    // window_data.width  = 1920;
+    // window_data.height = 1080;
 
     window_data.aspect_ratio = (float) window_data.width/window_data.height;
     char * window_name = "Game3";
 
     window_data.handle = os_specific_create_window(window_data.width, window_data.height, window_name);
 
+    init_textures();
+
+    init_fonts();
+
     init_renderer(window_data.width, window_data.height, window_data.handle);
 
     init_game();
 
     init_hotloader();
+
+    register_manager(&texture_manager);
+    texture_manager.directories.push_back("textures/");
 
     log_print("perf_counter", "Startup time : %.3f seconds", os_specific_get_time());
 
@@ -1160,10 +1240,11 @@ void main() {
         keyboard = os_specific_update_keyboard();
 
         game();
-        
-        draw();
+
+        draw(&texture_manager);
         clear_buffers();
 
         check_hotloader_modifications();
+        texture_manager.perform_reloads();
     }
 }
