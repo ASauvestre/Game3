@@ -1,7 +1,7 @@
 #include <assert.h>
 #include <windows.h>
 #include <stdio.h>
-#include <vector>
+#include <malloc.h> // For alloca
 
 #include "macros.h"
 #include "asset_manager.h"
@@ -25,8 +25,6 @@ static void issue_read_directory(Directory * directory);
 
 static void handle_notifications();
 
-static char * find_char_from_right(char c, char * string);
-
 static FILE_NOTIFY_INFORMATION * bump_ptr_to_next_notification(FILE_NOTIFY_INFORMATION * notification);
 
 // Const
@@ -35,9 +33,9 @@ const int NOTIFICATION_BUFFER_LENGTH = 10000; // @Temporary figure out how much 
 // Globals
 static Directory dir;
 
-static std::vector<AssetChange> asset_changes;
+static Array<AssetChange> asset_changes;
 
-static std::vector<AssetManager *> managers;
+static Array<AssetManager *> managers;
 
 void release(AssetChange * ac) {
     free(ac->full_path);
@@ -77,14 +75,14 @@ void init_hotloader() {
 }
 
 void register_manager(AssetManager * am) {
-    managers.push_back(am);
+    managers.add(am);
 }
 
 void check_hotloader_modifications() {
     handle_notifications();
 
-    for(int i = 0; i < asset_changes.size(); i++) {
-        AssetChange * change = &asset_changes[i];
+    for(int i = 0; i < asset_changes.count; i++) {
+        AssetChange * change = &asset_changes.data[i];
 
         // log_print("check_hotloader_modifications", "Detected modication on file %s", change->file_name);
 
@@ -95,16 +93,16 @@ void check_hotloader_modifications() {
         directory[path_without_filename_length] = 0;
 
         // Look for a manager who's interested in changes from this directory
-        int num_managers = managers.size();
+        int num_managers = managers.count;
 
         for(int i = 0; i < num_managers; i++) {
-            AssetManager * am = managers[i];
+            AssetManager * am = managers.data[i];
 
-            int num_subscribed_directories = am->directories.size();
+            int num_subscribed_directories = am->directories.count;
 
             for(int j = 0; j < num_subscribed_directories; j++) {
-                if(strcmp(am->directories[j], directory) == 0) {
-                    am->elements_to_reload.push_back(strdup(change->full_path)); // Allocates new string, to be freed by manager // @Leak, see asset_manager.cpp
+                if(strcmp(am->directories.data[j], directory) == 0) {
+                    am->assets_to_reload.add(strdup(change->full_path));
                 }
             }
         }
@@ -112,7 +110,7 @@ void check_hotloader_modifications() {
         release(change);
     }
 
-    asset_changes.clear();
+    asset_changes.reset(true);
 }
 
 static void handle_notifications() {
@@ -202,7 +200,7 @@ static void handle_notifications() {
 
 		}
 
-        asset_changes.push_back(change);
+        asset_changes.add(change);
     }
 }
 

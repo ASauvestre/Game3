@@ -1,6 +1,8 @@
 #include <stdlib.h>
-#include <vector>
+#include <stdio.h>
 #include <string.h>
+
+#include "array.h"
 
 #define COMMON_TYPES_IMPLEMENTATION
 #include "common_types.h"
@@ -83,21 +85,24 @@ struct HashTable {
 };
 
 struct AssetManager {
-    static const int MAX_NUM_ELEMENTS = 1024; // @Temporary, make the array grow dynamically (or not, but look into it).
 
-    Asset * assets[MAX_NUM_ELEMENTS];
+    // ------ Constants ------
+    static const int MAX_NUM_ASSETS = 1024; // @Temporary, make the array grow dynamically (or not, but look into it).
 
-    int num_elements;
+    // ------ Variables ------
+    Asset * assets[MAX_NUM_ASSETS];
+
+    int num_assets;
 
     HashTable map;
 
-    // Directories for which the manager wants to get notifications from the hotloader
-    std::vector<char *> directories;
+    Array<char *> directories;
 
-    // Element for which a change has been detected by the hotloader
-    std::vector<char *> elements_to_reload;
+    Array<char *> assets_to_reload;
 
-    // Functions
+
+    // ------ Functions ------
+
     void * allocate(int size);
 
     int register_asset(Asset * asset);

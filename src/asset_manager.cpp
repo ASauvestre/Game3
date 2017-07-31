@@ -8,7 +8,7 @@ void * AssetManager::allocate(int size) {
 }
 
 int AssetManager::register_asset(Asset * asset) {
-    if(num_elements == MAX_NUM_ELEMENTS) {
+    if(num_assets == MAX_NUM_ASSETS) {
         log_print("asset_manager", "No slots left in the catalog");
         return -1;
     }
@@ -17,11 +17,11 @@ int AssetManager::register_asset(Asset * asset) {
     int index = find_asset_index(asset->name);
 
     if(index == -1) {
-        index = num_elements;
+        index = num_assets;
 
         map.add(asset->name, index);
 
-         num_elements++;
+         num_assets++;
     }
 
     assets[index] = asset; // @Leak if asset was heap allocated, which is the case for Textures
@@ -50,12 +50,11 @@ void AssetManager::reload_asset(char * file_path, char * file_name, char * exten
 void AssetManager::perform_reloads() {
     AssetManager * am = this; //@Cleanup
 
-    int num_elements = am->elements_to_reload.size();
+    int num_assets_to_reload = am->assets_to_reload.count;
 
-    for(int i = 0; i < num_elements; i++) {
-        char * file_path = am->elements_to_reload[i];
-        // scope_exit(free(file_path)); // @Incomplete @Leak Allocated by strdup but free causes heap
-                                        // corruption, std::vector may makes its own copy, fix this when we stop using it.
+    for(int i = 0; i < num_assets_to_reload; i++) {
+        char * file_path = am->assets_to_reload.data[i];
+        scope_exit(free(file_path)); // Allocated by strdup in hotloader.cpp
 
         char * file_name = find_char_from_right('/', file_path); // @Redundant, this is already computed in hotloader.cpp, we could simply have another array with file names to reload.
 
@@ -74,6 +73,7 @@ void AssetManager::perform_reloads() {
         if(strcmp("png", extension) == 0) {
 
             // @Incomplete, we're getting two of those when PS saves, make sure we update only once.
+            // @Incomplete @Temporary, the extension check shouldn't happen here.
             reload_asset(file_path, file_name, extension);
 
             // log_print("perform_manager_reloads", "Texture with file_name %s and extension %s up for reload. Full path is : %s", file_name, extension, file_path);
@@ -81,5 +81,5 @@ void AssetManager::perform_reloads() {
         }
     }
 
-    am->elements_to_reload.clear();
+    am->assets_to_reload.reset(true);
 }

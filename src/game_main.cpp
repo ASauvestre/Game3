@@ -72,6 +72,7 @@ struct Object {
 };
 
 struct Room {
+    // @Temporary. Have a separate function for this constructor, I want this struct to be POD.
     Room(char * n, int w, int h) {
         name = n;
         width = w;
@@ -95,8 +96,10 @@ struct Room {
     int num_tiles;
     Tile * tiles;
 
+    // @Temporary. Either makes those normal tiles with a special type, or use another
+    // system. I don't like having those be in a separate array.
     int num_outer_tiles;
-    Tile * outer_tiles; // Border tiles, used for teleport triggers
+    Tile * outer_tiles; // Border tiles, used for teleport triggers.
 };
 
 struct Camera {
@@ -184,6 +187,8 @@ static Vector2f editor_click_menu_position;
 
 static TextureManager texture_manager;
 
+// @Temporary? Just have the hotloader send notifications for every
+// files on startup (or provide a list when a catalog requests it).
 static void init_textures() {
     texture_manager.load_texture("grass1.png");
     texture_manager.load_texture("grass2.png");
@@ -194,7 +199,7 @@ static void init_textures() {
     texture_manager.load_texture("megaperson.png");
     texture_manager.load_texture("tree.png");
 }
-
+// @Temporary See comment for init_textures() above.
 static void init_fonts() {
     my_font = load_font("Inconsolata.ttf");
 }
@@ -309,27 +314,20 @@ Room * generate_room(char * name, int width, int height) {
             tile.local_x = i;
             tile.local_y = -1;
 
-            tile.collision_box.x = tile.local_x + 0.75;
-            tile.collision_box.y = tile.local_y;
-            tile.collision_box.width = -0.5;
-            tile.collision_box.height = 1;
         } else if(i > (room->num_outer_tiles - room->width - 1)) {
             tile.local_x = (i - (room->num_outer_tiles - room->width));
             tile.local_y = room->height;
 
-            tile.collision_box.x = tile.local_x + 0.75;
-            tile.collision_box.y = tile.local_y;
-            tile.collision_box.width = -0.5;
-            tile.collision_box.height = 1;
         } else {
             tile.local_x = room->width - (room->width + 1)*((i - room->width)%2);
             tile.local_y = (i - room->width)/2;
 
-            tile.collision_box.x = tile.local_x;
-            tile.collision_box.y = tile.local_y + 0.75;
-            tile.collision_box.width = 1;
-            tile.collision_box.height = -0.5;
         }
+
+        tile.collision_box.x = tile.local_x;
+        tile.collision_box.y = tile.local_y;
+        tile.collision_box.width = 1;
+        tile.collision_box.height = 1;
 
         tile.type = BLOCK;
         tile.collision_enabled = true;
@@ -345,9 +343,11 @@ Room * generate_room(char * name, int width, int height) {
 void init_game() {
 
     // Init camera
-    main_camera.size.x = 32.0f;
-    main_camera.offset.x = 0.0f;
-    main_camera.offset.y = 0.0f;
+    {
+        main_camera.size.x  = 32.0f;
+        main_camera.offset.x = 0.0f;
+        main_camera.offset.y = 0.0f;
+    }
 
     // Init player
     {
@@ -407,6 +407,8 @@ void init_game() {
 }
 
 void game() {
+    perf_monitor();
+
     main_camera.size.y = main_camera.size.x / window_data.aspect_ratio;
 
     handle_user_input();
@@ -488,40 +490,14 @@ void handle_user_input() {
         // Early collision detection, find current tile
         {
             // @Optimisation We can probably infer the tiles we collide with from the player's x and y coordinates and information about the room's size
-            // for(int i = 0; i < current_room->num_tiles; i++) {
-            //  Tile tile = current_room->tiles[i];
-
-            //  bool should_compute_collision = tile.collision_enabled;
-
-            //  if(should_compute_collision) {
-
-
-            //      if((player.position.x < tile.collision_box.x + tile.collision_box.width) && (tile.collision_box.x < player.position.x + player.size) && // X tests
-            //         (player.position.y < tile.collision_box.y + tile.collision_box.height) && (tile.collision_box.y < player.position.y + player.size)) {    // Y tests
-
-            //          if(tile.type == SWITCH_ROOM) {
-            //              log_print("collision", "Player is on a tile with type SWITCH_ROOM, switching to room %d", tile.room_target_id);
-            //              current_room = rooms[tile.room_target_id];
-
-            //              player.position = tile.target_tile_coords;
-            //          }
-
-            //      }
-
-            //  }
-            // }
-
-            // @Optimisation We can probably infer the tiles we collide with from the player's x and y coordinates and information about the room's size
-            for(int i = 0; i < 2 * (current_room->width + current_room->height - 2); i++) {
+            for(int i = 0; i < current_room->num_outer_tiles; i++) {
                 Tile tile = current_room->outer_tiles[i];
 
                 bool should_compute_collision = tile.collision_enabled;
 
                 if(should_compute_collision) {
-
-
-                    if((player.position.x < tile.collision_box.x + tile.collision_box.width) && (tile.collision_box.x < player.position.x + player.size) && // X tests
-                       (player.position.y < tile.collision_box.y + tile.collision_box.height) && (tile.collision_box.y < player.position.y + player.size)) {    // Y tests
+                    if((player.position.x < tile.local_x + tile.collision_box.width) && (tile.local_x < player.position.x + player.size) && // X tests
+                       (player.position.y < tile.local_y + tile.collision_box.height) && (tile.local_y < player.position.y + player.size)) {    // Y tests
 
                         if(tile.type == SWITCH_ROOM) {
                             // log_print("collision", "Player is on a tile with type SWITCH_ROOM, switching to room %d", tile.room_target_id);
@@ -542,6 +518,7 @@ void handle_user_input() {
             if(player.position.x < 0)  {
                 player.position.x = 0;
             }
+
             if(player.position.x >  current_room->width - 1)  {
                 player.position.x = current_room->width - 1;
             }
@@ -549,6 +526,7 @@ void handle_user_input() {
             if(player.position.y < 0) {
                 player.position.y = 0;
             }
+
             if(player.position.y >  current_room->height - 1)  {
                 player.position.y = current_room->height - 1;
             }
@@ -1183,6 +1161,7 @@ void update_time() {
     double now = os_specific_get_time();
     float current_dt = now - last_time;
 
+    // @Incomplete, needs to sync up to GPU maybe. Or just use usual Vsync.
     if (window_data.locked_fps) {
         while (current_dt < 1.0f / TARGET_FPS) {
            os_specific_sleep(0);
@@ -1203,19 +1182,24 @@ void main() {
 
     os_specific_init_clock();
 
-    window_data.width  = 960;
-    window_data.height = 720;
+    // Init window
+    {
+        window_data.width  = 960;
+        window_data.height = 720;
 
-    // window_data.width  = 1920;
-    // window_data.height = 1080;
+        // window_data.width  = 1920;
+        // window_data.height = 1080;
 
-    window_data.aspect_ratio = (float) window_data.width/window_data.height;
-    char * window_name = "Game3";
+        window_data.aspect_ratio = (float) window_data.width/window_data.height;
+        char * window_name = "Game3";
 
-    window_data.handle = os_specific_create_window(window_data.width, window_data.height, window_name);
+        window_data.handle = os_specific_create_window(window_data.width, window_data.height, window_name);
+    }
 
+    // @Temporary
     init_textures();
 
+    // @Temporary
     init_fonts();
 
     init_renderer(window_data.width, window_data.height, window_data.handle);
@@ -1224,14 +1208,16 @@ void main() {
 
     init_hotloader();
 
-    register_manager(&texture_manager);
-    texture_manager.directories.push_back("textures/");
+    // Init texture manager
+    {
+        texture_manager.directories.add("textures/");
+        register_manager(&texture_manager);
+    }
 
     log_print("perf_counter", "Startup time : %.3f seconds", os_specific_get_time());
 
     bool should_quit = false;
     while(!should_quit) {
-
         update_time();
 
         should_quit = os_specific_update_window_events(window_data.handle);

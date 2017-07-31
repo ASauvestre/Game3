@@ -1,3 +1,5 @@
+//@Incomplete, rework event system, reduce involvment on this end, make processing happen on the game side
+
 #include "windows.h"
 
 #include "os/win32/core.h"
@@ -7,13 +9,13 @@
 #define COMMON_TYPES_IMPLEMENTATION
 #include "common_types.h" // For Keyboard
 
-// From "windowsx.h" 
+// From "windowsx.h"
 // Gets Low short and high short from LPARAM
 #define GET_X_LPARAM(lp) ((int)(short)LOWORD(lp))
 #define GET_Y_LPARAM(lp) ((int)(short)HIWORD(lp))
 
 static Keyboard local_keyboard;
-static bool local_should_quit; // @Temoporary, probably shouldn't get that from here.
+static bool local_should_quit; // @Temporary, probably shouldn't get that from here.
 
 static int window_width = 0;
 static int window_height = 0;
@@ -42,7 +44,7 @@ LRESULT CALLBACK WndProc(HWND window_handle, UINT message, WPARAM w_param, LPARA
         }
         case WM_KEYDOWN : {
 
-            // if(l_param & 0x40000000) { break; } // Bit 30 "The previous key state. The value is 1 if the key is down 
+            // if(l_param & 0x40000000) { break; } // Bit 30 "The previous key state. The value is 1 if the key is down
                                                    // before the message is sent, or it is zero if the key is up." (MSDN)
 
             switch(w_param) {
@@ -92,7 +94,7 @@ LRESULT CALLBACK WndProc(HWND window_handle, UINT message, WPARAM w_param, LPARA
                     // printf("Keyboard Event: Unknown key was pressed.\n");
                 }
             }
-            break;  
+            break;
         }
         case WM_KEYUP : {
             switch(w_param) {
@@ -144,7 +146,7 @@ LRESULT CALLBACK WndProc(HWND window_handle, UINT message, WPARAM w_param, LPARA
                 }
             }
             break;
-        }   
+        }
         case WM_MOUSEMOVE : {
             if(window_width == 0) {
                 local_keyboard.mouse_position.x = 0.0f;
@@ -245,8 +247,8 @@ void * win32_create_window(int width, int height, char * name) {
         int centered_x = (GetSystemMetrics(SM_CXSCREEN)-width)/2;
         int centered_y = (GetSystemMetrics(SM_CYSCREEN)-height)/2;
 
-        handle = CreateWindowEx(0, window_class.lpszClassName, (LPCTSTR) name, window_style, centered_x, 
-                                                     centered_y, window_dimensions.right - window_dimensions.left, 
+        handle = CreateWindowEx(0, window_class.lpszClassName, (LPCTSTR) name, window_style, centered_x,
+                                                     centered_y, window_dimensions.right - window_dimensions.left,
                                                      window_dimensions.bottom - window_dimensions.top, NULL, NULL, instance, NULL);
 
         if(handle) {

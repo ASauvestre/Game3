@@ -18,7 +18,7 @@ struct Vertex;
 struct VertexBuffer;
 struct IndexBuffer;
 
-struct Shader; // Platform specific definition
+struct Shader; // API specific definition
 
 struct Keyboard;
 struct WindowData;

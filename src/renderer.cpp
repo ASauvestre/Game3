@@ -65,10 +65,12 @@ void init_renderer(int width, int height, void * handle) {
 }
 
 void draw(TextureManager * tm) {
+    perf_monitor();
+
     assert(!buffering);
 
     // Add the last batch
-    graphics_buffer.batches.push_back(current_batch);
+    graphics_buffer.batches.add(current_batch);
 
 	// From platfrom_renderer
 	draw_frame(&graphics_buffer, num_buffers, tm);
@@ -99,18 +101,20 @@ void set_buffer_mode(BufferMode buffer_mode) {
 //
 void find_or_create_compatible_batch(DrawBatch * batch) {
 
+	assert(batch != NULL);
+
     if(num_buffers > 0) {
         if(previous_batch_info.shader == batch->info.shader) {
             if(batch->info.shader == colored_shader) {
 
-                first_vertex_index_in_buffer = batch->vb.vertices.size();
+                first_vertex_index_in_buffer = batch->vb.vertices.count;
                 return;
             }
 
             if((batch->info.shader == font_shader) || (batch->info.shader == textured_shader)) {
                 if (strcmp(batch->info.texture, previous_batch_info.texture) == 0) {
 
-                    first_vertex_index_in_buffer = batch->vb.vertices.size();
+                    first_vertex_index_in_buffer = batch->vb.vertices.count;
                     return;
                 }
             }
@@ -122,10 +126,25 @@ void find_or_create_compatible_batch(DrawBatch * batch) {
 
         batch->info = previous_batch_info;
 
-        graphics_buffer.batches.push_back(*batch);
+		DrawBatch batch_copy;
 
-        batch->vb.vertices.clear();
-        batch->ib.indices.clear();
+		batch_copy.info = batch->info;
+
+		// @Speed, we could allocate memory manually and memcpy.
+		// Or make a function in Array that copies an array. Either way,
+		// this is working for now, we'll see it it ends up being too slow.
+		for_array(batch->vb.vertices.data, batch->vb.vertices.count) {
+			batch_copy.vb.vertices.add(*it);
+		}
+
+		for_array(batch->ib.indices.data, batch->ib.indices.count) {
+			batch_copy.ib.indices.add(*it);
+		}
+
+        graphics_buffer.batches.add(batch_copy);
+
+        batch->vb.vertices.reset();
+        batch->ib.indices.reset();
 
         batch->info = temp_info;
     }
@@ -145,7 +164,7 @@ void start_buffer() {
 void add_to_buffer(Vertex vertex) {
     assert(buffering == true);
 
-    current_batch.vb.vertices.push_back(vertex);
+    current_batch.vb.vertices.add(vertex);
 }
 
 void end_buffer() {
@@ -154,17 +173,17 @@ void end_buffer() {
     // Fill the index buffer
     if(current_buffer_mode == QUADS) {
 
-        assert(current_batch.vb.vertices.size() % 4 == 0); // Assert we actually have Quads // @Temporary, we shouldn't crash here.
+        assert(current_batch.vb.vertices.count % 4 == 0); // Assert we actually have Quads // @Temporary, we shouldn't crash here.
 
         int first_index = first_vertex_index_in_buffer;
 
-        for(int i = 0; i < (current_batch.vb.vertices.size() - first_vertex_index_in_buffer) / 4; i++) {
-            current_batch.ib.indices.push_back(first_index);
-            current_batch.ib.indices.push_back(first_index+1);
-            current_batch.ib.indices.push_back(first_index+2);
-            current_batch.ib.indices.push_back(first_index);
-            current_batch.ib.indices.push_back(first_index+3);
-            current_batch.ib.indices.push_back(first_index+1);
+        for(int i = 0; i < (current_batch.vb.vertices.count - first_vertex_index_in_buffer) / 4; i++) {
+            current_batch.ib.indices.add(first_index);
+            current_batch.ib.indices.add(first_index+1);
+            current_batch.ib.indices.add(first_index+2);
+            current_batch.ib.indices.add(first_index);
+            current_batch.ib.indices.add(first_index+3);
+            current_batch.ib.indices.add(first_index+1);
 
             first_index += 4;
         }
@@ -176,11 +195,19 @@ void end_buffer() {
 }
 
 void clear_buffers() {
-    // Clear buffer;
-    graphics_buffer.batches.clear();
+    // Clear buffers
 
-    current_batch.vb.vertices.clear();
-    current_batch.ib.indices.clear();
+	// -1 on the count because the last batch is current_batch which is on the stack and can't be freed.
+	// I need to @Cleanup this, I don't like the batchs being added that way anyway.
+    for_array(graphics_buffer.batches.data, graphics_buffer.batches.count - 1) {
+        it->vb.vertices.reset(true);
+        it->ib.indices.reset(true);
+    }
+
+    graphics_buffer.batches.reset();
+
+    current_batch.vb.vertices.reset();
+    current_batch.ib.indices.reset();
 
     previous_batch_info.shader = NULL;
 	previous_batch_info.texture = NULL;

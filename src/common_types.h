@@ -1,7 +1,5 @@
 #pragma once
 
-#include <vector>
-
 struct Font;
 
 struct Vector2;
@@ -29,6 +27,8 @@ struct PlatformTextureInfo;
 
 #include "stb_truetype.h"
 
+#include "array.h"
+
 struct Asset {
     char * name;
 };
@@ -46,13 +46,13 @@ struct Texture : Asset{
 
     bool modified; // Was it changed this frame ?
 
-    PlatformTextureInfo * platform_info; // Point to data structure containing platform specific fields
+    PlatformTextureInfo * platform_info; // Pointer to data structure containing platform specific fields
 };
 
 struct Font {
     char * name;
     Texture * texture;
-    stbtt_bakedchar char_data[96]; // 96 ASCII characters
+    stbtt_bakedchar char_data[96]; // 96 ASCII characters @Temporary
 };
 
 struct Vector2 {
@@ -129,11 +129,11 @@ struct Color4f {
 };
 
 struct VertexBuffer {
-    std::vector<Vertex> vertices;
+    Array<Vertex> vertices;
 };
 
 struct IndexBuffer {
-    std::vector<int> indices;
+    Array<int> indices;
 };
 
 struct VertexTextureInfo {

@@ -250,31 +250,33 @@ void draw_frame(GraphicsBuffer * graphics_buffer, int num_buffers, TextureManage
 // @Rewrite This is really ugly, rewrite and refactor things
 static void draw_buffer(GraphicsBuffer * graphics_buffer, int buffer_index, TextureManager * texture_manager) {
 
-    Shader * shader = *graphics_buffer->batches[buffer_index].info.shader;
+    Shader * shader = *graphics_buffer->batches.data[buffer_index].info.shader;
 
     if(shader != last_shader_set) {
         switch_to_shader(shader);
         last_shader_set = shader;
     }
 
+    DrawBatch * batch = &graphics_buffer->batches.data[buffer_index];
+
+    VertexBuffer * vb = &batch->vb;
+    IndexBuffer * ib = &batch->ib;
+
+    // Update vertex buffer
+    D3D11_MAPPED_SUBRESOURCE resource = {};
+    d3d_dc->Map(d3d_vertex_buffer_interface, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
+    memcpy(resource.pData, vb->vertices.data, sizeof(Vertex) * vb->vertices.count);
+    d3d_dc->Unmap(d3d_vertex_buffer_interface, 0);
+
+    // Update index buffer
+    resource = {};
+    d3d_dc->Map(d3d_index_buffer_interface, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
+    memcpy(resource.pData, ib->indices.data, sizeof( int ) *  ib->indices.count);
+    d3d_dc->Unmap(d3d_index_buffer_interface, 0);
+
     if(d3d_shader.input_mode == POS_TEXCOORD) {
 
-        VertexBuffer * vb = &graphics_buffer->batches[buffer_index].vb;
-        IndexBuffer * ib = &graphics_buffer->batches[buffer_index].ib;
-
-        // Update vertex buffer
-        D3D11_MAPPED_SUBRESOURCE resource = {};
-        d3d_dc->Map(d3d_vertex_buffer_interface, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
-        memcpy(resource.pData, &vb->vertices[0], sizeof(Vertex) * vb->vertices.size());
-        d3d_dc->Unmap(d3d_vertex_buffer_interface, 0);
-
-        // Update index buffer
-        resource = {};
-        d3d_dc->Map(d3d_index_buffer_interface, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
-        memcpy(resource.pData, &ib->indices[0], sizeof( int ) *  ib->indices.size());
-        d3d_dc->Unmap(d3d_index_buffer_interface, 0);
-
-        char * texture_name = graphics_buffer->batches[buffer_index].info.texture;
+        char * texture_name = graphics_buffer->batches.data[buffer_index].info.texture;
 
         Texture * texture = (Texture *) texture_manager->find_asset_by_name(texture_name);
 
@@ -304,28 +306,14 @@ static void draw_buffer(GraphicsBuffer * graphics_buffer, int buffer_index, Text
 		}
 
     } else if(d3d_shader.input_mode == POS_COL) {
-
-        VertexBuffer * vb = &graphics_buffer->batches[buffer_index].vb;
-        IndexBuffer * ib = &graphics_buffer->batches[buffer_index].ib;
-
-        // Update vertex buffer
-        D3D11_MAPPED_SUBRESOURCE resource = {};
-        d3d_dc->Map(d3d_vertex_buffer_interface, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
-        memcpy(resource.pData, &vb->vertices[0], sizeof(Vertex) * vb->vertices.size());
-        d3d_dc->Unmap(d3d_vertex_buffer_interface, 0);
-
-        // Update index buffer
-        resource = {};
-        d3d_dc->Map(d3d_index_buffer_interface, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
-        memcpy(resource.pData, &ib->indices[0], sizeof( int ) *  ib->indices.size());
-        d3d_dc->Unmap(d3d_index_buffer_interface, 0);
+        // Nothing to do
 
     } else {
         log_print("draw_buffer", "Unsupported shader input mode");
         return;
     }
 
-    d3d_dc->DrawIndexed(graphics_buffer->batches[buffer_index].ib.indices.size(), 0, 0);
+    d3d_dc->DrawIndexed(graphics_buffer->batches.data[buffer_index].ib.indices.count, 0, 0);
 }
 
 static void bind_srv_to_texture(Texture * texture) {

@@ -1,3 +1,5 @@
+#include "array.h"
+
 struct VertexBuffer;
 struct IndexBuffer;
 struct Shader;
@@ -5,7 +7,7 @@ struct DrawBatch;
 struct DrawBatchInfo;
 
 struct GraphicsBuffer {
-	std::vector<DrawBatch> batches;
+	Array <DrawBatch> batches;
 };
 
 struct DrawBatchInfo {
