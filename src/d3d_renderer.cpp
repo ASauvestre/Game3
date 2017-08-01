@@ -542,16 +542,3 @@ static void switch_to_shader(Shader * shader) {
     d3d_dc->VSSetShader(d3d_shader.VS, NULL, 0);
     d3d_dc->PSSetShader(d3d_shader.PS, NULL, 0);
 }
-
-
-// From bottom-left (0,0) z out of screen (right-handed) to bottom-left(-1,-1) z into screen (left-handed)
-static void convert_coords_to_d3d(Vertex * v) {
-    v->position.z *= -1.0f;
-    v->position.z += 1.0f;
-
-    v->position.x *= 2.0f;
-    v->position.y *= 2.0f;
-
-    v->position.x -= 1.0f;
-    v->position.y -= 1.0f;
-}

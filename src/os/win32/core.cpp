@@ -157,7 +157,7 @@ LRESULT CALLBACK WndProc(HWND window_handle, UINT message, WPARAM w_param, LPARA
             if(window_height == 0) {
                 local_keyboard.mouse_position.y = 0.0f;
             } else {
-                local_keyboard.mouse_position.y = (float)GET_Y_LPARAM(l_param) / window_height;
+                local_keyboard.mouse_position.y = 1.0f - ((float)GET_Y_LPARAM(l_param) / window_height);
             }
 
             break;
