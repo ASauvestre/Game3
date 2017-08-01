@@ -5,5 +5,9 @@ float4 convert_coords(float4 pos) {
     pos.x -= 1.0f;
     pos.y -= 1.0f;
 
+    // Flip the z axis
+    pos.z *= -1.0f;
+    pos.z += 1.0f;
+
     return pos;
 }

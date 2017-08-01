@@ -1,6 +1,8 @@
+#include "data/shaders/common.hlsl"
+
 float4 VS(float4 input_pos : POSITION) : SV_POSITION
 {
-    return input_pos;
+    return convert_coords(input_pos);
 }
 
 float4 PS() : SV_TARGET

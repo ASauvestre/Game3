@@ -143,13 +143,16 @@ void buffer_colored_quad(float x, float y, Alignement alignement, float width, f
 void convert_top_left_coords_to_centered(Vertex * v1, Vertex * v2, Vertex * v3, Vertex * v4);
 
 // Constants
-const float DEBUG_OVERLAY_Z                = 0.0000000f;
-const float DEBUG_OVERLAY_BACKGROUND_Z     = 0.0000001f;
-const float EDITOR_OVERLAY_Z               = 0.0000010f;
-const float EDITOR_LEFT_PANEL_BACKGROUND_Z = 0.0000009f;
-const float EDITOR_LEFT_PANEL_CONTENT_Z    = 0.0000008f;
-const float MIN_ENTITY_Z                   = 0.0000100f;
+const float DEBUG_OVERLAY_Z                = 0.9999999f;
+const float DEBUG_OVERLAY_BACKGROUND_Z     = 0.9999998f;
 
+const float EDITOR_LEFT_PANEL_CONTENT_Z    = 0.9999989f;
+const float EDITOR_LEFT_PANEL_BACKGROUND_Z = 0.9999988f;
+const float EDITOR_OVERLAY_Z               = 0.9999987f;
+
+const float TILES_Z                        = 0.0000001f;
+const float RANGE_ENTITY_Z                 = 0.9999900f;
+const float MIN_ENTITY_Z                   = 0.0000002f;
 const int TARGET_FPS = 60;
 
 const int MAX_NUMBER_ENTITIES = 1;
@@ -923,7 +926,7 @@ void buffer_entity(Entity entity) {
         screen_size.x = tile_size.x * entity.size;
         screen_size.y = tile_size.y * entity.size;
 
-        float z = (1.0f - (entity.position.y + entity.size)/current_room->height) * 0.99f;
+        float z = (1.0f - (entity.position.y + entity.size)/current_room->height) * RANGE_ENTITY_Z + MIN_ENTITY_Z;
 
         Vertex v1 = {screen_pos.x                , screen_pos.y + screen_size.y, z, 0.0f, 0.0f};
         Vertex v2 = {screen_pos.x + screen_size.x, screen_pos.y                , z, 1.0f, 1.0f};
@@ -965,10 +968,10 @@ void buffer_tiles(Room * room) {
         tile_offset.x = tile_size.x * (col - main_camera.offset.x) + 0.5f;
         tile_offset.y = 0.5f - tile_size.y * (row + 1 - main_camera.offset.y); // @Temporary see other one and also figure out why we needed a +1 here. :CoordsConversion
 
-        Vertex v1 = {tile_offset.x              , tile_offset.y + tile_size.y, 0.99f, 0.0f, 0.0f};
-        Vertex v2 = {tile_offset.x + tile_size.x, tile_offset.y              , 0.99f, 1.0f, 1.0f};
-        Vertex v3 = {tile_offset.x              , tile_offset.y              , 0.99f, 0.0f, 1.0f};
-        Vertex v4 = {tile_offset.x + tile_size.x, tile_offset.y + tile_size.y, 0.99f, 1.0f, 0.0f};
+        Vertex v1 = {tile_offset.x              , tile_offset.y + tile_size.y, TILES_Z, 0.0f, 0.0f};
+        Vertex v2 = {tile_offset.x + tile_size.x, tile_offset.y              , TILES_Z, 1.0f, 1.0f};
+        Vertex v3 = {tile_offset.x              , tile_offset.y              , TILES_Z, 0.0f, 1.0f};
+        Vertex v4 = {tile_offset.x + tile_size.x, tile_offset.y + tile_size.y, TILES_Z, 1.0f, 0.0f};
 
         set_texture(tile.texture);
         set_shader(textured_shader);
@@ -1110,8 +1113,6 @@ void buffer_colored_quad(float x, float y, Alignement alignement, float width, f
 
     end_buffer();
 }
-
-float ENTITY_MIMINUM_DEPTH = 0.0000f;
 
 // This was used when we were using an OpenGL like coord system and were converting to the D3D11 screenspace one.
 // Now we're using bottom-left (0,0) and converting to the API system in the shaders.

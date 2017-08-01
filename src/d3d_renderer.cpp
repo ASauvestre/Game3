@@ -309,7 +309,10 @@ static void draw_buffer(GraphicsBuffer * graphics_buffer, int buffer_index, Text
         // Nothing to do
 
     } else {
-        log_print("draw_buffer", "Unsupported shader input mode");
+        // @Temporary, we need to fix dummy shader so that it can accept any input.
+        if(d3d_shader.input_mode != NONE) {
+            log_print("draw_buffer", "Unsupported shader input mode");
+        }
         return;
     }
 
