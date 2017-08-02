@@ -137,6 +137,8 @@ void buffer_editor_tile_overlay(Room * room);
 
 int get_objects_colliding_at(Vector2f position, Object objects[], int max_collisions);
 
+void buffer_textured_quad(float x, float y, Alignement alignement, float width, float height, float depth, char * texture);
+
 void buffer_colored_quad(Vector2f position, Alignement alignement, float width, float height, float depth, Color4f color);
 void buffer_colored_quad(float x, float y, Alignement alignement, float width, float height, float depth, Color4f color);
 
@@ -690,22 +692,9 @@ void buffer_editor_left_panel() {
 
                 float aspect_ratio = window_data.aspect_ratio;
 
-                Vertex v1 = {texture_side_padding                       , y - texture_top_padding                                      , EDITOR_LEFT_PANEL_CONTENT_Z, 0.0f, 0.0f};
-                Vertex v2 = {texture_side_padding + texture_display_size, y - texture_top_padding - texture_display_size * aspect_ratio, EDITOR_LEFT_PANEL_CONTENT_Z, 1.0f, 1.0f};
-                Vertex v3 = {texture_side_padding                       , y - texture_top_padding - texture_display_size * aspect_ratio, EDITOR_LEFT_PANEL_CONTENT_Z, 0.0f, 1.0f};
-                Vertex v4 = {texture_side_padding + texture_display_size, y - texture_top_padding                                      , EDITOR_LEFT_PANEL_CONTENT_Z, 1.0f, 0.0f};
+                char * texture = editor_left_panel_displayed_object.tile->texture;
 
-                set_texture(editor_left_panel_displayed_object.tile->texture);
-                set_shader(textured_shader);
-
-                start_buffer();
-
-                add_to_buffer(v1);
-                add_to_buffer(v2);
-                add_to_buffer(v3);
-                add_to_buffer(v4);
-
-                end_buffer();
+                buffer_textured_quad(texture_side_padding,  1.0f - texture_top_padding, TOP_LEFT, texture_display_size, texture_display_size * aspect_ratio, EDITOR_LEFT_PANEL_CONTENT_Z, texture);
 
                 y -= texture_display_size * aspect_ratio + 2 * texture_top_padding;
             }
@@ -928,22 +917,7 @@ void buffer_entity(Entity entity) {
 
         float z = (1.0f - (entity.position.y + entity.size)/current_room->height) * RANGE_ENTITY_Z + MIN_ENTITY_Z;
 
-        Vertex v1 = {screen_pos.x                , screen_pos.y + screen_size.y, z, 0.0f, 0.0f};
-        Vertex v2 = {screen_pos.x + screen_size.x, screen_pos.y                , z, 1.0f, 1.0f};
-        Vertex v3 = {screen_pos.x                , screen_pos.y                , z, 0.0f, 1.0f};
-        Vertex v4 = {screen_pos.x + screen_size.x, screen_pos.y + screen_size.y, z, 1.0f, 0.0f};
-
-        set_texture(entity.texture);
-        set_shader(textured_shader);
-
-        start_buffer();
-
-        add_to_buffer(v1);
-        add_to_buffer(v2);
-        add_to_buffer(v3);
-        add_to_buffer(v4);
-
-        end_buffer();
+        buffer_textured_quad(screen_pos.x, screen_pos.y, BOTTOM_LEFT, screen_size.x, screen_size.y, z, entity.texture);
 }
 
 void buffer_tiles(Room * room) {
@@ -968,22 +942,7 @@ void buffer_tiles(Room * room) {
         tile_offset.x = tile_size.x * (col - main_camera.offset.x) + 0.5f;
         tile_offset.y = 0.5f - tile_size.y * (row + 1 - main_camera.offset.y); // @Temporary see other one and also figure out why we needed a +1 here. :CoordsConversion
 
-        Vertex v1 = {tile_offset.x              , tile_offset.y + tile_size.y, TILES_Z, 0.0f, 0.0f};
-        Vertex v2 = {tile_offset.x + tile_size.x, tile_offset.y              , TILES_Z, 1.0f, 1.0f};
-        Vertex v3 = {tile_offset.x              , tile_offset.y              , TILES_Z, 0.0f, 1.0f};
-        Vertex v4 = {tile_offset.x + tile_size.x, tile_offset.y + tile_size.y, TILES_Z, 1.0f, 0.0f};
-
-        set_texture(tile.texture);
-        set_shader(textured_shader);
-
-        start_buffer();
-
-        add_to_buffer(v1);
-        add_to_buffer(v2);
-        add_to_buffer(v3);
-        add_to_buffer(v4);
-
-        end_buffer();
+        buffer_textured_quad(tile_offset.x, tile_offset.y, BOTTOM_LEFT, tile_size.x, tile_size.y, TILES_Z, tile.texture);
     }
 }
 
@@ -1004,7 +963,7 @@ float buffer_string(char * text, float x, float y, float z,  Font * font, Aligne
         float zero_y = 0.0f;
 
         stbtt_aligned_quad q;
-        stbtt_GetBakedQuad(font->char_data, font->texture->width, font->texture->height, 'A' - 32, &zero_x, &zero_y, &q, 1);
+        stbtt_GetBakedQuad(font->char_data, font->texture->width, font->texture->height, 'A' - 32, &zero_x, &zero_y, &q, 1); // 'A' is used as a reference character
 
         text_height = (float) ((int)(q.y0 + 0.5f)) / window_data.height;
 
@@ -1013,25 +972,21 @@ float buffer_string(char * text, float x, float y, float z,  Font * font, Aligne
 
     // Compute width
     {
-        char * original_text = text;
-        float original_pixel_x = pixel_x;
-        float original_pixel_y = pixel_y;
+        float zero_x = 0.0f;
+        float zero_y = 0.0f;
 
-        // First pass to determine width and height
-        while (*text) {
-            // Make sure it's an ascii character
-            if (*text >= 32 && *text < 128) {
+        char * cursor = text;
+
+        while (*cursor) {
+            // Make sure it's an ascii character // @Incomplete
+            if (*cursor >= 32 && *cursor < 128) {
                 stbtt_aligned_quad q;
-                stbtt_GetBakedQuad(font->char_data, font->texture->width, font->texture->height, *text - 32, &pixel_x, &pixel_y, &q, 1);
+                stbtt_GetBakedQuad(font->char_data, font->texture->width, font->texture->height, *cursor - ' ', &zero_x, &zero_y, &q, 1);
             }
-            ++text;
+            ++cursor;
         }
 
-        text_width = (float) ((int)(pixel_x - original_pixel_x + 0.5f)) / window_data.width;
-
-        text = original_text;
-        pixel_x = original_pixel_x;
-        pixel_y = original_pixel_y;
+        text_width = (float) ((int)(zero_x + 0.5f)) / window_data.width;
     }
 
     set_texture(font->texture->name);
@@ -1078,6 +1033,40 @@ float buffer_string(char * text, float x, float y, float z,  Font * font, Aligne
     return text_width;
 }
 
+
+// Incomplete, handle uv coordinates
+void buffer_textured_quad(float x, float y, Alignement alignement, float width, float height, float depth, char * texture) {
+    Vertex v1;
+    Vertex v2;
+    Vertex v3;
+    Vertex v4;
+
+    if(alignement == BOTTOM_LEFT) {
+        v1 = {x        , y + height, depth, 0.0f, 0.0f};
+        v2 = {x + width, y         , depth, 1.0f, 1.0f};
+        v3 = {x        , y         , depth, 0.0f, 1.0f};
+        v4 = {x + width, y + height, depth, 1.0f, 0.0f};
+    }
+    else if(alignement == TOP_LEFT) {
+        v1 = {x        , y         , depth, 0.0f, 0.0f};
+        v2 = {x + width, y - height, depth, 1.0f, 1.0f};
+        v3 = {x        , y - height, depth, 0.0f, 1.0f};
+        v4 = {x + width, y         , depth, 1.0f, 0.0f};
+    }
+
+    set_shader(textured_shader);
+    set_texture(texture);
+
+    start_buffer();
+
+    add_to_buffer(v1);
+    add_to_buffer(v2);
+    add_to_buffer(v3);
+    add_to_buffer(v4);
+
+    end_buffer();
+}
+
 void buffer_colored_quad(Vector2f position, Alignement alignement, float width, float height, float depth, Color4f color) {
     buffer_colored_quad(position.x, position.y, alignement, width, height, depth, color);
 }
@@ -1113,32 +1102,6 @@ void buffer_colored_quad(float x, float y, Alignement alignement, float width, f
 
     end_buffer();
 }
-
-// This was used when we were using an OpenGL like coord system and were converting to the D3D11 screenspace one.
-// Now we're using bottom-left (0,0) and converting to the API system in the shaders.
-
-// void convert_top_left_coords_to_centered(Vertex * v1, Vertex * v2, Vertex * v3, Vertex * v4) {
-//
-//     v1->position.x *= 2.0f;
-//     v2->position.x *= 2.0f;
-//     v3->position.x *= 2.0f;
-//     v4->position.x *= 2.0f;
-//
-//     v1->position.y *= -2.0f;
-//     v2->position.y *= -2.0f;
-//     v3->position.y *= -2.0f;
-//     v4->position.y *= -2.0f;
-//
-//     v1->position.x -= 1.0f;
-//     v2->position.x -= 1.0f;
-//     v3->position.x -= 1.0f;
-//     v4->position.x -= 1.0f;
-//
-//     v1->position.y += 1.0f;
-//     v2->position.y += 1.0f;
-//     v3->position.y += 1.0f;
-//     v4->position.y += 1.0f;
-// }
 
 void update_time() {
     double now = os_specific_get_time();
