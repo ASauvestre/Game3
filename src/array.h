@@ -21,25 +21,20 @@ struct Array {
 
     T * data = NULL;
 
-    bool add(T item);
+    bool add             (T item);
+    bool add_at_index    (T item, int index);
+    int  add_if_unique   (T item);
 
-    int add_if_unique(T item);
+    int  remove          (T item);
+    void remove_by_index (int index);
 
-    int remove(T item);
+    int  find            (T item);
 
-    void remove_by_index(int index);
+    void reset           ();
+    void reset           (bool free_memory);
 
-    int find(T item);
-
-    void reset();
-
-    void reset(bool free_memory);
-
-    // T& operator [](int index);
-
-private :
-
-    bool reserve(int size);
+    bool reserve         (int size);
+    bool reserve         (int size, bool zero);
 
 };
 
@@ -47,6 +42,22 @@ private :
 // ---- Implementation ---- //
 // ************************ //
 static const int MIN_SIZE_ARRAY = 8;
+
+template <typename T>
+bool Array<T>::add_at_index(T item, int index) {
+    if (index >= this->allocated) {
+        return false;
+    }
+
+    // We're copying the item, maybe simply assigning it is preferable. We'll see.
+    memcpy(&this->data[index], &item, sizeof(T)); // @Warning potential overwrite.
+    // this->data[this->count] = item;
+
+    this->count += 1;
+
+    return true;
+
+}
 
 template <typename T>
 bool Array<T>::add(T item){
@@ -139,13 +150,13 @@ void Array<T>::reset(bool free_memory) {
 
 }
 
-// This seems convenient, but I don't like it all that much, I'll de-comment it if typing .data get tedious.
-// T& Array<T>::operator [](int index) {
-//     return this->data[index];
-// }
-
 template <typename T>
 bool Array<T>::reserve(int to_reserve) {
+    return this->reserve(to_reserve, false);
+}
+
+template <typename T>
+bool Array<T>::reserve(int to_reserve, bool zero) {
     // Trying to allocate a size smaller than we currently have, so don't do anything.
     // Maybe we should allow this as long as size is greater than count. Let's return
     // true, since even if we did not allocate, everything is fine.
@@ -157,6 +168,10 @@ bool Array<T>::reserve(int to_reserve) {
     assert(new_block);
 
     if (!new_block) return false; // We failed to allocate memory, let's let our caller know and deal with it.
+
+    if(zero) {
+        memset((char *)new_block + this->allocated, 0, to_reserve - this->allocated);
+    }
 
     this->data = (T *) new_block;
     this->allocated = to_reserve;

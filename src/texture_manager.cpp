@@ -10,7 +10,7 @@ Texture * TextureManager::create_texture(char * name, unsigned char * data, int 
 }
 
 Texture * TextureManager::create_texture(char * name, unsigned char * data, int width, int height, int bytes_per_pixel) {
-    Texture * texture = (Texture * ) this->allocate(sizeof(Texture));
+    Texture * texture = (Texture * ) malloc(sizeof(Texture));
 
     texture->name            = name;
     texture->bitmap          = data;
@@ -25,7 +25,7 @@ Texture * TextureManager::create_texture(char * name, unsigned char * data, int 
     texture->modified        = false;
     texture->platform_info   = NULL;
 
-    this->register_asset(texture);
+    this->table.add(name, texture);
 
     return texture;
 }
@@ -62,13 +62,13 @@ void TextureManager::do_load_texture(Texture * texture) {
 }
 
 void TextureManager::load_texture(char * name) {
-    Texture * texture = (Texture * ) this->allocate(sizeof(Texture));
+    Texture * texture = (Texture * ) malloc(sizeof(Texture));
 
     texture->name = name;
 
     do_load_texture(texture);
 
-    this->register_asset(texture);
+    this->table.add(name, texture);
 }
 
 void TextureManager::reload_asset(char * file_path, char * file_name, char * extension) {

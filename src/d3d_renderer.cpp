@@ -17,7 +17,7 @@ struct PlatformTextureInfo {
 #include "d3d_renderer.h"
 
 struct ShaderInputFormat {
-    ID3D11InputLayout *layout;
+    ID3D11InputLayout * layout;
     D3D11_INPUT_ELEMENT_DESC * layout_desc;
     int num_inputs;
 };
@@ -274,11 +274,13 @@ static void draw_buffer(GraphicsBuffer * graphics_buffer, int buffer_index, Text
     memcpy(resource.pData, ib->indices.data, sizeof( int ) *  ib->indices.count);
     d3d_dc->Unmap(d3d_index_buffer_interface, 0);
 
+
+
     if(d3d_shader.input_mode == POS_TEXCOORD) {
 
         char * texture_name = graphics_buffer->batches.data[buffer_index].info.texture;
 
-        Texture * texture = (Texture *) texture_manager->find_asset_by_name(texture_name);
+        Texture * texture = (Texture *) texture_manager->table.find(texture_name);
 
         if(texture == NULL) {
             log_print("draw_buffer", "Texture %s was not found in the catalog", texture_name);
@@ -316,7 +318,7 @@ static void draw_buffer(GraphicsBuffer * graphics_buffer, int buffer_index, Text
         return;
     }
 
-    d3d_dc->DrawIndexed(graphics_buffer->batches.data[buffer_index].ib.indices.count, 0, 0);
+    d3d_dc->DrawIndexed(ib->indices.count, 0, 0);
 }
 
 static void bind_srv_to_texture(Texture * texture) {

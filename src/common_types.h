@@ -136,6 +136,7 @@ struct IndexBuffer {
     Array<int> indices;
 };
 
+// @Cleanup
 struct VertexTextureInfo {
     Vector2f tex_coord;
 };
@@ -159,7 +160,7 @@ struct Vertex {
 
     union {
         Color4f color;
-        VertexTextureInfo tex_info;
+        VertexTextureInfo tex_info; // @Cleanup
     };
 };
 

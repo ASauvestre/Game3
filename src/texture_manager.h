@@ -1,5 +1,3 @@
-#pragma once
-
 #include "asset_manager.h"
 
 struct PlatformTextureInfo;

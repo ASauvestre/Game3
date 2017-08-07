@@ -4,6 +4,8 @@
 
 #include "game_main.h"
 #include "macros.h"
+#include "renderer.h"
+
 #include "texture_manager.h"
 
 #include "os/layer.h"

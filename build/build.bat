@@ -15,6 +15,7 @@ FOR %%A IN (%*) DO (
 	cl /nologo /LD /D %platform% /Zi /EHsc /Fe:d3d_renderer ^
 	..\src\d3d_renderer.cpp ^
 	..\src\asset_manager.cpp ^
+	..\src\hash.cpp ^
 	/link D3Dcompiler.lib d3d11.lib
 	echo --------------------- DLLs Compiled ----------------------
 	echo __________________________________________________________
@@ -29,6 +30,7 @@ cl /Zi /EHsc /D %platform% /I ..\src /Fe:win32_game ^
 ..\src\renderer.cpp ^
 ..\src\asset_manager.cpp ^
 ..\src\texture_manager.cpp ^
+..\src\hash.cpp ^
 ..\src\os\win32\core.cpp ^
 ..\src\os\win32\hotloader.cpp ^
 /link /nologo user32.lib Gdi32.lib d3d11.lib D3DCompiler.lib Winmm.lib

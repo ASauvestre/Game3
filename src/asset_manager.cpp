@@ -2,46 +2,10 @@
 #include "parsing.h"
 #include "macros.h"
 
-// Default allocator
-void * AssetManager::allocate(int size) {
-    return malloc(size);
-}
-
-int AssetManager::register_asset(Asset * asset) {
-    if(num_assets == MAX_NUM_ASSETS) {
-        log_print("asset_manager", "No slots left in the catalog");
-        return -1;
-    }
-
-    // Check if it already exists, if it doesn't, add it to the table.
-    int index = find_asset_index(asset->name);
-
-    if(index == -1) {
-        index = num_assets;
-
-        map.add(asset->name, index);
-
-         num_assets++;
-    }
-
-    assets[index] = asset; // @Leak if asset was heap allocated, which is the case for Textures
-
-    return index; // Return index of added asset
-}
-
-int AssetManager::find_asset_index(char * name) {
-    return map.get(name);
-}
-
-Asset * AssetManager::find_asset_by_name(char * name) {
-    int index = find_asset_index(name);
-
-    if(index == -1) {
-        return NULL;
-    }
-
-    return assets[index];
-}
+// @Cleanup think of something else to do here or remove it.
+// bool AssetManager::register_asset(Asset * asset) {
+//     return this->table.add(asset->name, asset);
+// }
 
 void AssetManager::reload_asset(char * file_path, char * file_name, char * extension) {
     log_print("reload_asset", "Asset %s is up for reloading, but the manager has no reload_asset funtion", file_name);
