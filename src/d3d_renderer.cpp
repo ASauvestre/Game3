@@ -286,7 +286,7 @@ static void draw_buffer(GraphicsBuffer * graphics_buffer, int buffer_index, Text
 
         // This texture was modified, so let's reset its SRV. @Incomplete @Speed, we can probably
         // just remap the data if the size and bit depth stay the same.
-        if(texture->modified) {
+        if(texture->dirty) {
             texture->platform_info->srv->Release(); // Release the D3D interface
             free(texture->platform_info);
         }

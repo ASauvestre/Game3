@@ -1,8 +1,5 @@
 #include <assert.h>
 
-#define STB_TRUETYPE_IMPLEMENTATION
-#include "stb_truetype.h"
-
 #include "game_main.h"
 
 #include "os/layer.h"
@@ -12,15 +9,10 @@
 
 #include "renderer.h"
 #include "texture_manager.h"
+#include "font_manager.h"
 
 // Structs
 //struct Shader; // API specific definition
-
-struct Font : Asset {
-    Texture * texture;
-    stbtt_bakedchar char_data[96]; // 96 ASCII characters @Temporary
-};
-
 
 struct WindowData {
     int width;
@@ -53,8 +45,6 @@ enum Alignement {
     BOTTOM_RIGHT,
     BOTTOM_LEFT
 };
-
-struct Font;
 
 struct Entity {
     Entity() {}
@@ -141,13 +131,9 @@ void init_fonts();
 
 void game();
 
-int get_file_size(FILE * file);
-
 void handle_user_input();
 
 void buffer_editor_overlay();
-
-Font * load_font(char * name);
 
 float buffer_string(char * text, float x, float y, float z,  Font * font, Alignement alignement);
 float buffer_string(char * text, float x, float y, float z,  Font * font);
@@ -193,8 +179,6 @@ extern Shader ** font_shader;
 extern Shader ** textured_shader;
 extern Shader ** colored_shader;
 
-extern Font * my_font;
-
 // Globals
 static WindowData window_data;
 
@@ -220,6 +204,9 @@ static bool editor_click_menu_was_open = false;
 static Vector2f editor_click_menu_position;
 
 static TextureManager texture_manager;
+static FontManager font_manager;
+
+static Font * my_font;
 
 // @Temporary? Just have the hotloader send notifications for every
 // files on startup (or provide a list when a catalog requests it).
@@ -236,59 +223,10 @@ static void init_textures() {
 
 // @Temporary See comment for init_textures() above.
 static void init_fonts() {
-    my_font = load_font("Inconsolata.ttf");
+    font_manager.load_font("Inconsolata.ttf");
 }
 
-Font * load_font(char * name) {
-    Font * font = (Font *) malloc(sizeof(Font));
 
-    font->name = name;
-
-    char path[512];
-    snprintf(path, 512, "data/fonts/%s", font->name);
-
-    FILE * font_file = fopen(path, "rb");
-
-    if(font_file == NULL) {
-        log_print("load_font", "Font %s not found at %s", name, path)
-        free(font);
-
-        return NULL;
-    }
-
-    int font_file_size = get_file_size(font_file);
-
-    unsigned char * font_file_buffer = (unsigned char *) malloc(font_file_size);
-    scope_exit(free(font_file_buffer));
-
-    // log_print("font_loading", "Font file for %s is %d bytes long", my_font->name, font_file_size);
-
-    fread(font_file_buffer, 1, font_file_size, font_file);
-
-    // We no longer need the file
-    fclose(font_file);
-
-    unsigned char * bitmap = (unsigned char *) malloc(256 * 256 * 4); // Our bitmap is 512x512 pixels and each pixel takes 4 bytes @Robustness, make sure the bitmap is big enough for the font
-
-    int result = stbtt_BakeFontBitmap(font_file_buffer, 0, 16.0, bitmap, 512, 512, 32, 96, font->char_data); // From stb_truetype.h : "no guarantee this fits!""
-
-    if(result <= 0) {
-        log_print("load_font", "The font %s could not be loaded, it is too large to fit in a 512x512 bitmap", name);
-    }
-
-    font->texture = texture_manager.create_texture(font->name, bitmap, 512, 512, 1);
-
-    log_print("load_font", "Loaded font %s", font->name);
-
-    return font;
-}
-
-static int get_file_size(FILE * file) {
-    fseek (file , 0 , SEEK_END);
-    int size = ftell (file);
-    fseek (file , 0 , SEEK_SET);
-    return size;
-}
 
 int find_tile_index_from_coords(int x, int y, Room * room) {
     return (x + 1) * room->width + y - 1;
@@ -1172,6 +1110,12 @@ void main() {
         window_data.handle = os_specific_create_window(window_data.width, window_data.height, window_name);
     }
 
+    texture_manager.init();
+    font_manager.init(&texture_manager);
+
+    register_manager(&texture_manager);
+    register_manager(&font_manager);
+
     // @Temporary
     init_textures();
 
@@ -1184,9 +1128,8 @@ void main() {
 
     init_hotloader();
 
-    texture_manager.init();
-    register_manager(&texture_manager);
 
+    my_font = font_manager.table.find("Inconsolata.ttf");
 
     log_print("perf_counter", "Startup time : %.3f seconds", os_specific_get_time());
 

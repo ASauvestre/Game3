@@ -1,5 +1,7 @@
 #pragma once
 
+#include <assert.h>
+
 #define JOIN2(a,b) a##_##b
 #define JOIN(a,b) JOIN2(a,b)
 

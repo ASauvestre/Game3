@@ -26,8 +26,8 @@ Texture * TextureManager::create_texture(char * name, unsigned char * data, int 
 
     // These should be default values, but since we're allocating textures on
     // the heap by default, those aren't set, so we do it here.
-    texture->modified        = false;
-    texture->platform_info   = NULL;
+    texture->dirty         = false;
+    texture->platform_info = NULL;
 
     this->table.add(name, texture);
 
@@ -61,7 +61,7 @@ void TextureManager::do_load_texture(Texture * texture) {
     texture->bytes_per_pixel = bytes_per_pixel;
     texture->width_in_bytes  = width * bytes_per_pixel;
     texture->num_bytes       = width * height * bytes_per_pixel;
-    texture->modified        = false;
+    texture->dirty           = false;
     texture->platform_info   = NULL;
 }
 
