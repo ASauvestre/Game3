@@ -4,10 +4,9 @@
 
 #include "os/win32/core.h"
 
-#include "macros.h"
+#include "os/common.h"
 
-#define COMMON_TYPES_IMPLEMENTATION
-#include "common_types.h" // For Keyboard
+#include "macros.h"
 
 // From "windowsx.h"
 // Gets Low short and high short from LPARAM

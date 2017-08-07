@@ -8,6 +8,8 @@
 
 #include "os/layer.h"
 
+struct Font;
+
 // DLL functions
 typedef void (*INIT_PLATFORM_RENDERER_FUNC)(Vector2f, void*);
 typedef void (*INIT_PLATFORM_SHADERS_FUNC)();

@@ -1,4 +1,5 @@
 struct AssetChange;
+struct AssetManager;
 
 void release(AssetChange * ac);
 

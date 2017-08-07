@@ -1,3 +1,5 @@
+#include "os/common.h"
+
 #ifdef WINDOWS
 #define PLATFORM win32
 #include "os/win32/core.h"

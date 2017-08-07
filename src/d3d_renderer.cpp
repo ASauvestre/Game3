@@ -11,9 +11,6 @@ struct PlatformTextureInfo {
 
 #include "graphics_buffer.h"
 
-#define COMMON_TYPES_IMPLEMENTATION
-#include "common_types.h"
-
 #include "d3d_renderer.h"
 
 struct ShaderInputFormat {

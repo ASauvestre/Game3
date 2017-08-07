@@ -1,10 +1,8 @@
 enum BufferMode;
 
-struct Shader;
-struct Vertex;
-struct Texture;
-struct Font;
 struct TextureManager;
+struct Vertex;
+struct Shader;
 
 // Init
 void init_renderer(int width, int height, void * handle); // handle is an HWND used for d3d

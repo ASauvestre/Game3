@@ -5,6 +5,10 @@
 #include "texture_manager.h"
 #include "macros.h"
 
+void TextureManager::init() {
+    this->directories.add("textures/");
+}
+
 Texture * TextureManager::create_texture(char * name, unsigned char * data, int width, int height) {
     return create_texture(name, data, width, height, 4); // Default is 32-bit bitmap.
 }

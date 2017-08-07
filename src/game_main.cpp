@@ -1,16 +1,39 @@
 #include <assert.h>
 
 #define STB_TRUETYPE_IMPLEMENTATION
+#include "stb_truetype.h"
 
 #include "game_main.h"
-#include "macros.h"
-#include "renderer.h"
-
-#include "texture_manager.h"
 
 #include "os/layer.h"
+#include "os/win32/hotloader.h" // @Temporary, I'd like to move the hotloader out of win32.
 
-#include "os/win32/hotloader.h" // @Temporary
+#include "macros.h"
+
+#include "renderer.h"
+#include "texture_manager.h"
+
+// Structs
+//struct Shader; // API specific definition
+
+struct Font : Asset {
+    Texture * texture;
+    stbtt_bakedchar char_data[96]; // 96 ASCII characters @Temporary
+};
+
+
+struct WindowData {
+    int width;
+    int height;
+    float aspect_ratio;
+    Color4f background_color;
+
+    double current_time = 0.0f;
+    float current_dt = 0.0f;
+    bool locked_fps = false;
+
+    void * handle;
+};
 
 enum GameMode {
     TITLE_SCREEN,
@@ -110,11 +133,15 @@ struct Camera {
 };
 
 // Prototypes
-int get_file_size(FILE * file);
+void init_game();
 
 void init_textures();
 
 void init_fonts();
+
+void game();
+
+int get_file_size(FILE * file);
 
 void handle_user_input();
 
@@ -206,6 +233,7 @@ static void init_textures() {
     texture_manager.load_texture("megaperson.png");
     texture_manager.load_texture("tree.png");
 }
+
 // @Temporary See comment for init_textures() above.
 static void init_fonts() {
     my_font = load_font("Inconsolata.ttf");
@@ -1156,11 +1184,9 @@ void main() {
 
     init_hotloader();
 
-    // Init texture manager
-    {
-        texture_manager.directories.add("textures/");
-        register_manager(&texture_manager);
-    }
+    texture_manager.init();
+    register_manager(&texture_manager);
+
 
     log_print("perf_counter", "Startup time : %.3f seconds", os_specific_get_time());
 
