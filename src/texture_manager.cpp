@@ -72,8 +72,9 @@ void TextureManager::load_texture(char * name) {
 }
 
 void TextureManager::reload_asset(char * file_path, char * file_name, char * extension) {
-    log_print("reload_asset", "Asset change on file %s caught by the texture manager", file_name);
-    // @Incomplete, check extension
-    load_texture(file_name);
+    if(strcmp(".png", extension) == 0) {
+        log_print("reload_asset", "Asset change on file %s caught by the texture manager", file_name);
+        load_texture(file_name);
+    }
 
 }

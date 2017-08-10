@@ -33,17 +33,13 @@ void AssetManager::perform_reloads() {
             continue;
         }
 
-        // Do reloads based on extension @Temporary, allow managers to filter by extensions
-        if(strcmp("png", extension) == 0) {
+        // @Incomplete, allow filtering by extension
+        // @Incomplete, we're getting two of those when PS saves, make sure we update only once.
+        // @Incomplete @Temporary, the extension check shouldn't happen here.
+        reload_asset(file_path, file_name, extension);
 
-            // @Incomplete, we're getting two of those when PS saves, make sure we update only once.
-            // @Incomplete @Temporary, the extension check shouldn't happen here.
-            reload_asset(file_path, file_name, extension);
-
-            // log_print("perform_manager_reloads", "Texture with file_name %s and extension %s up for reload. Full path is : %s", file_name, extension, file_path);
-
-        }
-    }
+        // log_print("perform_manager_reloads", "Texture with file_name %s and extension %s up for reload. Full path is : %s", file_name, extension, file_path);
+}
 
     am->assets_to_reload.reset(true);
 }

@@ -2,6 +2,7 @@
 
 #include "renderer.h"
 #include "texture_manager.h"
+#include "shader_manager.h"
 #include "graphics_buffer.h"
 
 #include "macros.h"
@@ -11,21 +12,13 @@
 struct Font;
 
 // DLL functions
-typedef void (*INIT_PLATFORM_RENDERER_FUNC)(Vector2f, void*);
-typedef void (*INIT_PLATFORM_SHADERS_FUNC)();
-typedef void (*DRAW_FRAME_FUNC)(GraphicsBuffer*, int, TextureManager*);
+typedef void (*INIT_PLATFORM_RENDERER_FUNC) (Vector2f, void*);
+typedef void (*DRAW_FRAME_FUNC)             (GraphicsBuffer*, int, TextureManager*);
+typedef bool (*COMPILE_SHADER_FUNC)         (Shader*);
 
 INIT_PLATFORM_RENDERER_FUNC init_platform_renderer;
-INIT_PLATFORM_SHADERS_FUNC init_platform_shaders;
 DRAW_FRAME_FUNC draw_frame;
-
-// DLL variables
-Shader ** font_shader;
-Shader ** colored_shader;
-Shader ** textured_shader;
-
-// Extern globals
-Font * my_font;
+COMPILE_SHADER_FUNC compile_shader;
 
 // Globals
 static BufferMode current_buffer_mode = QUADS;
@@ -48,12 +41,8 @@ static void load_graphics_dll() {
     void * graphics_library_dll = os_specific_load_dll("d3d_renderer.dll"); //@Robustness Handle failed loading (maybe try another dll or at least die gracefully)
 
     init_platform_renderer = (INIT_PLATFORM_RENDERER_FUNC) os_specific_get_address_from_dll(graphics_library_dll, "init_platform_renderer");
-    init_platform_shaders =  (INIT_PLATFORM_SHADERS_FUNC)  os_specific_get_address_from_dll(graphics_library_dll, "init_platform_shaders");
-    draw_frame =             (DRAW_FRAME_FUNC)             os_specific_get_address_from_dll(graphics_library_dll, "draw_frame");
-
-    font_shader =     (Shader **) os_specific_get_address_from_dll(graphics_library_dll, "font_shader");
-    colored_shader =  (Shader **) os_specific_get_address_from_dll(graphics_library_dll, "colored_shader");
-    textured_shader = (Shader **) os_specific_get_address_from_dll(graphics_library_dll, "textured_shader");
+    draw_frame             = (DRAW_FRAME_FUNC)             os_specific_get_address_from_dll(graphics_library_dll, "draw_frame");
+	compile_shader         = (COMPILE_SHADER_FUNC)         os_specific_get_address_from_dll(graphics_library_dll, "compile_shader");
 }
 
 void init_renderer(int width, int height, void * handle) {
@@ -64,7 +53,6 @@ void init_renderer(int width, int height, void * handle) {
 
 	// From platform renderer
     init_platform_renderer(rendering_resolution, handle);
-    init_platform_shaders();
 }
 
 void draw(TextureManager * tm) {
@@ -76,7 +64,7 @@ void draw(TextureManager * tm) {
 	draw_frame(&graphics_buffer, num_buffers, tm);
 }
 
-void set_shader(Shader ** shader) {
+void set_shader(Shader * shader) {
     current_batch_info.shader = shader;
 }
 
@@ -103,13 +91,14 @@ void find_or_create_compatible_batch() {
 
     if(current_batch) {
         if(previous_batch_info.shader == current_batch_info.shader) {
-            if(current_batch_info.shader == colored_shader) {
+            Shader * current_shader = current_batch_info.shader;
+            if(current_shader->input_mode == POS_COL) {
 
                 first_vertex_index_in_buffer = current_batch->vb.vertices.count;
                 return;
             }
 
-            if((current_batch_info.shader == font_shader) || (current_batch_info.shader == textured_shader)) {
+            if(current_shader->input_mode == POS_UV) {
                 if (strcmp(current_batch_info.texture, previous_batch_info.texture) == 0) {
 
                     first_vertex_index_in_buffer = current_batch->vb.vertices.count;
@@ -192,4 +181,9 @@ void clear_buffers() {
 	previous_batch_info.texture = NULL;
 
     num_buffers = 0;
+}
+
+// Meh
+void do_load_shader(Shader * shader) {
+    compile_shader(shader);
 }

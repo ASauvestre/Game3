@@ -10,6 +10,7 @@
 #include "renderer.h"
 #include "texture_manager.h"
 #include "font_manager.h"
+#include "shader_manager.h"
 
 // Structs
 //struct Shader; // API specific definition
@@ -125,6 +126,8 @@ struct Camera {
 // Prototypes
 void init_game();
 
+void init_shaders();
+
 void init_textures();
 
 void init_fonts();
@@ -173,12 +176,11 @@ const int TARGET_FPS = 60;
 
 const int MAX_NUMBER_ENTITIES = 1;
 
-// Extern Globals
-extern Shader ** font_shader;
-extern Shader ** textured_shader;
-extern Shader ** colored_shader;
-
 // Globals
+static Shader * font_shader;
+static Shader * textured_shader;
+static Shader * colored_shader;
+
 static WindowData window_data;
 
 static Keyboard keyboard;
@@ -204,6 +206,7 @@ static Vector2f editor_click_menu_position;
 
 static TextureManager texture_manager;
 static FontManager font_manager;
+static ShaderManager shader_manager;
 
 static Font * my_font;
 
@@ -225,7 +228,11 @@ static void init_fonts() {
     font_manager.load_font("Inconsolata.ttf");
 }
 
-
+static void init_shaders() {
+    font_shader = shader_manager.load_shader("font_shader.hlsl");
+    textured_shader = shader_manager.load_shader("textured_shader.hlsl");
+    colored_shader = shader_manager.load_shader("colored_shader.hlsl");
+}
 
 int find_tile_index_from_coords(int x, int y, Room * room) {
     return (x + 1) * room->width + y - 1;
@@ -1106,10 +1113,12 @@ void main() {
     }
 
     texture_manager.init();
+    shader_manager.init();
     font_manager.init(&texture_manager);
 
     register_manager(&texture_manager);
     register_manager(&font_manager);
+    register_manager(&shader_manager);
 
     // @Temporary
     init_textures();
@@ -1118,6 +1127,9 @@ void main() {
     init_fonts();
 
     init_renderer(window_data.width, window_data.height, window_data.handle);
+
+    //@Temporary ?
+    init_shaders(); // Needs to happen after init_renderer because we need the graphics dll to compile the shaders
 
     init_game();
 
@@ -1144,5 +1156,7 @@ void main() {
 
         check_hotloader_modifications();
         texture_manager.perform_reloads();
+        // font_manager.perform_reloads(); // @Incomplete: make sure this works
+        shader_manager.perform_reloads();
     }
 }

@@ -3,21 +3,20 @@
 #include <d3d11.h>
 #include <assert.h>
 
+#include "d3d_renderer.h"
+
+#include "texture_manager.h"
+#include "shader_manager.h"
+#include "graphics_buffer.h"
+
 struct PlatformTextureInfo {
     ID3D11ShaderResourceView * srv;
 };
 
 struct InputLayoutDesc {
-	D3D11_INPUT_ELEMENT_DESC * desc;
-	int num_inputs;
+    D3D11_INPUT_ELEMENT_DESC * desc;
+    int num_inputs;
 };
-
-#include "texture_manager.h"
-
-#include "graphics_buffer.h"
-
-#include "d3d_renderer.h"
-
 
 ///////////////////////////////////////////////
 InputLayoutDesc pos_layout_desc;
@@ -32,7 +31,6 @@ static void bind_srv_to_texture(Texture * texture);
 
 static bool create_shader(char * filename, ShaderInputMode input_mode, Shader * shader);
 
-static bool compile_shader(Shader * shader);
 static void check_specific_shader_file_modification(Shader * shader);
 
 static void draw_buffer(GraphicsBuffer * graphics_buffer, int buffer_index, TextureManager * texture_manager);
@@ -69,7 +67,6 @@ static Shader d3d_shader;
 static char * last_texture_set;
 
 void init_platform_renderer(Vector2f rendering_resolution, void * handle) {
-
     DXGI_MODE_DESC  buffer_desc = {};
                     buffer_desc.Width                   = rendering_resolution.width;
                     buffer_desc.Height                  = rendering_resolution.height;
@@ -219,10 +216,6 @@ void init_platform_renderer(Vector2f rendering_resolution, void * handle) {
 }
 
 void draw_frame(GraphicsBuffer * graphics_buffer, int num_buffers, TextureManager * texture_manager) {
-
-    // Check if shaders have changed @Temporary move to hotloader
-    check_shader_files_modification();
-
     // Clear view
     float color_array[4] = {0.29f, 0.84f, 0.93f, 1.0f}; // Sky blue @Temporary, move the sky background buffering to game_main.
 
@@ -241,17 +234,17 @@ void draw_frame(GraphicsBuffer * graphics_buffer, int num_buffers, TextureManage
 // @Rewrite This is really ugly, rewrite and refactor things
 static void draw_buffer(GraphicsBuffer * graphics_buffer, int buffer_index, TextureManager * texture_manager) {
 
-    Shader * shader = *graphics_buffer->batches.data[buffer_index].info.shader;
-
-    if(shader != last_shader_set) {
-        switch_to_shader(shader);
-        last_shader_set = shader;
-    }
-
     DrawBatch * batch = &graphics_buffer->batches.data[buffer_index];
 
     VertexBuffer * vb = &batch->vb;
     IndexBuffer * ib = &batch->ib;
+
+	Shader * shader = batch->info.shader;
+
+	if (shader != last_shader_set) {
+		switch_to_shader(shader);
+		last_shader_set = shader;
+	}
 
     // Update vertex buffer
     D3D11_MAPPED_SUBRESOURCE resource = {};
@@ -353,15 +346,15 @@ static void bind_srv_to_texture(Texture * texture) {
 }
 
 // Shaders
-void init_platform_shaders() {
-    font_shader     = (Shader *) malloc(sizeof(Shader));
-    textured_shader = (Shader *) malloc(sizeof(Shader));
-    colored_shader  = (Shader *) malloc(sizeof(Shader));
+// void init_platform_shaders() {
+//     font_shader     = (Shader *) malloc(sizeof(Shader));
+//     textured_shader = (Shader *) malloc(sizeof(Shader));
+//     colored_shader  = (Shader *) malloc(sizeof(Shader));
 
-    create_shader("font_shader.hlsl",     POS_UV,  font_shader);
-    create_shader("textured_shader.hlsl", POS_UV,  textured_shader);
-    create_shader("colored_shader.hlsl",  POS_COL, colored_shader);
-}
+//     create_shader("font_shader.hlsl",     POS_UV,  font_shader);
+//     create_shader("textured_shader.hlsl", POS_UV,  textured_shader);
+//     create_shader("colored_shader.hlsl",  POS_COL, colored_shader);
+// }
 
 static void check_shader_files_modification() {
     // check_specific_shader_file_modification(dummy_shader);
@@ -370,7 +363,7 @@ static void check_shader_files_modification() {
     // check_specific_shader_file_modification(font_shader);
 }
 
-static bool compile_shader(Shader * shader) {
+bool compile_shader(Shader * shader) {
     shader->VS = NULL;
     shader->PS = NULL;
 
@@ -429,12 +422,14 @@ static bool compile_shader(Shader * shader) {
         return false;
     }
 
-    d3d_device->CreateVertexShader(VS_bytecode->GetBufferPointer(), VS_bytecode->GetBufferSize(),
-                                   NULL, (ID3D11VertexShader **) &shader->VS);
-    d3d_device->CreatePixelShader( PS_bytecode->GetBufferPointer(), PS_bytecode->GetBufferSize(),
-                                   NULL, (ID3D11PixelShader **)  &shader->PS);
+    // @Temporary, @Hack, @ThisIsTerrible
 
-	InputLayoutDesc * layout;
+    if(strcmp(shader->filename, "dummy_shader.hlsl")    == 0) { shader->input_mode = POS; }
+    if(strcmp(shader->filename, "textured_shader.hlsl") == 0) { shader->input_mode = POS_UV; }
+    if(strcmp(shader->filename, "font_shader.hlsl")     == 0) { shader->input_mode = POS_UV; }
+    if(strcmp(shader->filename, "colored_shader.hlsl")  == 0) { shader->input_mode = POS_COL; }
+
+	InputLayoutDesc * layout = NULL;
 
 	switch (shader->input_mode) {
 		case POS: {
@@ -449,8 +444,18 @@ static bool compile_shader(Shader * shader) {
 		}
 	}
 
-    d3d_device->CreateInputLayout(layout->desc, layout->num_inputs, VS_bytecode->GetBufferPointer(),
-                                   VS_bytecode->GetBufferSize(), (ID3D11InputLayout **) &shader->input_layout);
+	if (layout) {
+		d3d_device->CreateInputLayout(layout->desc, layout->num_inputs, VS_bytecode->GetBufferPointer(),
+			VS_bytecode->GetBufferSize(), (ID3D11InputLayout **)&shader->input_layout);
+
+		d3d_device->CreateVertexShader(VS_bytecode->GetBufferPointer(), VS_bytecode->GetBufferSize(),
+			NULL, (ID3D11VertexShader **)&shader->VS);
+
+		d3d_device->CreatePixelShader(PS_bytecode->GetBufferPointer(), PS_bytecode->GetBufferSize(),
+			NULL, (ID3D11PixelShader **)&shader->PS);
+	} else {
+		log_print("compile_shader", "Could not compile shader %s, the input mode was unknown (value was %d)", shader->filename, shader->input_mode);
+	}
 
     VS_bytecode->Release();
     PS_bytecode->Release();
@@ -458,11 +463,11 @@ static bool compile_shader(Shader * shader) {
     return true;
 }
 
-static void recompile_shaders() {
-    compile_shader(font_shader);
-    compile_shader(textured_shader);
-    compile_shader(colored_shader);
-}
+// static void recompile_shaders() {
+//     compile_shader(font_shader);
+//     compile_shader(textured_shader);
+//     compile_shader(colored_shader);
+// }
 
 static bool create_shader(char * filename, ShaderInputMode input_mode, Shader * shader){
     shader->filename = filename;

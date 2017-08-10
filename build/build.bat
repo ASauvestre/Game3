@@ -30,6 +30,7 @@ cl /Zi /EHsc /D %platform% /I ..\src /Fe:win32_game ^
 ..\src\renderer.cpp ^
 ..\src\asset_manager.cpp ^
 ..\src\texture_manager.cpp ^
+..\src\shader_manager.cpp ^
 ..\src\font_manager.cpp ^
 ..\src\hash.cpp ^
 ..\src\os\win32\core.cpp ^
