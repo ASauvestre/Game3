@@ -135,8 +135,7 @@ void handle_user_input();
 
 void buffer_editor_overlay();
 
-float buffer_string(char * text, float x, float y, float z,  Font * font, Alignement alignement);
-float buffer_string(char * text, float x, float y, float z,  Font * font);
+float buffer_string(char * text, float x, float y, float z,  Font * font, Alignement alignement = BOTTOM_LEFT);
 
 void buffer_player();
 
@@ -914,11 +913,7 @@ void buffer_tiles(Room * room) {
     }
 }
 
-float buffer_string(char * text, float x, float y, float z,  Font * font) {
-    return buffer_string(text, x, y, z, font, BOTTOM_LEFT);
-}
-
-float buffer_string(char * text, float x, float y, float z,  Font * font, Alignement alignement) {
+float buffer_string(char * text, float x, float y, float z,  Font * font, Alignement alignement) { // Default : alignement = BOTTOM_LEFT
     float pixel_x = x * window_data.width;
     float pixel_y = y * window_data.height;
 

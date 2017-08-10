@@ -32,12 +32,9 @@ struct Array {
 
     int  find            (T item);
 
-    void reset           ();
-    void reset           (bool free_memory);
+    void reset           (bool free_memory = false);
 
-    bool reserve         (int size);
-    bool reserve         (int size, bool zero);
-
+    bool reserve         (int size, bool zero = false);
 };
 
 // ************************ //
@@ -135,13 +132,8 @@ int Array<T>::find(T item) {
     return -1;
 }
 
-// We could make this one call the other reset with false, but this seems nicer
 template <typename T>
-void Array<T>::reset() {
-    this->count = 0;
-}
-template <typename T>
-void Array<T>::reset(bool free_memory) {
+void Array<T>::reset(bool free_memory) { // Default : free_memory = false
     this->count = 0;
 
     if(free_memory) {
@@ -153,12 +145,7 @@ void Array<T>::reset(bool free_memory) {
 }
 
 template <typename T>
-bool Array<T>::reserve(int to_reserve) {
-    return this->reserve(to_reserve, false);
-}
-
-template <typename T>
-bool Array<T>::reserve(int to_reserve, bool zero) {
+bool Array<T>::reserve(int to_reserve, bool zero) { // Default : zero = false
     // Trying to allocate a size smaller than we currently have, so don't do anything.
     // Maybe we should allow this as long as size is greater than count. Let's return
     // true, since even if we did not allocate, everything is fine.

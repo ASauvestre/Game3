@@ -9,11 +9,7 @@ void TextureManager::init() {
     this->directories.add("textures/");
 }
 
-Texture * TextureManager::create_texture(char * name, unsigned char * data, int width, int height) {
-    return create_texture(name, data, width, height, 4); // Default is 32-bit bitmap.
-}
-
-Texture * TextureManager::create_texture(char * name, unsigned char * data, int width, int height, int bytes_per_pixel) {
+Texture * TextureManager::create_texture(char * name, unsigned char * data, int width, int height, int bytes_per_pixel) { // Default : bytes_per_pixel = 4
     Texture * texture = (Texture * ) malloc(sizeof(Texture));
 
     texture->name            = name;

@@ -10,6 +10,25 @@ struct DrawBatch;
 struct DrawBatchInfo;
 struct Vertex;
 
+enum ShaderInputMode {
+    NONE,
+    POS,
+    POS_COL,
+    POS_UV
+};
+
+// Lots of void * because this is going to be used by multiple Graphics APIs
+struct Shader {
+    char * filename;
+
+    void * VS;
+    void * PS;
+
+    void * input_layout; // @Temporary, I don't like this very much, I wonder if we could have handle input layouts in D3D the same way OGL does them (ie, not shader bound)
+
+    ShaderInputMode input_mode;
+};
+
 struct Color4f {
     Color4f() {}
     Color4f(float r, float g, float b, float a) {

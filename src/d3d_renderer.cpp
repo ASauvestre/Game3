@@ -7,47 +7,30 @@ struct PlatformTextureInfo {
     ID3D11ShaderResourceView * srv;
 };
 
+struct InputLayoutDesc {
+	D3D11_INPUT_ELEMENT_DESC * desc;
+	int num_inputs;
+};
+
 #include "texture_manager.h"
 
 #include "graphics_buffer.h"
 
 #include "d3d_renderer.h"
 
-struct ShaderInputFormat {
-    ID3D11InputLayout * layout;
-    D3D11_INPUT_ELEMENT_DESC * layout_desc;
-    int num_inputs;
-};
 
-enum ShaderInputMode {
-    NONE,
-    POS_COL,
-    POS_TEXCOORD
-};
-
-struct Shader {
-    HANDLE file_handle;
-
-    FILETIME last_modified;
-
-    char * filename;
-    char * vs_name;
-    char * ps_name;
-
-    ID3D11VertexShader * VS;
-    ID3D11PixelShader * PS;
-
-    ShaderInputFormat input_format;
-    ShaderInputMode input_mode;
-};
+///////////////////////////////////////////////
+InputLayoutDesc pos_layout_desc;
+InputLayoutDesc pos_col_layout_desc;
+InputLayoutDesc pos_uv_layout_desc;
+///////////////////////////////////////////////
 
 // Private functions
 static void check_shader_files_modification(); // @Temporary, move to hotloader.
 
 static void bind_srv_to_texture(Texture * texture);
 
-static bool create_shader(char * filename, char * vs_name, char * ps_name, D3D11_INPUT_ELEMENT_DESC * layout_desc,
-                          int num_shader_inputs, ShaderInputMode input_mode, Shader * shader);
+static bool create_shader(char * filename, ShaderInputMode input_mode, Shader * shader);
 
 static bool compile_shader(Shader * shader);
 static void check_specific_shader_file_modification(Shader * shader);
@@ -162,14 +145,6 @@ void init_platform_renderer(Vector2f rendering_resolution, void * handle) {
 
     d3d_dc->IASetIndexBuffer(d3d_index_buffer_interface, DXGI_FORMAT_R32_UINT, 0);
 
-    // Default shader
-    dummy_shader = (Shader *)malloc(sizeof(Shader));
-
-    D3D11_INPUT_ELEMENT_DESC dummy_shader_layout_desc[] = {
-        { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-    };
-
-    create_shader("dummy_shader.hlsl", "VS", "PS", dummy_shader_layout_desc, ARRAYSIZE(dummy_shader_layout_desc), NONE, dummy_shader);
 
     // Input Layout
     d3d_dc->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -222,6 +197,25 @@ void init_platform_renderer(Vector2f rendering_resolution, void * handle) {
     d3d_dc->OMSetBlendState(transparent_blend_state, NULL, 0xffffffff);
 
     d3d_dc->PSSetSamplers(0, 1, &default_sampler_state);
+
+    // Init shader layouts @Temporary
+    pos_layout_desc.num_inputs = 1;
+	pos_layout_desc.desc = (D3D11_INPUT_ELEMENT_DESC * ) malloc(sizeof(D3D11_INPUT_ELEMENT_DESC) * pos_layout_desc.num_inputs);
+	pos_layout_desc.desc[0] = { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 };
+
+	pos_uv_layout_desc.num_inputs = 2;
+	pos_uv_layout_desc.desc = (D3D11_INPUT_ELEMENT_DESC * ) malloc(sizeof(D3D11_INPUT_ELEMENT_DESC) * pos_uv_layout_desc.num_inputs);
+    pos_uv_layout_desc.desc[0] = { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 };
+    pos_uv_layout_desc.desc[1] = { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 };
+
+    pos_col_layout_desc.num_inputs = 2;
+	pos_col_layout_desc.desc = (D3D11_INPUT_ELEMENT_DESC * ) malloc(sizeof(D3D11_INPUT_ELEMENT_DESC) * pos_col_layout_desc.num_inputs);
+    pos_col_layout_desc.desc[0] = { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 };
+    pos_col_layout_desc.desc[1] = { "COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 };
+
+    dummy_shader = (Shader *)malloc(sizeof(Shader));
+
+    create_shader("dummy_shader.hlsl", POS, dummy_shader);
 }
 
 void draw_frame(GraphicsBuffer * graphics_buffer, int num_buffers, TextureManager * texture_manager) {
@@ -271,9 +265,7 @@ static void draw_buffer(GraphicsBuffer * graphics_buffer, int buffer_index, Text
     memcpy(resource.pData, ib->indices.data, sizeof( int ) *  ib->indices.count);
     d3d_dc->Unmap(d3d_index_buffer_interface, 0);
 
-
-
-    if(d3d_shader.input_mode == POS_TEXCOORD) {
+    if(d3d_shader.input_mode == POS_UV) {
 
         char * texture_name = graphics_buffer->batches.data[buffer_index].info.texture;
 
@@ -366,37 +358,16 @@ void init_platform_shaders() {
     textured_shader = (Shader *) malloc(sizeof(Shader));
     colored_shader  = (Shader *) malloc(sizeof(Shader));
 
-    // Pixel formats
-    D3D11_INPUT_ELEMENT_DESC font_shader_layout_desc[] = {
-        { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-        { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-    };
-
-    D3D11_INPUT_ELEMENT_DESC textured_shader_layout_desc[] = {
-        { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-        { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-    };
-
-    D3D11_INPUT_ELEMENT_DESC colored_shader_layout_desc[] = {
-        { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-        { "COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-    };
-
-    create_shader("font_shader.hlsl", "VS", "PS", font_shader_layout_desc,
-                  ARRAYSIZE(font_shader_layout_desc), POS_TEXCOORD, font_shader);
-
-    create_shader("textured_shader.hlsl", "VS", "PS", textured_shader_layout_desc,
-                  ARRAYSIZE(textured_shader_layout_desc), POS_TEXCOORD, textured_shader);
-
-    create_shader("colored_shader.hlsl", "VS", "PS", colored_shader_layout_desc,
-                  ARRAYSIZE(colored_shader_layout_desc), POS_COL, colored_shader);
+    create_shader("font_shader.hlsl",     POS_UV,  font_shader);
+    create_shader("textured_shader.hlsl", POS_UV,  textured_shader);
+    create_shader("colored_shader.hlsl",  POS_COL, colored_shader);
 }
 
 static void check_shader_files_modification() {
-    check_specific_shader_file_modification(dummy_shader);
-    check_specific_shader_file_modification(textured_shader);
-    check_specific_shader_file_modification(colored_shader);
-    check_specific_shader_file_modification(font_shader);
+    // check_specific_shader_file_modification(dummy_shader);
+    // check_specific_shader_file_modification(textured_shader);
+    // check_specific_shader_file_modification(colored_shader);
+    // check_specific_shader_file_modification(font_shader);
 }
 
 static bool compile_shader(Shader * shader) {
@@ -408,14 +379,19 @@ static bool compile_shader(Shader * shader) {
 
     ID3DBlob * error = NULL;
 
-    int file_size = GetFileSize(shader->file_handle, NULL);
+
+    char path[512];
+    snprintf(path, 512, "data/shaders/%s", shader->filename);
+    HANDLE file_handle = CreateFile(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+
+    int file_size = GetFileSize(file_handle, NULL);
 
     void * file_data = malloc(file_size);
     scope_exit(free(file_data));
 
     DWORD shader_size = 0;
 
-    if(!ReadFile(shader->file_handle, file_data, file_size, &shader_size, NULL)) {
+    if(!ReadFile(file_handle, file_data, file_size, &shader_size, NULL)) {
         log_print("compile_shader", "An error occured while reading the file \"%s\", could not compile the shaders. Error code is 0x%x",
                   shader->filename, GetLastError());
 
@@ -423,11 +399,10 @@ static bool compile_shader(Shader * shader) {
     }
 
     HRESULT error_code = D3DCompile(file_data, file_size, NULL, NULL, D3D_COMPILE_STANDARD_FILE_INCLUDE,
-                       shader->vs_name, "vs_5_0", 0, 0, &VS_bytecode, &error);
+                       "VS", "vs_5_0", 0, 0, &VS_bytecode, &error);
 
     if(error) {
-        log_print("compile_shader", "Vertex shader %s in %s failed to compile, error given is : \n---------\n%s---------",
-                   shader->vs_name, shader->filename, (char *)error->GetBufferPointer());
+        log_print("compile_shader", "Vertex shader in %s failed to compile, error given is : \n---------\n%s---------", shader->filename, (char *)error->GetBufferPointer());
 
         error->Release();
 
@@ -443,11 +418,10 @@ static bool compile_shader(Shader * shader) {
     }
 
     D3DCompile(file_data, file_size, NULL, NULL, D3D_COMPILE_STANDARD_FILE_INCLUDE,
-                       shader->ps_name, "ps_5_0", 0, 0, &PS_bytecode, &error);
+                       "PS", "ps_5_0", 0, 0, &PS_bytecode, &error);
 
     if(error) {
-        log_print("compile_shader", "Pixel shader %s in %s failed to compile, error given is : \n---------\n%s---------",
-                   shader->ps_name, shader->filename, (char *)error->GetBufferPointer());
+        log_print("compile_shader", "Pixel shader in %s failed to compile, error given is : \n---------\n%s---------", shader->filename, (char *)error->GetBufferPointer());
 
         error->Release();
         VS_bytecode->Release();
@@ -456,12 +430,27 @@ static bool compile_shader(Shader * shader) {
     }
 
     d3d_device->CreateVertexShader(VS_bytecode->GetBufferPointer(), VS_bytecode->GetBufferSize(),
-                                   NULL, &shader->VS);
-    d3d_device->CreatePixelShader(PS_bytecode->GetBufferPointer(), PS_bytecode->GetBufferSize(),
-                                  NULL, &shader->PS);
+                                   NULL, (ID3D11VertexShader **) &shader->VS);
+    d3d_device->CreatePixelShader( PS_bytecode->GetBufferPointer(), PS_bytecode->GetBufferSize(),
+                                   NULL, (ID3D11PixelShader **)  &shader->PS);
 
-    d3d_device->CreateInputLayout(shader->input_format.layout_desc, shader->input_format.num_inputs, VS_bytecode->GetBufferPointer(),
-                                  VS_bytecode->GetBufferSize(), &shader->input_format.layout);
+	InputLayoutDesc * layout;
+
+	switch (shader->input_mode) {
+		case POS: {
+			layout = &pos_layout_desc;
+			break;
+		} case POS_UV: {
+			layout = &pos_uv_layout_desc;
+			break;
+		} case POS_COL: {
+			layout = &pos_col_layout_desc;
+			break;
+		}
+	}
+
+    d3d_device->CreateInputLayout(layout->desc, layout->num_inputs, VS_bytecode->GetBufferPointer(),
+                                   VS_bytecode->GetBufferSize(), (ID3D11InputLayout **) &shader->input_layout);
 
     VS_bytecode->Release();
     PS_bytecode->Release();
@@ -475,63 +464,52 @@ static void recompile_shaders() {
     compile_shader(colored_shader);
 }
 
-static bool create_shader(char * filename, char * vs_name, char * ps_name, D3D11_INPUT_ELEMENT_DESC * layout_desc,
-                          int num_shader_inputs, ShaderInputMode input_mode, Shader * shader){
+static bool create_shader(char * filename, ShaderInputMode input_mode, Shader * shader){
     shader->filename = filename;
-    shader->vs_name = vs_name;
-    shader->ps_name = ps_name;
-
-    shader->input_format.num_inputs = num_shader_inputs;
-    shader->input_format.layout_desc = (D3D11_INPUT_ELEMENT_DESC *) malloc(sizeof(D3D11_INPUT_ELEMENT_DESC) * num_shader_inputs);
 
     shader->input_mode = input_mode;
-
-    memcpy(shader->input_format.layout_desc, layout_desc, sizeof(D3D11_INPUT_ELEMENT_DESC) * num_shader_inputs);
 
     char path[512];;
     snprintf(path, 512, "data/shaders/%s", shader->filename);
 
-    shader->file_handle = CreateFile(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-    GetFileTime(shader->file_handle, NULL, NULL, &shader->last_modified);
-
     return compile_shader(shader);
 }
 
-static void check_specific_shader_file_modification(Shader * shader) {
-    FILETIME new_last_modified;
+// static void check_specific_shader_file_modification(Shader * shader) {
+//     FILETIME new_last_modified;
 
-    GetFileTime(shader->file_handle, NULL, NULL, &new_last_modified);
+//     GetFileTime(shader->file_handle, NULL, NULL, &new_last_modified);
 
-    if((new_last_modified.dwLowDateTime  != shader->last_modified.dwLowDateTime)  ||
-       (new_last_modified.dwHighDateTime != shader->last_modified.dwHighDateTime)) {
+//     if((new_last_modified.dwLowDateTime  != shader->last_modified.dwLowDateTime)  ||
+//        (new_last_modified.dwHighDateTime != shader->last_modified.dwHighDateTime)) {
 
-        // log_print("recompile_shaders", "Previous time : %u %u, New time : %u %u",
-        //        shader->last_modified.dwHighDateTime, shader->last_modified.dwLowDateTime,
-        //        new_last_modified.dwHighDateTime, new_last_modified.dwLowDateTime);
+//         // log_print("recompile_shaders", "Previous time : %u %u, New time : %u %u",
+//         //        shader->last_modified.dwHighDateTime, shader->last_modified.dwLowDateTime,
+//         //        new_last_modified.dwHighDateTime, new_last_modified.dwLowDateTime);
 
-        // Get new handle
-        char path[512];;
-        snprintf(path, 512, "data/shaders/%s", shader->filename);
+//         // Get new handle
+//         char path[512];;
+//         snprintf(path, 512, "data/shaders/%s", shader->filename);
 
-        shader->file_handle = CreateFile(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+//         shader->file_handle = CreateFile(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 
-        log_print("recompile_shaders", "Detected file modification, recompiling shader \"%s\"", shader->filename);
+//         log_print("recompile_shaders", "Detected file modification, recompiling shader \"%s\"", shader->filename);
 
-        compile_shader(shader);
+//         compile_shader(shader);
 
-        shader->last_modified = new_last_modified;
-    }
-}
+//         shader->last_modified = new_last_modified;
+//     }
+// }
 
 static void switch_to_shader(Shader * shader) {
     if(shader->VS == NULL) {
-        d3d_shader.input_format.layout = dummy_shader->input_format.layout;
-        d3d_shader.VS = dummy_shader->VS;
-        d3d_shader.input_mode = dummy_shader->input_mode;
+        d3d_shader.VS           = dummy_shader->VS;
+		d3d_shader.input_layout = dummy_shader->input_layout;
+        d3d_shader.input_mode   = dummy_shader->input_mode;
     } else {
-        d3d_shader.input_format.layout = shader->input_format.layout;
-        d3d_shader.VS = shader->VS;
-        d3d_shader.input_mode = shader->input_mode;
+        d3d_shader.VS           = shader->VS;
+		d3d_shader.input_layout = shader->input_layout;
+        d3d_shader.input_mode   = shader->input_mode;
     }
 
     if(shader->PS == NULL) {
@@ -540,7 +518,7 @@ static void switch_to_shader(Shader * shader) {
         d3d_shader.PS = shader->PS;
     }
 
-    d3d_dc->IASetInputLayout(d3d_shader.input_format.layout);
-    d3d_dc->VSSetShader(d3d_shader.VS, NULL, 0);
-    d3d_dc->PSSetShader(d3d_shader.PS, NULL, 0);
+    d3d_dc->IASetInputLayout((ID3D11InputLayout *) d3d_shader.input_layout);
+    d3d_dc->VSSetShader((ID3D11VertexShader *) d3d_shader.VS, NULL, 0);
+    d3d_dc->PSSetShader((ID3D11PixelShader *)  d3d_shader.PS, NULL, 0);
 }

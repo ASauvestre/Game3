@@ -23,8 +23,7 @@ struct TextureManager : AssetManager_Poly<Texture> {
 
     void reload_asset(char * file_path, char * file_name, char * extension);
 
-    Texture * create_texture(char * name, unsigned char * data, int width, int height, int bytes_per_pixel);
-    Texture * create_texture(char * name, unsigned char * data, int width, int height);
+    Texture * create_texture(char * name, unsigned char * data, int width, int height, int bytes_per_pixel = 4);
 
     void load_texture(char * name);
 
