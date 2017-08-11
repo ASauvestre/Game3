@@ -3,7 +3,8 @@
 #include "renderer.h"
 #include "texture_manager.h"
 #include "shader_manager.h"
-#include "graphics_buffer.h"
+
+#include "math_m.h"
 
 #include "macros.h"
 
@@ -94,14 +95,14 @@ void find_or_create_compatible_batch() {
             Shader * current_shader = current_batch_info.shader;
             if(current_shader->input_mode == POS_COL) {
 
-                first_vertex_index_in_buffer = current_batch->vb.vertices.count;
+                first_vertex_index_in_buffer = current_batch->positions.count;
                 return;
             }
 
             if(current_shader->input_mode == POS_UV) {
                 if (strcmp(current_batch_info.texture, previous_batch_info.texture) == 0) {
 
-                    first_vertex_index_in_buffer = current_batch->vb.vertices.count;
+                    first_vertex_index_in_buffer = current_batch->positions.count;
                     return;
                 }
             }
@@ -136,10 +137,23 @@ void start_buffer() {
     find_or_create_compatible_batch();
 }
 
-void add_to_buffer(Vertex vertex) {
+void add_vertex(float x, float y, float z, float u, float v) {
     assert(buffering == true);
 
-    current_batch->vb.vertices.add(vertex);
+    Vector3f pos = {x, y, z};
+    Vector2f uv  = {u, v};
+
+    current_batch->positions.add(pos);
+    current_batch->texture_uvs.add(uv);
+}
+
+void add_vertex(float x, float y, float z, Color4f color) {
+    assert(buffering == true);
+
+    Vector3f pos = {x, y, z};
+
+    current_batch->positions.add(pos);
+    current_batch->colors.add(color);
 }
 
 void end_buffer() {
@@ -148,17 +162,17 @@ void end_buffer() {
     // Fill the index buffer
     if(current_buffer_mode == QUADS) {
 
-        assert(current_batch->vb.vertices.count % 4 == 0); // Assert we actually have Quads // @Temporary, we shouldn't crash here.
+        assert(current_batch->positions.count % 4 == 0); // Assert we actually have Quads // @Temporary, we shouldn't crash here.
 
         int first_index = first_vertex_index_in_buffer;
 
-        for(int i = 0; i < (current_batch->vb.vertices.count - first_vertex_index_in_buffer) / 4; i++) {
-            current_batch->ib.indices.add(first_index);
-            current_batch->ib.indices.add(first_index+1);
-            current_batch->ib.indices.add(first_index+2);
-            current_batch->ib.indices.add(first_index);
-            current_batch->ib.indices.add(first_index+3);
-            current_batch->ib.indices.add(first_index+1);
+        for(int i = 0; i < (current_batch->positions.count - first_vertex_index_in_buffer) / 4; i++) {
+            current_batch->indices.add(first_index);
+            current_batch->indices.add(first_index+1);
+            current_batch->indices.add(first_index+2);
+            current_batch->indices.add(first_index+3);
+            current_batch->indices.add(first_index+2);
+            current_batch->indices.add(first_index+1);
 
             first_index += 4;
         }
@@ -171,8 +185,10 @@ void end_buffer() {
 
 void clear_buffers() {
     for_array(graphics_buffer.batches.data, graphics_buffer.batches.count) {
-        it->vb.vertices.reset(true);
-        it->ib.indices.reset(true);
+        it->positions.reset(true);
+        it->colors.reset(true);
+        it->texture_uvs.reset(true);
+        it->indices.reset(true);
     }
 
     graphics_buffer.batches.reset();

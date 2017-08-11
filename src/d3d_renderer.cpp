@@ -19,19 +19,16 @@ struct InputLayoutDesc {
 };
 
 ///////////////////////////////////////////////
+// @Temporary, will be infered from file
 InputLayoutDesc pos_layout_desc;
 InputLayoutDesc pos_col_layout_desc;
 InputLayoutDesc pos_uv_layout_desc;
 ///////////////////////////////////////////////
 
 // Private functions
-static void check_shader_files_modification(); // @Temporary, move to hotloader.
-
 static void bind_srv_to_texture(Texture * texture);
 
 static bool create_shader(char * filename, ShaderInputMode input_mode, Shader * shader);
-
-static void check_specific_shader_file_modification(Shader * shader);
 
 static void draw_buffer(GraphicsBuffer * graphics_buffer, int buffer_index, TextureManager * texture_manager);
 
@@ -42,16 +39,20 @@ const int MAX_VERTEX_BUFFER_SIZE = 8192;
 const int MAX_INDEX_BUFFER_SIZE  = 8192;
 
 // Globals
-static IDXGISwapChain * swap_chain;
-static ID3D11Device * d3d_device;
+static IDXGISwapChain      * swap_chain;
+static ID3D11Device        * d3d_device;
 static ID3D11DeviceContext * d3d_dc;
 
 static ID3D11RenderTargetView * render_target_view;
 
 static ID3D11DepthStencilView * depth_stencil_view;
-static ID3D11Texture2D * depth_stencil_buffer;
+static ID3D11Texture2D        * depth_stencil_buffer;
 
-static ID3D11Buffer * d3d_vertex_buffer_interface;
+// static ID3D11Buffer * d3d_vertex_buffer_interface;
+static ID3D11Buffer * positions_vertex_buffer;
+static ID3D11Buffer * colors_vertex_buffer;
+static ID3D11Buffer * texture_uvs_vertex_buffer;
+
 static ID3D11Buffer * d3d_index_buffer_interface;
 
 static ID3D11SamplerState * default_sampler_state;
@@ -59,7 +60,6 @@ static ID3D11SamplerState * default_sampler_state;
 static ID3D11BlendState * transparent_blend_state;
 
 static Shader * dummy_shader;
-
 static Shader * last_shader_set;
 
 static Shader d3d_shader;
@@ -77,15 +77,15 @@ void init_platform_renderer(Vector2f rendering_resolution, void * handle) {
                     buffer_desc.Scaling                 = DXGI_MODE_SCALING_UNSPECIFIED;
 
     DXGI_SWAP_CHAIN_DESC    swap_chain_desc = {};
-                            swap_chain_desc.BufferDesc          = buffer_desc;
-                            swap_chain_desc.SampleDesc.Count    = 1;
-                            swap_chain_desc.SampleDesc.Quality  = 0;
-                            swap_chain_desc.BufferUsage         = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-                            swap_chain_desc.BufferCount         = 1;
-                            swap_chain_desc.OutputWindow        = (HWND) handle;
-                            swap_chain_desc.Windowed            = true;
-                            swap_chain_desc.SwapEffect          = DXGI_SWAP_EFFECT_DISCARD;
-                            swap_chain_desc.Flags               = 0;
+                            swap_chain_desc.BufferDesc         = buffer_desc;
+                            swap_chain_desc.SampleDesc.Count   = 1;
+                            swap_chain_desc.SampleDesc.Quality = 0;
+                            swap_chain_desc.BufferUsage        = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+                            swap_chain_desc.BufferCount        = 1;
+                            swap_chain_desc.OutputWindow       = (HWND) handle;
+                            swap_chain_desc.Windowed           = true;
+                            swap_chain_desc.SwapEffect         = DXGI_SWAP_EFFECT_DISCARD;
+                            swap_chain_desc.Flags              = 0;
 
     D3D11CreateDeviceAndSwapChain(  NULL, D3D_DRIVER_TYPE_HARDWARE, NULL, 0, NULL, 0, D3D11_SDK_VERSION,
                                     &swap_chain_desc, &swap_chain, &d3d_device, NULL, &d3d_dc);
@@ -98,17 +98,17 @@ void init_platform_renderer(Vector2f rendering_resolution, void * handle) {
 
     // Depth/Stencil Buffer
     D3D11_TEXTURE2D_DESC    depth_stencil_desc;
-                            depth_stencil_desc.Width                = rendering_resolution.width;
-                            depth_stencil_desc.Height               = rendering_resolution.height;
-                            depth_stencil_desc.MipLevels            = 1;
-                            depth_stencil_desc.ArraySize            = 1;
-                            depth_stencil_desc.Format               = DXGI_FORMAT_D24_UNORM_S8_UINT;
-                            depth_stencil_desc.SampleDesc.Count     = 1;
-                            depth_stencil_desc.SampleDesc.Quality   = 0;
-                            depth_stencil_desc.Usage                = D3D11_USAGE_DEFAULT;
-                            depth_stencil_desc.BindFlags            = D3D11_BIND_DEPTH_STENCIL;
-                            depth_stencil_desc.CPUAccessFlags       = 0;
-                            depth_stencil_desc.MiscFlags            = 0;
+                            depth_stencil_desc.Width              = rendering_resolution.width;
+                            depth_stencil_desc.Height             = rendering_resolution.height;
+                            depth_stencil_desc.MipLevels          = 1;
+                            depth_stencil_desc.ArraySize          = 1;
+                            depth_stencil_desc.Format             = DXGI_FORMAT_D24_UNORM_S8_UINT;
+                            depth_stencil_desc.SampleDesc.Count   = 1;
+                            depth_stencil_desc.SampleDesc.Quality = 0;
+                            depth_stencil_desc.Usage              = D3D11_USAGE_DEFAULT;
+                            depth_stencil_desc.BindFlags          = D3D11_BIND_DEPTH_STENCIL;
+                            depth_stencil_desc.CPUAccessFlags     = 0;
+                            depth_stencil_desc.MiscFlags          = 0;
 
     d3d_device->CreateTexture2D(&depth_stencil_desc, NULL, &depth_stencil_buffer);
 
@@ -116,44 +116,61 @@ void init_platform_renderer(Vector2f rendering_resolution, void * handle) {
 
     d3d_dc->OMSetRenderTargets( 1, &render_target_view, depth_stencil_view);
 
-    // Vectex Buffer
-    D3D11_BUFFER_DESC   vertex_buffer_desc = {};
-                        vertex_buffer_desc.Usage            = D3D11_USAGE_DYNAMIC;
-                        vertex_buffer_desc.ByteWidth        = sizeof(Vertex) * MAX_VERTEX_BUFFER_SIZE;
-                        vertex_buffer_desc.BindFlags        = D3D11_BIND_VERTEX_BUFFER;
-                        vertex_buffer_desc.CPUAccessFlags   = D3D11_CPU_ACCESS_WRITE;
-                        vertex_buffer_desc.MiscFlags        = 0;
+    // Vertex Buffers
+    D3D11_BUFFER_DESC   positions_vertex_buffer_desc                  = {};
+                        positions_vertex_buffer_desc.Usage            = D3D11_USAGE_DYNAMIC;
+                        positions_vertex_buffer_desc.ByteWidth        = sizeof(Vector3f) * MAX_VERTEX_BUFFER_SIZE;
+                        positions_vertex_buffer_desc.BindFlags        = D3D11_BIND_VERTEX_BUFFER;
+                        positions_vertex_buffer_desc.CPUAccessFlags   = D3D11_CPU_ACCESS_WRITE;
+                        positions_vertex_buffer_desc.MiscFlags        = 0;
 
-    d3d_device->CreateBuffer(&vertex_buffer_desc, NULL, &d3d_vertex_buffer_interface);
+    D3D11_BUFFER_DESC   colors_vertex_buffer_desc                     = {};
+                        colors_vertex_buffer_desc.Usage               = D3D11_USAGE_DYNAMIC;
+                        colors_vertex_buffer_desc.ByteWidth           = sizeof(Vector3f) * MAX_VERTEX_BUFFER_SIZE;
+                        colors_vertex_buffer_desc.BindFlags           = D3D11_BIND_VERTEX_BUFFER;
+                        colors_vertex_buffer_desc.CPUAccessFlags      = D3D11_CPU_ACCESS_WRITE;
+                        colors_vertex_buffer_desc.MiscFlags           = 0;
 
-    UINT stride = sizeof(Vertex);
-    UINT offset = 0;
-    d3d_dc->IASetVertexBuffers(0, 1, &d3d_vertex_buffer_interface, &stride, &offset);
+    D3D11_BUFFER_DESC   texture_uvs_vertex_buffer_desc                = {};
+                        texture_uvs_vertex_buffer_desc.Usage          = D3D11_USAGE_DYNAMIC;
+                        texture_uvs_vertex_buffer_desc.ByteWidth      = sizeof(Vector3f) * MAX_VERTEX_BUFFER_SIZE;
+                        texture_uvs_vertex_buffer_desc.BindFlags      = D3D11_BIND_VERTEX_BUFFER;
+                        texture_uvs_vertex_buffer_desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+                        texture_uvs_vertex_buffer_desc.MiscFlags      = 0;
+
+    d3d_device->CreateBuffer(&positions_vertex_buffer_desc,   NULL, &positions_vertex_buffer);
+    d3d_device->CreateBuffer(&colors_vertex_buffer_desc,      NULL, &colors_vertex_buffer);
+    d3d_device->CreateBuffer(&texture_uvs_vertex_buffer_desc, NULL, &texture_uvs_vertex_buffer);
+
+    ID3D11Buffer * vertex_buffers[] = {positions_vertex_buffer, colors_vertex_buffer, texture_uvs_vertex_buffer};
+    UINT strides[]                  = {sizeof(Vector3f),        sizeof(Color4f),      sizeof(Vector2f)};
+    UINT offsets[]                  = {0,                       0,                    0};
+
+    d3d_dc->IASetVertexBuffers(0, 3, vertex_buffers, strides, offsets);
 
     // Index Buffer
     D3D11_BUFFER_DESC   index_buffer_desc = {};
-                        index_buffer_desc.Usage             = D3D11_USAGE_DYNAMIC;
-                        index_buffer_desc.ByteWidth         = sizeof(int) * MAX_INDEX_BUFFER_SIZE;
-                        index_buffer_desc.BindFlags         = D3D11_BIND_INDEX_BUFFER;
-                        index_buffer_desc.CPUAccessFlags    = D3D11_CPU_ACCESS_WRITE;
-                        index_buffer_desc.MiscFlags         = 0;
+                        index_buffer_desc.Usage          = D3D11_USAGE_DYNAMIC;
+                        index_buffer_desc.ByteWidth      = sizeof(int) * MAX_INDEX_BUFFER_SIZE;
+                        index_buffer_desc.BindFlags      = D3D11_BIND_INDEX_BUFFER;
+                        index_buffer_desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+                        index_buffer_desc.MiscFlags      = 0;
 
     d3d_device->CreateBuffer(&index_buffer_desc, NULL, &d3d_index_buffer_interface);
 
     d3d_dc->IASetIndexBuffer(d3d_index_buffer_interface, DXGI_FORMAT_R32_UINT, 0);
-
 
     // Input Layout
     d3d_dc->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
     // Viewport
     D3D11_VIEWPORT  viewport;
-                    viewport.TopLeftX   = 0;
-                    viewport.TopLeftY   = 0;
-                    viewport.Width      = rendering_resolution.width;
-                    viewport.Height     = rendering_resolution.height;
-                    viewport.MinDepth   = 0.0f;
-                    viewport.MaxDepth   = 1.0f;
+                    viewport.TopLeftX = 0;
+                    viewport.TopLeftY = 0;
+                    viewport.Width    = rendering_resolution.width;
+                    viewport.Height   = rendering_resolution.height;
+                    viewport.MinDepth = 0.0f;
+                    viewport.MaxDepth = 1.0f;
 
     d3d_dc->RSSetViewports(1, &viewport);
 
@@ -175,19 +192,19 @@ void init_platform_renderer(Vector2f rendering_resolution, void * handle) {
     // Blending
     D3D11_RENDER_TARGET_BLEND_DESC render_target_blend_desc;
 
-    render_target_blend_desc.BlendEnable            = true;
-    render_target_blend_desc.SrcBlend               = D3D11_BLEND_SRC_ALPHA;
-    render_target_blend_desc.DestBlend              = D3D11_BLEND_INV_SRC_ALPHA;
-    render_target_blend_desc.BlendOp                = D3D11_BLEND_OP_ADD;
-    render_target_blend_desc.SrcBlendAlpha          = D3D11_BLEND_ONE;
-    render_target_blend_desc.DestBlendAlpha         = D3D11_BLEND_ZERO;
-    render_target_blend_desc.BlendOpAlpha           = D3D11_BLEND_OP_ADD;
-    render_target_blend_desc.RenderTargetWriteMask  = D3D11_COLOR_WRITE_ENABLE_ALL;
+    render_target_blend_desc.BlendEnable           = true;
+    render_target_blend_desc.SrcBlend              = D3D11_BLEND_SRC_ALPHA;
+    render_target_blend_desc.DestBlend             = D3D11_BLEND_INV_SRC_ALPHA;
+    render_target_blend_desc.BlendOp               = D3D11_BLEND_OP_ADD;
+    render_target_blend_desc.SrcBlendAlpha         = D3D11_BLEND_ONE;
+    render_target_blend_desc.DestBlendAlpha        = D3D11_BLEND_ZERO;
+    render_target_blend_desc.BlendOpAlpha          = D3D11_BLEND_OP_ADD;
+    render_target_blend_desc.RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
 
     D3D11_BLEND_DESC blend_desc;
-    blend_desc.AlphaToCoverageEnable    = false;
-    blend_desc.IndependentBlendEnable   = false;
-    blend_desc.RenderTarget[0]          = render_target_blend_desc;
+    blend_desc.AlphaToCoverageEnable  = false;
+    blend_desc.IndependentBlendEnable = false;
+    blend_desc.RenderTarget[0]        = render_target_blend_desc;
 
     d3d_device->CreateBlendState(&blend_desc, &transparent_blend_state);
 
@@ -196,19 +213,19 @@ void init_platform_renderer(Vector2f rendering_resolution, void * handle) {
     d3d_dc->PSSetSamplers(0, 1, &default_sampler_state);
 
     // Init shader layouts @Temporary
-    pos_layout_desc.num_inputs = 1;
-	pos_layout_desc.desc = (D3D11_INPUT_ELEMENT_DESC * ) malloc(sizeof(D3D11_INPUT_ELEMENT_DESC) * pos_layout_desc.num_inputs);
-	pos_layout_desc.desc[0] = { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 };
+    pos_layout_desc.num_inputs     = 1;
+	pos_layout_desc.desc           = (D3D11_INPUT_ELEMENT_DESC * ) malloc(sizeof(D3D11_INPUT_ELEMENT_DESC) * pos_layout_desc.num_inputs);
+	pos_layout_desc.desc[0]        = { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 };
 
-	pos_uv_layout_desc.num_inputs = 2;
-	pos_uv_layout_desc.desc = (D3D11_INPUT_ELEMENT_DESC * ) malloc(sizeof(D3D11_INPUT_ELEMENT_DESC) * pos_uv_layout_desc.num_inputs);
-    pos_uv_layout_desc.desc[0] = { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 };
-    pos_uv_layout_desc.desc[1] = { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 };
+	pos_uv_layout_desc.num_inputs  = 2;
+	pos_uv_layout_desc.desc        = (D3D11_INPUT_ELEMENT_DESC * ) malloc(sizeof(D3D11_INPUT_ELEMENT_DESC) * pos_uv_layout_desc.num_inputs);
+    pos_uv_layout_desc.desc[0]     = { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0,                            D3D11_INPUT_PER_VERTEX_DATA, 0 };
+    pos_uv_layout_desc.desc[1]     = { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    2, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 };
 
     pos_col_layout_desc.num_inputs = 2;
-	pos_col_layout_desc.desc = (D3D11_INPUT_ELEMENT_DESC * ) malloc(sizeof(D3D11_INPUT_ELEMENT_DESC) * pos_col_layout_desc.num_inputs);
-    pos_col_layout_desc.desc[0] = { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 };
-    pos_col_layout_desc.desc[1] = { "COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 };
+	pos_col_layout_desc.desc       = (D3D11_INPUT_ELEMENT_DESC * ) malloc(sizeof(D3D11_INPUT_ELEMENT_DESC) * pos_col_layout_desc.num_inputs);
+    pos_col_layout_desc.desc[0]    = { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT,    0, 0,                            D3D11_INPUT_PER_VERTEX_DATA, 0 };
+    pos_col_layout_desc.desc[1]    = { "COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 };
 
     dummy_shader = (Shader *)malloc(sizeof(Shader));
 
@@ -230,14 +247,38 @@ void draw_frame(GraphicsBuffer * graphics_buffer, int num_buffers, TextureManage
     swap_chain->Present(0, 0);
 }
 
+static void update_buffers(DrawBatch * batch, ShaderInputMode mode) {
+    // Update vertex buffers
+    D3D11_MAPPED_SUBRESOURCE resource = {};
+    d3d_dc->Map(positions_vertex_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
+    memcpy(resource.pData, batch->positions.data, sizeof(Vector3f) * batch->positions.count);
+    d3d_dc->Unmap(positions_vertex_buffer, 0);
+
+    if(mode == POS_COL) {
+        resource = {};
+        d3d_dc->Map(colors_vertex_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
+        memcpy(resource.pData, batch->colors.data, sizeof(Color4f) * batch->colors.count);
+        d3d_dc->Unmap(colors_vertex_buffer, 0);
+    }
+
+    if(mode == POS_UV) {
+        resource = {};
+        d3d_dc->Map(texture_uvs_vertex_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
+        memcpy(resource.pData, batch->texture_uvs.data, sizeof(Vector2f) * batch->texture_uvs.count);
+        d3d_dc->Unmap(texture_uvs_vertex_buffer, 0);
+    }
+
+    // Update index buffer
+    resource = {};
+    d3d_dc->Map(d3d_index_buffer_interface, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
+    memcpy(resource.pData, batch->indices.data, sizeof( int ) *  batch->indices.count);
+    d3d_dc->Unmap(d3d_index_buffer_interface, 0);
+}
 
 // @Rewrite This is really ugly, rewrite and refactor things
 static void draw_buffer(GraphicsBuffer * graphics_buffer, int buffer_index, TextureManager * texture_manager) {
 
     DrawBatch * batch = &graphics_buffer->batches.data[buffer_index];
-
-    VertexBuffer * vb = &batch->vb;
-    IndexBuffer * ib = &batch->ib;
 
 	Shader * shader = batch->info.shader;
 
@@ -246,21 +287,11 @@ static void draw_buffer(GraphicsBuffer * graphics_buffer, int buffer_index, Text
 		last_shader_set = shader;
 	}
 
-    // Update vertex buffer
-    D3D11_MAPPED_SUBRESOURCE resource = {};
-    d3d_dc->Map(d3d_vertex_buffer_interface, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
-    memcpy(resource.pData, vb->vertices.data, sizeof(Vertex) * vb->vertices.count);
-    d3d_dc->Unmap(d3d_vertex_buffer_interface, 0);
-
-    // Update index buffer
-    resource = {};
-    d3d_dc->Map(d3d_index_buffer_interface, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
-    memcpy(resource.pData, ib->indices.data, sizeof( int ) *  ib->indices.count);
-    d3d_dc->Unmap(d3d_index_buffer_interface, 0);
+    update_buffers(batch, shader->input_mode);
 
     if(d3d_shader.input_mode == POS_UV) {
 
-        char * texture_name = graphics_buffer->batches.data[buffer_index].info.texture;
+        char * texture_name = batch->info.texture;
 
         Texture * texture = (Texture *) texture_manager->table.find(texture_name);
 
@@ -300,7 +331,7 @@ static void draw_buffer(GraphicsBuffer * graphics_buffer, int buffer_index, Text
         return;
     }
 
-    d3d_dc->DrawIndexed(ib->indices.count, 0, 0);
+    d3d_dc->DrawIndexed(batch->indices.count, 0, 0);
 }
 
 static void bind_srv_to_texture(Texture * texture) {
@@ -343,24 +374,6 @@ static void bind_srv_to_texture(Texture * texture) {
     }
 
     d3d_device->CreateShaderResourceView(d3d_texture, &srv_desc, &texture->platform_info->srv);
-}
-
-// Shaders
-// void init_platform_shaders() {
-//     font_shader     = (Shader *) malloc(sizeof(Shader));
-//     textured_shader = (Shader *) malloc(sizeof(Shader));
-//     colored_shader  = (Shader *) malloc(sizeof(Shader));
-
-//     create_shader("font_shader.hlsl",     POS_UV,  font_shader);
-//     create_shader("textured_shader.hlsl", POS_UV,  textured_shader);
-//     create_shader("colored_shader.hlsl",  POS_COL, colored_shader);
-// }
-
-static void check_shader_files_modification() {
-    // check_specific_shader_file_modification(dummy_shader);
-    // check_specific_shader_file_modification(textured_shader);
-    // check_specific_shader_file_modification(colored_shader);
-    // check_specific_shader_file_modification(font_shader);
 }
 
 bool compile_shader(Shader * shader) {
@@ -463,12 +476,6 @@ bool compile_shader(Shader * shader) {
     return true;
 }
 
-// static void recompile_shaders() {
-//     compile_shader(font_shader);
-//     compile_shader(textured_shader);
-//     compile_shader(colored_shader);
-// }
-
 static bool create_shader(char * filename, ShaderInputMode input_mode, Shader * shader){
     shader->filename = filename;
 
@@ -479,32 +486,6 @@ static bool create_shader(char * filename, ShaderInputMode input_mode, Shader * 
 
     return compile_shader(shader);
 }
-
-// static void check_specific_shader_file_modification(Shader * shader) {
-//     FILETIME new_last_modified;
-
-//     GetFileTime(shader->file_handle, NULL, NULL, &new_last_modified);
-
-//     if((new_last_modified.dwLowDateTime  != shader->last_modified.dwLowDateTime)  ||
-//        (new_last_modified.dwHighDateTime != shader->last_modified.dwHighDateTime)) {
-
-//         // log_print("recompile_shaders", "Previous time : %u %u, New time : %u %u",
-//         //        shader->last_modified.dwHighDateTime, shader->last_modified.dwLowDateTime,
-//         //        new_last_modified.dwHighDateTime, new_last_modified.dwLowDateTime);
-
-//         // Get new handle
-//         char path[512];;
-//         snprintf(path, 512, "data/shaders/%s", shader->filename);
-
-//         shader->file_handle = CreateFile(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-
-//         log_print("recompile_shaders", "Detected file modification, recompiling shader \"%s\"", shader->filename);
-
-//         compile_shader(shader);
-
-//         shader->last_modified = new_last_modified;
-//     }
-// }
 
 static void switch_to_shader(Shader * shader) {
     if(shader->VS == NULL) {
@@ -524,6 +505,6 @@ static void switch_to_shader(Shader * shader) {
     }
 
     d3d_dc->IASetInputLayout((ID3D11InputLayout *) d3d_shader.input_layout);
-    d3d_dc->VSSetShader((ID3D11VertexShader *) d3d_shader.VS, NULL, 0);
-    d3d_dc->PSSetShader((ID3D11PixelShader *)  d3d_shader.PS, NULL, 0);
+    d3d_dc->VSSetShader((ID3D11VertexShader *)     d3d_shader.VS, NULL, 0);
+    d3d_dc->PSSetShader((ID3D11PixelShader *)      d3d_shader.PS, NULL, 0);
 }

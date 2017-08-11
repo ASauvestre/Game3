@@ -1,9 +1,7 @@
-enum BufferMode;
+#include "graphics_buffer.h"
 
 struct TextureManager;
 struct ShaderManager;
-struct Vertex;
-struct Shader;
 
 // Init
 void init_renderer(int width, int height, void * handle); // handle is an HWND used for d3d
@@ -19,7 +17,9 @@ void set_buffer_mode(BufferMode buffer_mode);
 
 void start_buffer();
 
-void add_to_buffer(Vertex vertex);
+void add_vertex(float x, float y, float z, float u, float v);
+void add_vertex(float x, float y, float z, Color4f color);
+
 
 void end_buffer();
 

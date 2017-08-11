@@ -159,7 +159,7 @@ void buffer_textured_quad(float x, float y, Alignement alignement, float width, 
 void buffer_colored_quad(Vector2f position, Alignement alignement, float width, float height, float depth, Color4f color);
 void buffer_colored_quad(float x, float y, Alignement alignement, float width, float height, float depth, Color4f color);
 
-void convert_top_left_coords_to_centered(Vertex * v1, Vertex * v2, Vertex * v3, Vertex * v4);
+void convert_top_left_coords_to_centered(Vector3f * v1, Vector3f * v2, Vector3f * v3, Vector3f * v4);
 
 // Constants
 const float DEBUG_OVERLAY_Z                = 0.9999999f;
@@ -172,6 +172,7 @@ const float EDITOR_OVERLAY_Z               = 0.9999987f;
 const float TILES_Z                        = 0.0000001f;
 const float RANGE_ENTITY_Z                 = 0.9999900f;
 const float MIN_ENTITY_Z                   = 0.0000002f;
+
 const int TARGET_FPS = 60;
 
 const int MAX_NUMBER_ENTITIES = 1;
@@ -978,22 +979,25 @@ float buffer_string(char * text, float x, float y, float z,  Font * font, Aligne
             float inverted_y_top   = (int)((pixel_y - height_below_bl) + 0.5f);
             float inverted_y_below = (int)((pixel_y - height_above_bl) + 0.5f);
 
-            Vertex v1 = {q.x0/window_data.width, inverted_y_top  /window_data.height, z, q.s0, q.t0};
-            Vertex v2 = {q.x1/window_data.width, inverted_y_below/window_data.height, z, q.s1, q.t1};
-            Vertex v3 = {q.x0/window_data.width, inverted_y_below/window_data.height, z, q.s0, q.t1};
-            Vertex v4 = {q.x1/window_data.width, inverted_y_top  /window_data.height, z, q.s1, q.t0};
+            // Vertex v1 = {q.x0/window_data.width, inverted_y_top  /window_data.height, z, q.s0, q.t0};
+            // Vertex v2 = {q.x1/window_data.width, inverted_y_below/window_data.height, z, q.s1, q.t1};
+            // Vertex v3 = {q.x0/window_data.width, inverted_y_below/window_data.height, z, q.s0, q.t1};
+            // Vertex v4 = {q.x1/window_data.width, inverted_y_top  /window_data.height, z, q.s1, q.t0};
+
+            float x0 = q.x0/window_data.width;
+            float y0 = inverted_y_below/window_data.height;
+            float x1 = q.x1/window_data.width;
+            float y1 = inverted_y_top/window_data.height;
 
             if((alignement == TOP_RIGHT) || (alignement == BOTTOM_RIGHT)) {
-                v1.position.x -= text_width;
-                v2.position.x -= text_width;
-                v3.position.x -= text_width;
-                v4.position.x -= text_width;
+                x0 -= text_width;
+                x1 -= text_width;
             }
 
-            add_to_buffer(v1);
-            add_to_buffer(v2);
-            add_to_buffer(v3);
-            add_to_buffer(v4);
+            add_vertex(x0, y0, z, q.s0, q.t1);
+            add_vertex(x0, y1, z, q.s0, q.t0);
+            add_vertex(x1, y0, z, q.s1, q.t1);
+            add_vertex(x1, y1, z, q.s1, q.t0);
         }
         ++text;
     }
@@ -1006,22 +1010,14 @@ float buffer_string(char * text, float x, float y, float z,  Font * font, Aligne
 
 // Incomplete, handle uv coordinates
 void buffer_textured_quad(float x, float y, Alignement alignement, float width, float height, float depth, char * texture) {
-    Vertex v1;
-    Vertex v2;
-    Vertex v3;
-    Vertex v4;
+    float x0 = x;
+    float y0 = y;
+    float x1 = x + width;
+    float y1 = y + height;
 
-    if(alignement == BOTTOM_LEFT) {
-        v1 = {x        , y + height, depth, 0.0f, 0.0f};
-        v2 = {x + width, y         , depth, 1.0f, 1.0f};
-        v3 = {x        , y         , depth, 0.0f, 1.0f};
-        v4 = {x + width, y + height, depth, 1.0f, 0.0f};
-    }
-    else if(alignement == TOP_LEFT) {
-        v1 = {x        , y         , depth, 0.0f, 0.0f};
-        v2 = {x + width, y - height, depth, 1.0f, 1.0f};
-        v3 = {x        , y - height, depth, 0.0f, 1.0f};
-        v4 = {x + width, y         , depth, 1.0f, 0.0f};
+    if(alignement == TOP_LEFT) {
+        y0 -= height;
+        y1 -= height;
     }
 
     set_shader(textured_shader);
@@ -1029,10 +1025,10 @@ void buffer_textured_quad(float x, float y, Alignement alignement, float width, 
 
     start_buffer();
 
-    add_to_buffer(v1);
-    add_to_buffer(v2);
-    add_to_buffer(v3);
-    add_to_buffer(v4);
+    add_vertex(x0, y0, depth, 0.0f, 1.0f);
+    add_vertex(x0, y1, depth, 0.0f, 0.0f);
+    add_vertex(x1, y0, depth, 1.0f, 1.0f);
+    add_vertex(x1, y1, depth, 1.0f, 0.0f);
 
     end_buffer();
 }
@@ -1042,33 +1038,24 @@ void buffer_colored_quad(Vector2f position, Alignement alignement, float width, 
 }
 
 void buffer_colored_quad(float x, float y, Alignement alignement, float width, float height, float depth, Color4f color) {
+    float x0 = x;
+    float y0 = y;
+    float x1 = x + width;
+    float y1 = y + height;
 
-    Vertex v1;
-    Vertex v2;
-    Vertex v3;
-    Vertex v4;
-
-    if(alignement == BOTTOM_LEFT) {
-        v1 = {x        , y + height, depth, color};
-        v2 = {x + width, y         , depth, color};
-        v3 = {x        , y         , depth, color};
-        v4 = {x + width, y + height, depth, color};
-    }
-    else if(alignement == TOP_LEFT) {
-        v1 = {x        , y         , depth, color};
-        v2 = {x + width, y - height, depth, color};
-        v3 = {x        , y - height, depth, color};
-        v4 = {x + width, y         , depth, color};
+    if(alignement == TOP_LEFT) {
+        y0 -= height;
+        y1 -= height;
     }
 
     set_shader(colored_shader);
 
     start_buffer();
 
-    add_to_buffer(v1);
-    add_to_buffer(v2);
-    add_to_buffer(v3);
-    add_to_buffer(v4);
+    add_vertex(x0, y0, depth, color);
+    add_vertex(x0, y1, depth, color);
+    add_vertex(x1, y0, depth, color);
+    add_vertex(x1, y1, depth, color);
 
     end_buffer();
 }
