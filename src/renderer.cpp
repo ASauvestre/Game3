@@ -53,7 +53,7 @@ void init_renderer(int width, int height, void * handle) {
 	load_graphics_dll();
 
 	// From platform renderer
-    init_platform_renderer(rendering_resolution, handle);
+	init_platform_renderer(rendering_resolution, handle);
 }
 
 void draw(TextureManager * tm) {

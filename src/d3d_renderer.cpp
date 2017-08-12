@@ -496,49 +496,71 @@ void parse_input_layout_from_file(char * file_name, char * c_file_data, Shader *
 
     String line = bump_to_next_line(&file_data);
 
+    int found = -1;
+    int line_number = 0;
+
     while(line.count >= 0) {
-           // printf("    %s\n", c_string);
+        String left = cut_until_space(&line);
 
-        {
-            String left = cut_until_space(&line);
+        char * c_left = to_c_string(left);
+        scope_exit(free(c_left));
 
-            char * c_left = to_c_string(left);
-            scope_exit(free(c_left));
+        if(strcmp(c_left, "VS_FUNC") == 0) { // @Incomplete @Speed Use a memcmp here, no need to malloc a string.
+            char * c_string = to_c_string(line);
+            scope_exit(free(c_string));
 
-            if(strcmp(c_left, "VS_FUNC") == 0) { // @Incomplete @Speed Use a memcmp here, no need to malloc a string.
-                char * c_string = to_c_string(line);
-                scope_exit(free(c_string));
-                printf("----- Found VS function : %s\n", c_string);
+            if(found >= 0) {
+                log_print("compile_shader", "Found multiple lines beginning with \"VS_FUNC\" on lines %d and %d, only the first line will be taken into account.", found + 1, line_number + 1);
+                continue;
+            }
 
-                cut_until_char('(', &line);
-                String args = cut_until_char(')', &line);
-                int arg_index = 0;
-                while(args.count > 0) { // Go until end of line
-                    cut_until_char(':', &args);
+            found = line_number;
 
-                    push(&args); // We don't want the ':'
-                    cut_spaces(&args);
+            // printf("----- Found VS function : %s\n", c_string);
+            cut_until_char('(', &line);
 
-                    String token = cut_until_space(&args);
+            if(line.count == 0) {
+                log_print("compile_shader", "Found vertex shader function on line %d of %s, but we could not find the arguments block, make sure that it is on the same line.", line_number + 1, file_name);
+                continue;
+            }
 
-                    if(token[token.count -1] == ',') token.count -= 1; // If we have a ',' or a ')' after the input type, cut it.
-                    if(token.count == 0) continue; // Token was just ',' so we move on to the next one.
+            String args = cut_until_char(')', &line);
 
-                    char * c_token = to_c_string(token); // @Incomplete @Speed Use a memcmp here, no need to malloc a string.
-                    scope_exit(free(c_token));
+            if(line.count == 0) { // No ')' was found, so we have no guarantee that all he arguments were on the same line.
+                log_print("compile_shader", "Found vertex shader function on line %d of %s, but we could not find the end of the arguments block, make sure that it is on the same line.", line_number + 1, file_name);
+                continue;
+            }
 
-                    if     (strcmp("POSITION", c_token) == 0) shader->position_index = arg_index;
-                    else if(strcmp("COLOR",    c_token) == 0) shader->color_index    = arg_index;
-                    else if(strcmp("TEXCOORD", c_token) == 0) shader->uv_index       = arg_index;
+            int arg_index = 0;
+            while(args.count > 0) { // Go until end of line
+                cut_until_char(':', &args);
 
-                    arg_index += 1;
-                }
+                push(&args); // We don't want the ':'
+                cut_spaces(&args);
 
+                String token = cut_until_space(&args);
 
+                if(token[token.count -1] == ',') token.count -= 1; // If we have a ',' or a ')' after the input type, cut it.
+                if(token.count == 0) continue; // Token was just ',' so we move on to the next one.
+
+                char * c_token = to_c_string(token); // @Incomplete @Speed Use a memcmp here, no need to malloc a string.
+                scope_exit(free(c_token));
+
+                if     (strcmp("POSITION", c_token) == 0) shader->position_index = arg_index;
+                else if(strcmp("COLOR",    c_token) == 0) shader->color_index    = arg_index;
+                else if(strcmp("TEXCOORD", c_token) == 0) shader->uv_index       = arg_index;
+
+                arg_index += 1;
             }
         }
 
+        line_number += 1;
         line = bump_to_next_line(&file_data);
+    }
+
+    if(found == -1) {
+        log_print("compile_shader", "Could not find the vertex shader function while parsing %s, did you remember to prefix it with \"VS_FUNC\" ?", file_name);
+        return;
     }
 
     printf("--------> Parsed inputs:\n", shader->position_index, shader->color_index, shader->uv_index);
@@ -546,7 +568,6 @@ void parse_input_layout_from_file(char * file_name, char * c_file_data, Shader *
     if(shader->position_index >= 0) printf("                POSITION @ index %d\n", shader->position_index);
     if(shader->color_index    >= 0) printf("                COLOR    @ index %d\n", shader->color_index);
     if(shader->uv_index       >= 0) printf("                TEXCOORD @ index %d\n", shader->uv_index);
-
 
 	printf("\n");
 }
