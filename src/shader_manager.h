@@ -16,6 +16,11 @@ struct Shader : Asset {
 
     void * input_layout; // @Temporary, I don't like this very much, I wonder if we could have handle input layouts in D3D the same way OGL does them (ie, not shader bound)
 
+    // Indices of input types in the Vertex Shader
+    int position_index = -1;
+    int color_index    = -1;
+    int uv_index       = -1;
+
     ShaderInputMode input_mode;
 };
 

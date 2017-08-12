@@ -9,7 +9,7 @@ struct VS_OUTPUT
     float2 tex_coord : TEXCOORD;
 };
 
-VS_OUTPUT VS(float4 input_pos : POSITION, float2 input_tex_coord : TEXCOORD)
+VS_FUNC VS_OUTPUT VS(float4 input_pos : POSITION, float2 input_tex_coord : TEXCOORD)
 {
     VS_OUTPUT output;
 
@@ -19,7 +19,7 @@ VS_OUTPUT VS(float4 input_pos : POSITION, float2 input_tex_coord : TEXCOORD)
     return output;
 }
 
-float4 PS(VS_OUTPUT input) : SV_TARGET
+PS_FUNC float4 PS(VS_OUTPUT input) : SV_TARGET
 {
     float4 textureColor =  m_texture.Sample( m_sampler_state, input.tex_coord);
 

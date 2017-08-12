@@ -6,7 +6,7 @@ struct VS_OUTPUT
     float4 color: COLOR;
 };
 
-VS_OUTPUT VS(float4 input_pos : POSITION, float4 input_color : COLOR)
+VS_FUNC VS_OUTPUT VS(float4 input_pos : POSITION, float4 input_color : COLOR)
 {
     VS_OUTPUT output;
 
@@ -16,7 +16,7 @@ VS_OUTPUT VS(float4 input_pos : POSITION, float4 input_color : COLOR)
     return output;
 }
 
-float4 PS(VS_OUTPUT input) : SV_TARGET
+PS_FUNC float4 PS(VS_OUTPUT input) : SV_TARGET
 {
     return input.color;
 }
