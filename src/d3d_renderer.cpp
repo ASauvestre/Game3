@@ -5,6 +5,8 @@
 
 #include "d3d_renderer.h"
 
+#include "parsing.h"
+
 #include "texture_manager.h"
 #include "shader_manager.h"
 #include "graphics_buffer.h"
@@ -343,120 +345,7 @@ static void bind_srv_to_texture(Texture * texture) {
     d3d_device->CreateShaderResourceView(d3d_texture, &srv_desc, &texture->platform_info->srv);
 }
 
-struct String {
-    char * data  = NULL;
-    int    count = 0;
-
-    inline char& operator[](int i) {
-        return this->data[i];
-    }
-
-    String& operator=(String & string) {
-        this->count = string.count;
-        this->data  = string.data;
-
-        return *this;
-    }
-};
-
-char * to_c_string(String string) { // @Incomplete take pointer here ?
-    char * c = (char *) malloc(string.count + 1);
-    memcpy(c, string.data, string.count);
-    c[string.count] = 0;
-
-    return c;
-}
-
-void push(String * string, int amount = 1) {
-    string->data  += amount;
-    string->count -= amount;
-}
-
-inline void cut_spaces(String * string) {
-    while((*string)[0] == ' ') push(string);
-}
-
-String bump_to_next_line(String * string) {
-    cut_spaces(string);
-
-    String line;
-    line.data  = string->data;
-    line.count = 0;
-
-    // Empty line / EOF check.
-    {
-        if((*string)[0] == '\0') {
-            line.count = -1; // @Temporary, this signals that we should stop getting new lines from the buffer, we should probably find a better way to do it.
-            return line; // EOF
-        }
-
-        if((*string)[0] == '\r') {
-            push(string, 2); // CLRF
-            return line;
-        }
-
-        if((*string)[0] == '\n') {
-            push(string);
-            return line;
-        }
-    }
-
-    while(true) {
-
-        line.count  += 1;
-        push(string);
-
-        // End of line/file check
-        {
-            if((*string)[0] == '\0') {
-                break; // EOF
-            }
-
-            if((*string)[0] == '\n') {
-                push(string);
-                break;
-            }
-
-            if((*string)[0] == '\r') {
-                push(string, 2);
-                break;
-            }
-        }
-    }
-
-    return line;
-}
-
-
-// Right-side inclusive
-String cut_until_char(char c, String * string) {
-    String left;
-    left.data  = string->data;
-    left.count = 0;
-
-    while(string->count > 0) {
-        if((*string)[0] == c) break;
-        push(string);
-        left.count += 1;
-    }
-
-    return left;
-}
-
-// @Temporary: Make this use cut_until_char?
-String cut_until_space(String * string) {
-
-    String left = cut_until_char(' ', string);
-
-    cut_spaces(string);
-
-    return left;
-
-}
-
 void parse_input_layout_from_file(char * file_name, char * c_file_data, Shader * shader) {
-    printf("Parsing shader file %s\n\n", file_name);
-
     String file_data;
     file_data.data = c_file_data;
     file_data.count = strlen(c_file_data);
