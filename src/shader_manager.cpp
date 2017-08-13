@@ -25,6 +25,10 @@ void ShaderManager::reload_asset(char * file_path, char * file_name, char * exte
 
     Shader * shader = this->table.find(file_name);
 
+	if (!shader) {
+		log_print("reload_asset", "Shader file %s is not registered in the manager, so we're not reloading it", file_name);
+	}
+
     do_load_shader(shader);
 }
 

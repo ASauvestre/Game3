@@ -13,22 +13,15 @@ struct PlatformTextureInfo {
     ID3D11ShaderResourceView * srv;
 };
 
-struct InputLayoutDesc {
-    D3D11_INPUT_ELEMENT_DESC * desc;
-    int num_inputs;
+struct InputLayout {
+    Array<D3D11_INPUT_ELEMENT_DESC> layout_desc;
+    ID3D11InputLayout * layout = NULL;
 };
-
-///////////////////////////////////////////////
-// @Temporary, will be infered from file
-InputLayoutDesc pos_layout_desc;
-InputLayoutDesc pos_col_layout_desc;
-InputLayoutDesc pos_uv_layout_desc;
-///////////////////////////////////////////////
 
 // Private functions
 static void bind_srv_to_texture(Texture * texture);
 
-static bool create_shader(char * filename, ShaderInputMode input_mode, Shader * shader);
+static bool create_shader(char * filename, Shader * shader);
 
 static void draw_buffer(GraphicsBuffer * graphics_buffer, int buffer_index, TextureManager * texture_manager);
 
@@ -48,12 +41,18 @@ static ID3D11RenderTargetView * render_target_view;
 static ID3D11DepthStencilView * depth_stencil_view;
 static ID3D11Texture2D        * depth_stencil_buffer;
 
-// static ID3D11Buffer * d3d_vertex_buffer_interface;
 static ID3D11Buffer * positions_vertex_buffer;
 static ID3D11Buffer * colors_vertex_buffer;
 static ID3D11Buffer * texture_uvs_vertex_buffer;
 
 static ID3D11Buffer * d3d_index_buffer_interface;
+
+// Layout row descriptions
+static D3D11_INPUT_ELEMENT_DESC position_row_desc;
+static D3D11_INPUT_ELEMENT_DESC color_row_desc;
+static D3D11_INPUT_ELEMENT_DESC uv_row_desc;
+
+static Array<InputLayout> input_layouts;
 
 static ID3D11SamplerState * default_sampler_state;
 
@@ -212,24 +211,15 @@ void init_platform_renderer(Vector2f rendering_resolution, void * handle) {
 
     d3d_dc->PSSetSamplers(0, 1, &default_sampler_state);
 
-    // Init shader layouts @Temporary
-    pos_layout_desc.num_inputs     = 1;
-	pos_layout_desc.desc           = (D3D11_INPUT_ELEMENT_DESC * ) malloc(sizeof(D3D11_INPUT_ELEMENT_DESC) * pos_layout_desc.num_inputs);
-	pos_layout_desc.desc[0]        = { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 };
+    // Input Layouts
+    position_row_desc = { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 };
+    color_row_desc    = { "COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 };
+    uv_row_desc       = { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,       2, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 };
 
-	pos_uv_layout_desc.num_inputs  = 2;
-	pos_uv_layout_desc.desc        = (D3D11_INPUT_ELEMENT_DESC * ) malloc(sizeof(D3D11_INPUT_ELEMENT_DESC) * pos_uv_layout_desc.num_inputs);
-    pos_uv_layout_desc.desc[0]     = { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0,                            D3D11_INPUT_PER_VERTEX_DATA, 0 };
-    pos_uv_layout_desc.desc[1]     = { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    2, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 };
-
-    pos_col_layout_desc.num_inputs = 2;
-	pos_col_layout_desc.desc       = (D3D11_INPUT_ELEMENT_DESC * ) malloc(sizeof(D3D11_INPUT_ELEMENT_DESC) * pos_col_layout_desc.num_inputs);
-    pos_col_layout_desc.desc[0]    = { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT,    0, 0,                            D3D11_INPUT_PER_VERTEX_DATA, 0 };
-    pos_col_layout_desc.desc[1]    = { "COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 };
-
+    // Dummy shader
     dummy_shader = (Shader *) malloc(sizeof(Shader));
 
-    create_shader("dummy_shader.hlsl", POS, dummy_shader);
+    create_shader("dummy_shader.hlsl", dummy_shader);
 }
 
 void draw_frame(GraphicsBuffer * graphics_buffer, int num_buffers, TextureManager * texture_manager) {
@@ -247,50 +237,50 @@ void draw_frame(GraphicsBuffer * graphics_buffer, int num_buffers, TextureManage
     swap_chain->Present(0, 0);
 }
 
-static void update_buffers(DrawBatch * batch, ShaderInputMode mode) {
+static void update_buffers(DrawBatch * batch) {
     // Update vertex buffers
-    D3D11_MAPPED_SUBRESOURCE resource = {};
-    d3d_dc->Map(positions_vertex_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
-    memcpy(resource.pData, batch->positions.data, sizeof(Vector3f) * batch->positions.count);
-    d3d_dc->Unmap(positions_vertex_buffer, 0);
+    if(d3d_shader.position_index >= 0) {
+        D3D11_MAPPED_SUBRESOURCE resource = {};
+        d3d_dc->Map(positions_vertex_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
+        memcpy(resource.pData, batch->positions.data, sizeof(Vector3f) * batch->positions.count);
+        d3d_dc->Unmap(positions_vertex_buffer, 0);
+    }
 
-    if(mode == POS_COL) {
-        resource = {};
+    if(d3d_shader.color_index >= 0) {
+        D3D11_MAPPED_SUBRESOURCE resource = {};
         d3d_dc->Map(colors_vertex_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
         memcpy(resource.pData, batch->colors.data, sizeof(Color4f) * batch->colors.count);
         d3d_dc->Unmap(colors_vertex_buffer, 0);
     }
 
-    if(mode == POS_UV) {
-        resource = {};
+    if(d3d_shader.uv_index >= 0) {
+        D3D11_MAPPED_SUBRESOURCE resource = {};
         d3d_dc->Map(texture_uvs_vertex_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
         memcpy(resource.pData, batch->texture_uvs.data, sizeof(Vector2f) * batch->texture_uvs.count);
         d3d_dc->Unmap(texture_uvs_vertex_buffer, 0);
     }
 
     // Update index buffer
-    resource = {};
+    D3D11_MAPPED_SUBRESOURCE resource = {};
     d3d_dc->Map(d3d_index_buffer_interface, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
     memcpy(resource.pData, batch->indices.data, sizeof( int ) *  batch->indices.count);
     d3d_dc->Unmap(d3d_index_buffer_interface, 0);
 }
 
-// @Rewrite This is really ugly, rewrite and refactor things
 static void draw_buffer(GraphicsBuffer * graphics_buffer, int buffer_index, TextureManager * texture_manager) {
 
     DrawBatch * batch = &graphics_buffer->batches.data[buffer_index];
 
-	Shader * shader = batch->info.shader;
+    Shader * shader = batch->info.shader;
 
-	if (shader != last_shader_set) {
-		switch_to_shader(shader);
-		last_shader_set = shader;
-	}
+    if (shader != last_shader_set) {
+        switch_to_shader(shader);
+        last_shader_set = shader;
+    }
 
-    update_buffers(batch, shader->input_mode);
+    update_buffers(batch);
 
-    if(d3d_shader.input_mode == POS_UV) {
-
+    if(d3d_shader.position_index >= 0) {
         char * texture_name = batch->info.texture;
 
         Texture * texture = (Texture *) texture_manager->table.find(texture_name);
@@ -307,30 +297,16 @@ static void draw_buffer(GraphicsBuffer * graphics_buffer, int buffer_index, Text
             free(texture->platform_info);
         }
 
-
-        // This texture doesn't have its platform info, let's give it one
         if(texture->platform_info == NULL) {
             texture->platform_info = (PlatformTextureInfo *) malloc(sizeof(PlatformTextureInfo));
             bind_srv_to_texture(texture);
         }
 
-        // Send texture to shader if it's different from last time
-		if (last_texture_set == NULL || !(strcmp(last_texture_set, texture_name) == 0)) {
-			d3d_dc->PSSetShaderResources(0, 1, &texture->platform_info->srv);
-			last_texture_set = texture_name;
-		}
-
-    } else if(d3d_shader.input_mode == POS_COL) {
-        // Nothing to do
-
-    } else {
-        // @Temporary, we need to fix dummy shader so that it can accept any input.
-        if(d3d_shader.input_mode != NONE) {
-            log_print("draw_buffer", "Unsupported shader input mode");
+        if (last_texture_set == NULL || !(strcmp(last_texture_set, texture_name) == 0)) {
+            d3d_dc->PSSetShaderResources(0, 1, &texture->platform_info->srv);
+            last_texture_set = texture_name;
         }
-        return;
     }
-
     d3d_dc->DrawIndexed(batch->indices.count, 0, 0);
 }
 
@@ -547,7 +523,7 @@ void parse_input_layout_from_file(char * file_name, char * c_file_data, Shader *
                 scope_exit(free(c_token));
 
                 if     (strcmp("POSITION", c_token) == 0) shader->position_index = arg_index;
-                else if(strcmp("COLOR",    c_token) == 0) shader->color_index    = arg_index;
+                else if(strcmp("COLOR"   , c_token) == 0) shader->color_index    = arg_index;
                 else if(strcmp("TEXCOORD", c_token) == 0) shader->uv_index       = arg_index;
 
                 arg_index += 1;
@@ -563,18 +539,63 @@ void parse_input_layout_from_file(char * file_name, char * c_file_data, Shader *
         return;
     }
 
-    printf("--------> Parsed inputs:\n", shader->position_index, shader->color_index, shader->uv_index);
+ //    printf("--------> Parsed inputs:\n", shader->position_index, shader->color_index, shader->uv_index);
 
-    if(shader->position_index >= 0) printf("                POSITION @ index %d\n", shader->position_index);
-    if(shader->color_index    >= 0) printf("                COLOR    @ index %d\n", shader->color_index);
-    if(shader->uv_index       >= 0) printf("                TEXCOORD @ index %d\n", shader->uv_index);
+ //    if(shader->position_index >= 0) printf("                POSITION @ index %d\n", shader->position_index);
+ //    if(shader->color_index    >= 0) printf("                COLOR    @ index %d\n", shader->color_index);
+ //    if(shader->uv_index       >= 0) printf("                TEXCOORD @ index %d\n", shader->uv_index);
 
-	printf("\n");
+    // printf("\n");
+}
+
+InputLayout * assign_or_create_input_layout(Shader * shader) {
+    InputLayout layout;
+
+    // @Incomplete: add_at_index can overwrite, there's no real way to check if it happens right now,
+    // but it shouldn't.
+    //
+    // @Incomplete: We should also probably check that the indices are continuous.
+
+    if(shader->position_index >= 0) {
+        layout.layout_desc.reserve(shader->position_index + 1);
+        layout.layout_desc.add_at_index(position_row_desc, shader->position_index);
+    }
+
+    if(shader->color_index >= 0) {
+        layout.layout_desc.reserve(shader->color_index + 1);
+        layout.layout_desc.add_at_index(color_row_desc, shader->color_index);
+    }
+
+    if(shader->uv_index >= 0) {
+        layout.layout_desc.reserve(shader->uv_index + 1);
+        layout.layout_desc.add_at_index(uv_row_desc, shader->uv_index);
+    }
+
+    int match_index = -1;
+
+    for_array(input_layouts.data, input_layouts.count) {
+        if(it->layout_desc.count == layout.layout_desc.count) {
+            if(memcmp(it->layout_desc.data, layout.layout_desc.data, layout.layout_desc.count * sizeof(D3D11_INPUT_ELEMENT_DESC)) == 0) {
+                match_index = it_index;
+                // printf("Found match !\n");
+            }
+        }
+    }
+
+    if(match_index >= 0) {
+        layout.layout_desc.reset(true); // Free the array we just made.
+        return &input_layouts.data[match_index];
+    } else {
+        input_layouts.add(layout);
+        return &input_layouts.data[input_layouts.count - 1];
+    }
 }
 
 bool compile_shader(Shader * shader) {
     shader->VS = NULL;
     shader->PS = NULL;
+
+    shader->input_layout = NULL;
 
     shader->position_index = -1;
     shader->color_index    = -1;
@@ -635,42 +656,20 @@ bool compile_shader(Shader * shader) {
         return false;
     }
 
-    // @Temporary, @Hack, @ThisIsTerrible
-
-    if(strcmp(shader->filename, "dummy_shader.hlsl")    == 0) { shader->input_mode = POS; }
-    if(strcmp(shader->filename, "textured_shader.hlsl") == 0) { shader->input_mode = POS_UV; }
-    if(strcmp(shader->filename, "font_shader.hlsl")     == 0) { shader->input_mode = POS_UV; }
-    if(strcmp(shader->filename, "colored_shader.hlsl")  == 0) { shader->input_mode = POS_COL; }
-
     parse_input_layout_from_file(shader->filename, file_data, shader);
+    InputLayout * input_layout = assign_or_create_input_layout(shader);
 
-	InputLayoutDesc * layout = NULL;
+    if (!input_layout->layout) {
+        d3d_device->CreateInputLayout(input_layout->layout_desc.data, input_layout->layout_desc.count, VS_bytecode->GetBufferPointer(), VS_bytecode->GetBufferSize(), (ID3D11InputLayout **) &input_layout->layout);
+    }
 
-	switch (shader->input_mode) {
-		case POS: {
-			layout = &pos_layout_desc;
-			break;
-		} case POS_UV: {
-			layout = &pos_uv_layout_desc;
-			break;
-		} case POS_COL: {
-			layout = &pos_col_layout_desc;
-			break;
-		}
-	}
+    shader->input_layout = (void *) input_layout->layout;
 
-	if (layout) {
-		d3d_device->CreateInputLayout(layout->desc, layout->num_inputs, VS_bytecode->GetBufferPointer(),
-			VS_bytecode->GetBufferSize(), (ID3D11InputLayout **)&shader->input_layout);
+    d3d_device->CreateVertexShader(VS_bytecode->GetBufferPointer(), VS_bytecode->GetBufferSize(),
+                                   NULL, (ID3D11VertexShader **)&shader->VS);
 
-		d3d_device->CreateVertexShader(VS_bytecode->GetBufferPointer(), VS_bytecode->GetBufferSize(),
-			NULL, (ID3D11VertexShader **)&shader->VS);
-
-		d3d_device->CreatePixelShader(PS_bytecode->GetBufferPointer(), PS_bytecode->GetBufferSize(),
-			NULL, (ID3D11PixelShader **)&shader->PS);
-	} else {
-		log_print("compile_shader", "Could not compile shader %s, the input mode was unknown (value was %d)", shader->filename, shader->input_mode);
-	}
+    d3d_device->CreatePixelShader(PS_bytecode->GetBufferPointer(), PS_bytecode->GetBufferSize(),
+                                  NULL, (ID3D11PixelShader **)&shader->PS);
 
     VS_bytecode->Release();
     PS_bytecode->Release();
@@ -678,10 +677,8 @@ bool compile_shader(Shader * shader) {
     return true;
 }
 
-static bool create_shader(char * filename, ShaderInputMode input_mode, Shader * shader){
+static bool create_shader(char * filename, Shader * shader){
     shader->filename = filename;
-
-    shader->input_mode = input_mode;
 
     char path[512];;
     snprintf(path, 512, "data/shaders/%s", shader->filename);
@@ -691,13 +688,18 @@ static bool create_shader(char * filename, ShaderInputMode input_mode, Shader * 
 
 static void switch_to_shader(Shader * shader) {
     if(shader->VS == NULL) {
-        d3d_shader.VS           = dummy_shader->VS;
-		d3d_shader.input_layout = dummy_shader->input_layout;
-        d3d_shader.input_mode   = dummy_shader->input_mode;
+        d3d_shader.VS             = dummy_shader->VS;
+        d3d_shader.input_layout   = dummy_shader->input_layout;
+        d3d_shader.position_index = dummy_shader->position_index;
+        d3d_shader.color_index    = dummy_shader->color_index;
+        d3d_shader.uv_index       = dummy_shader->uv_index;
+
     } else {
-        d3d_shader.VS           = shader->VS;
-		d3d_shader.input_layout = shader->input_layout;
-        d3d_shader.input_mode   = shader->input_mode;
+        d3d_shader.VS             = shader->VS;
+        d3d_shader.input_layout   = shader->input_layout;
+        d3d_shader.position_index = shader->position_index;
+        d3d_shader.color_index    = shader->color_index;
+        d3d_shader.uv_index       = shader->uv_index;
     }
 
     if(shader->PS == NULL) {

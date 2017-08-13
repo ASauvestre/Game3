@@ -1,12 +1,5 @@
 #include "asset_manager.h"
 
-enum ShaderInputMode {
-    NONE,
-    POS,
-    POS_COL,
-    POS_UV
-};
-
 // Lots of void * because this is going to be used by multiple Graphics APIs
 struct Shader : Asset {
     char * filename;
@@ -14,14 +7,12 @@ struct Shader : Asset {
     void * VS;
     void * PS;
 
-    void * input_layout; // @Temporary, I don't like this very much, I wonder if we could have handle input layouts in D3D the same way OGL does them (ie, not shader bound)
+    void * input_layout = NULL;
 
     // Indices of input types in the Vertex Shader
     int position_index = -1;
     int color_index    = -1;
     int uv_index       = -1;
-
-    ShaderInputMode input_mode;
 };
 
 struct ShaderManager : AssetManager_Poly<Shader> {

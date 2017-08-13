@@ -35,6 +35,7 @@ struct Array {
     void reset           (bool free_memory = false);
 
     bool reserve         (int size, bool zero = false);
+
 };
 
 // ************************ //
@@ -52,7 +53,7 @@ bool Array<T>::add_at_index(T item, int index) {
     memcpy(&this->data[index], &item, sizeof(T)); // @Warning potential overwrite.
     // this->data[this->count] = item;
 
-    this->count += 1;
+    this->count += 1; // @Bug @Incomplete, This doesn't work if data[index was previously assigned], there is no real solution for this, the Array struct just isn't made for this job. We could have an occupancy mask that checks this.
 
     return true;
 

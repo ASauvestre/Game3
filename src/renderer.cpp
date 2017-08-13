@@ -90,27 +90,37 @@ void set_buffer_mode(BufferMode buffer_mode) {
 //
 void find_or_create_compatible_batch() {
 
+    // @Ugly @Refactor: Fix this.
     if(current_batch) {
         if(previous_batch_info.shader == current_batch_info.shader) {
+
             Shader * current_shader = current_batch_info.shader;
-            if(current_shader->input_mode == POS_COL) {
 
-                first_vertex_index_in_buffer = current_batch->positions.count;
-                return;
-            }
-
-            if(current_shader->input_mode == POS_UV) {
-                if (strcmp(current_batch_info.texture, previous_batch_info.texture) == 0) {
-
+            // If we have colors
+            if(current_shader->color_index >= 0) {
+                // And same texture as before if we have textures.
+                if(current_shader->uv_index >= 0) {
+                    if (strcmp(current_batch_info.texture, previous_batch_info.texture) == 0) {
+                        first_vertex_index_in_buffer = current_batch->positions.count;
+                        return;
+                    }
+                } else {
                     first_vertex_index_in_buffer = current_batch->positions.count;
                     return;
+                }
+            } else {
+                // We don't have colors, do we have the same texture as before ?
+                if(current_shader->uv_index >= 0) {
+                    if (strcmp(current_batch_info.texture, previous_batch_info.texture) == 0) {
+                        first_vertex_index_in_buffer = current_batch->positions.count;
+                        return;
+                    }
                 }
             }
         }
     }
 
     // Create a new batch and add it to the buffer.
-
     DrawBatch new_batch;
     new_batch.info = current_batch_info;
 
