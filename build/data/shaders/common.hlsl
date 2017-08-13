@@ -1,6 +1,6 @@
 // For parsing the input layout
 #define VS_FUNC
-#define PS_FUNC
+#define PS_FUNC // Useless
 
 float4 convert_coords(float4 pos) {
     pos.x *= 2.0f;

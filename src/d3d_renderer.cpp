@@ -23,8 +23,6 @@ static void bind_srv_to_texture(Texture * texture);
 
 static bool create_shader(char * filename, Shader * shader);
 
-static void draw_buffer(GraphicsBuffer * graphics_buffer, int buffer_index, TextureManager * texture_manager);
-
 static void switch_to_shader(Shader * shader);
 
 // Constants
@@ -63,7 +61,7 @@ static Shader * last_shader_set;
 
 static Shader d3d_shader;
 
-static char * last_texture_set;
+static Texture * last_texture_set;
 
 void init_platform_renderer(Vector2f rendering_resolution, void * handle) {
     DXGI_MODE_DESC  buffer_desc = {};
@@ -207,7 +205,7 @@ void init_platform_renderer(Vector2f rendering_resolution, void * handle) {
 
     d3d_device->CreateBlendState(&blend_desc, &transparent_blend_state);
 
-    d3d_dc->OMSetBlendState(transparent_blend_state, NULL, 0xffffffff);
+    d3d_dc->OMSetBlendState(transparent_blend_state, NULL, 0xFFFFFFFF);
 
     d3d_dc->PSSetSamplers(0, 1, &default_sampler_state);
 
@@ -222,18 +220,15 @@ void init_platform_renderer(Vector2f rendering_resolution, void * handle) {
     create_shader("dummy_shader.hlsl", dummy_shader);
 }
 
-void draw_frame(GraphicsBuffer * graphics_buffer, int num_buffers, TextureManager * texture_manager) {
+void init_frame() {
     // Clear view
-    float color_array[4] = {0.29f, 0.84f, 0.93f, 1.0f}; // Sky blue @Temporary, move the sky background buffering to game_main.
+    float color_array[4] = {0.29f, 0.84f, 0.93f, 1.0f};
 
     d3d_dc->ClearRenderTargetView(render_target_view, color_array);
     d3d_dc->ClearDepthStencilView(depth_stencil_view, D3D11_CLEAR_DEPTH|D3D11_CLEAR_STENCIL, 1.0f, 0);
+}
 
-    for(int i = 0; i < num_buffers; i++) {
-        // Draw buffer
-        draw_buffer(graphics_buffer, i, texture_manager);
-    }
-
+void present_frame() {
     swap_chain->Present(0, 0);
 }
 
@@ -267,10 +262,7 @@ static void update_buffers(DrawBatch * batch) {
     d3d_dc->Unmap(d3d_index_buffer_interface, 0);
 }
 
-static void draw_buffer(GraphicsBuffer * graphics_buffer, int buffer_index, TextureManager * texture_manager) {
-
-    DrawBatch * batch = &graphics_buffer->batches.data[buffer_index];
-
+void draw_batch(DrawBatch * batch) {
     Shader * shader = batch->info.shader;
 
     if (shader != last_shader_set) {
@@ -281,12 +273,11 @@ static void draw_buffer(GraphicsBuffer * graphics_buffer, int buffer_index, Text
     update_buffers(batch);
 
     if(d3d_shader.position_index >= 0) {
-        char * texture_name = batch->info.texture;
 
-        Texture * texture = (Texture *) texture_manager->table.find(texture_name);
+        Texture * texture = batch->info.texture;
 
         if(texture == NULL) {
-            log_print("draw_buffer", "Texture %s was not found in the catalog", texture_name);
+            log_print("draw_buffer", "Texture %s was not found in the catalog", texture->name);
             return;
         }
 
@@ -302,9 +293,9 @@ static void draw_buffer(GraphicsBuffer * graphics_buffer, int buffer_index, Text
             bind_srv_to_texture(texture);
         }
 
-        if (last_texture_set == NULL || !(strcmp(last_texture_set, texture_name) == 0)) {
+        if ((last_texture_set == NULL) || (last_texture_set != texture)) {
             d3d_dc->PSSetShaderResources(0, 1, &texture->platform_info->srv);
-            last_texture_set = texture_name;
+            last_texture_set = texture;
         }
     }
     d3d_dc->DrawIndexed(batch->indices.count, 0, 0);

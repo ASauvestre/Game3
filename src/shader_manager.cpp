@@ -9,7 +9,7 @@ void ShaderManager::init() {
 Shader * ShaderManager::load_shader(char * file_name) {
     Shader * shader = (Shader *) malloc(sizeof(Shader));
 
-    shader->name = file_name;
+    shader->name     = file_name;
     shader->filename = file_name;
 
     do_load_shader(shader);

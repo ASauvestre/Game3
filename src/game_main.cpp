@@ -960,7 +960,7 @@ float buffer_string(char * text, float x, float y, float z,  Font * font, Aligne
         text_width = (float) ((int)(zero_x + 0.5f)) / window_data.width;
     }
 
-    set_texture(font->texture->name);
+    set_texture(font->texture);
     set_shader(font_shader);
 
     start_buffer();
@@ -1008,8 +1008,8 @@ float buffer_string(char * text, float x, float y, float z,  Font * font, Aligne
 }
 
 
-// Incomplete, handle uv coordinates
-void buffer_textured_quad(float x, float y, Alignement alignement, float width, float height, float depth, char * texture) {
+// Incomplete, handle uv coordinates and consider using texture pointer instead of name as an argument
+void buffer_textured_quad(float x, float y, Alignement alignement, float width, float height, float depth, char * texture_name) {
     float x0 = x;
     float y0 = y;
     float x1 = x + width;
@@ -1019,6 +1019,8 @@ void buffer_textured_quad(float x, float y, Alignement alignement, float width, 
         y0 -= height;
         y1 -= height;
     }
+
+    Texture * texture = texture_manager.table.find(texture_name);
 
     set_shader(textured_shader);
     set_texture(texture);
@@ -1138,8 +1140,7 @@ void main() {
 
         game();
 
-        draw(&texture_manager);
-        clear_buffers();
+        draw_frame();
 
         check_hotloader_modifications();
         texture_manager.perform_reloads();

@@ -14,12 +14,19 @@ struct Font;
 
 // DLL functions
 typedef void (*INIT_PLATFORM_RENDERER_FUNC) (Vector2f, void*);
-typedef void (*DRAW_FRAME_FUNC)             (GraphicsBuffer*, int, TextureManager*);
 typedef bool (*COMPILE_SHADER_FUNC)         (Shader*);
+typedef bool (*INIT_FRAME)                  ();
+typedef bool (*DRAW_BATCH)                  (DrawBatch*);
+typedef bool (*PRESENT_FRAME)               ();
 
 INIT_PLATFORM_RENDERER_FUNC init_platform_renderer;
-DRAW_FRAME_FUNC draw_frame;
 COMPILE_SHADER_FUNC compile_shader;
+INIT_FRAME init_frame;
+DRAW_BATCH draw_batch;
+PRESENT_FRAME present_frame;
+
+// Prototypes
+static void clear_buffers();
 
 // Globals
 static BufferMode current_buffer_mode = QUADS;
@@ -38,12 +45,16 @@ static int num_buffers = 0;
 
 static Vector2f rendering_resolution;
 
+static bool frame_initted = false;
+
 static void load_graphics_dll() {
     void * graphics_library_dll = os_specific_load_dll("d3d_renderer.dll"); //@Robustness Handle failed loading (maybe try another dll or at least die gracefully)
 
     init_platform_renderer = (INIT_PLATFORM_RENDERER_FUNC) os_specific_get_address_from_dll(graphics_library_dll, "init_platform_renderer");
-    draw_frame             = (DRAW_FRAME_FUNC)             os_specific_get_address_from_dll(graphics_library_dll, "draw_frame");
 	compile_shader         = (COMPILE_SHADER_FUNC)         os_specific_get_address_from_dll(graphics_library_dll, "compile_shader");
+    init_frame             = (INIT_FRAME)                  os_specific_get_address_from_dll(graphics_library_dll, "init_frame");
+    draw_batch             = (DRAW_BATCH)                  os_specific_get_address_from_dll(graphics_library_dll, "draw_batch");
+    present_frame          = (PRESENT_FRAME)               os_specific_get_address_from_dll(graphics_library_dll, "present_frame");
 }
 
 void init_renderer(int width, int height, void * handle) {
@@ -56,20 +67,36 @@ void init_renderer(int width, int height, void * handle) {
 	init_platform_renderer(rendering_resolution, handle);
 }
 
-void draw(TextureManager * tm) {
+void draw_frame() {
+    flush_buffers();
+
+    present_frame();
+    frame_initted = false;
+}
+
+void flush_buffers() {
     perf_monitor();
 
     assert(!buffering);
 
-	// From platfrom_renderer
-	draw_frame(&graphics_buffer, num_buffers, tm);
+    if(!frame_initted) {
+        frame_initted = true;
+        init_frame();
+    }
+
+    for(int i = 0; i < num_buffers; i++) {
+        DrawBatch * batch = &graphics_buffer.batches.data[i];
+        draw_batch(batch);
+    }
+
+    clear_buffers();
 }
 
 void set_shader(Shader * shader) {
     current_batch_info.shader = shader;
 }
 
-void set_texture(char * texture) {
+void set_texture(Texture * texture) {
     assert(buffering == false); // Can't change texture while we're buffering
     current_batch_info.texture = texture; // @Temporary, find texture here ? At least check it exists.
 }
@@ -100,7 +127,7 @@ void find_or_create_compatible_batch() {
             if(current_shader->color_index >= 0) {
                 // And same texture as before if we have textures.
                 if(current_shader->uv_index >= 0) {
-                    if (strcmp(current_batch_info.texture, previous_batch_info.texture) == 0) {
+                    if (current_batch_info.texture == previous_batch_info.texture) {
                         first_vertex_index_in_buffer = current_batch->positions.count;
                         return;
                     }
@@ -111,7 +138,7 @@ void find_or_create_compatible_batch() {
             } else {
                 // We don't have colors, do we have the same texture as before ?
                 if(current_shader->uv_index >= 0) {
-                    if (strcmp(current_batch_info.texture, previous_batch_info.texture) == 0) {
+                    if (current_batch_info.texture == previous_batch_info.texture) {
                         first_vertex_index_in_buffer = current_batch->positions.count;
                         return;
                     }
@@ -193,7 +220,7 @@ void end_buffer() {
 	buffering = false;
 }
 
-void clear_buffers() {
+static void clear_buffers() {
     for_array(graphics_buffer.batches.data, graphics_buffer.batches.count) {
         it->positions.reset(true);
         it->colors.reset(true);

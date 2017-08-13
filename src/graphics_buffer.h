@@ -8,6 +8,7 @@ enum BufferMode;
 struct Shader;
 struct DrawBatch;
 struct DrawBatchInfo;
+struct Texture;
 
 struct Color4f {
     Color4f() {}
@@ -32,8 +33,8 @@ struct GraphicsBuffer {
 };
 
 struct DrawBatchInfo {
-	char * texture;
-	Shader * shader;
+    Texture * texture;
+	Shader  * shader;
 };
 
 struct DrawBatch {
