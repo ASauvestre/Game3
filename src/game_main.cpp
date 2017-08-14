@@ -324,7 +324,7 @@ void init_game() {
 
     // Init camera
     {
-        main_camera.size.x  = 32.0f;
+        main_camera.size.y  = 18.0f;
         main_camera.offset.x = 0.0f;
         main_camera.offset.y = 0.0f;
     }
@@ -392,7 +392,7 @@ void init_game() {
 void game() {
     perf_monitor();
 
-    main_camera.size.y = main_camera.size.x / window_data.aspect_ratio;
+    main_camera.size.x = main_camera.size.y * window_data.aspect_ratio;
 
     handle_user_input();
 
@@ -1069,7 +1069,7 @@ void update_time() {
     // @Incomplete, needs to sync up to GPU maybe. Or just use usual Vsync.
     if (window_data.locked_fps) {
         while (current_dt < 1.0f / TARGET_FPS) {
-           os_specific_sleep(0);
+            os_specific_sleep(0);
 
             now = os_specific_get_time();
             current_dt = now - last_time;

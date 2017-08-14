@@ -1,6 +1,7 @@
 #pragma once
 
 // Macros
+#define STRING_JOIN(x, y) STRING_JOIN2(x, y)
 #define STRING_JOIN2(x, y) x##y
 
 #define log_print(category, format, ...)                   \
@@ -30,7 +31,7 @@ template <typename F>
 _ScopeExit<F> _MakeScopeExit(F f) { return _ScopeExit<F>(f); };
 
 #define scope_exit(code)                                                     \
-    auto STRING_JOIN2(_scope_exit_, __LINE__) = _MakeScopeExit([=](){code;})
+    auto STRING_JOIN(_scope_exit_, __LINE__) = _MakeScopeExit([=](){code;})
 
 
 #ifdef PERF_MON

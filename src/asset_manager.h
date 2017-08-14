@@ -5,19 +5,26 @@
 #include <string.h>
 
 #include "table.h"
+#include "parsing.h" // For String
 
 struct Asset {
     char * name;
+
+    double last_reload_time = 0.0f;
+    double reload_timeout   = 0.1f;
 };
 
 struct AssetManager {
     Array<char *> directories;
 
-    Array<char *> assets_to_reload;
+    Array<String> assets_to_reload;
+
     // ------ Functions ------
-    virtual void reload_asset(char * file_path, char * file_name, char * extension);
+    virtual void reload_asset(String file_path, String file_name);
 
     void perform_reloads();
+
+    void init_asset(Asset * asset);
 };
 
 template <typename T>

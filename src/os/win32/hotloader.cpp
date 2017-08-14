@@ -16,8 +16,8 @@ struct Directory {
 };
 
 struct AssetChange {
-    char * file_name; // Subset of full_path
-    char * full_path; // On the heap
+    String file_name; // Subset of full_path
+    String full_path; // On the heap
 };
 
 // Private functions
@@ -38,7 +38,7 @@ static Array<AssetChange> asset_changes;
 static Array<AssetManager *> managers;
 
 void release(AssetChange * ac) {
-    free(ac->full_path);
+    free(ac->full_path.data);
 }
 
 void init_hotloader() {
@@ -86,11 +86,11 @@ void check_hotloader_modifications() {
 
         // log_print("check_hotloader_modifications", "Detected modication on file %s", change->file_name);
 
-        int path_without_filename_length = change->file_name - change->full_path;
+        String directory = change->full_path;
+        directory.count = change->full_path.count - change->file_name.count;
 
-        char * directory = (char *) alloca(path_without_filename_length + 1);
-        memcpy(directory, change->full_path, path_without_filename_length);
-        directory[path_without_filename_length] = 0;
+        char * c_directory = to_c_string(directory);
+        scope_exit(free(c_directory));
 
         // Look for a manager who's interested in changes from this directory
         int num_managers = managers.count;
@@ -101,13 +101,11 @@ void check_hotloader_modifications() {
             int num_subscribed_directories = am->directories.count;
 
             for(int j = 0; j < num_subscribed_directories; j++) {
-                if(strcmp(am->directories.data[j], directory) == 0) {
-                    am->assets_to_reload.add(strdup(change->full_path));
+                if(strcmp(am->directories.data[j], c_directory) == 0) {
+                    am->assets_to_reload.add(change->full_path);
                 }
             }
         }
-
-        release(change);
     }
 
     asset_changes.reset(true);
@@ -144,8 +142,8 @@ static void handle_notifications() {
 
     FILE_NOTIFY_INFORMATION * notification = dir.notifications;
     while(notification != NULL) {
-        if (notification->Action == FILE_ACTION_MODIFIED)         {} // @Incomplete, maybe send the action to the relevant catalogs
-        else if (notification->Action == FILE_ACTION_ADDED) {} // @Incomplete, maybe send the action to the relevant catalogs
+        if      (notification->Action == FILE_ACTION_MODIFIED)         {} // @Incomplete, maybe send the action to the relevant catalogs
+        else if (notification->Action == FILE_ACTION_ADDED)            {} // @Incomplete, maybe send the action to the relevant catalogs
         else if (notification->Action == FILE_ACTION_RENAMED_NEW_NAME) {} // @Incomplete, maybe send the action to the relevant catalogs
         else {
             // log_print("check_hotloader_modifications", "Ignored action %d", notification->Action);
@@ -165,12 +163,10 @@ static void handle_notifications() {
             assert(false);
         }
 
-        change.full_path = (char *) malloc(path_length + 1);
-        memcpy(change.full_path, name_buffer, path_length);
+        change.full_path.data = (char *) malloc(path_length);
+        memcpy(change.full_path.data, name_buffer, path_length);
 
-        // Adding 0-termination to the string
-        change.full_path[path_length] = 0;
-
+        change.full_path.count = path_length;
 
         notification = bump_ptr_to_next_notification(notification);
 
@@ -180,17 +176,17 @@ static void handle_notifications() {
 		}
 
         // Isolate file name from the path
-		char * t = find_char_from_right('/', change.full_path);
-		if (t) {
+		String t = find_char_from_right('/', change.full_path);
+		if (t.count) {
 			change.file_name = t;
-		}
-		else {
+		} else {
+
             // The change didn't happen in a directory, so it's either a file at the root
             // folder or a directory change notification, let's try and see if it has an extension
 
-            char * t = find_char_from_right('.', change.full_path);
+            String t = find_char_from_right('.', change.full_path);
 
-            if(t) {
+            if(t.count) {
                 // File at root folder
                 change.file_name = change.full_path;
             } else {
@@ -199,6 +195,11 @@ static void handle_notifications() {
             }
 
 		}
+
+        // Check uniqueness @Meh
+        for_array(asset_changes.data, asset_changes.count) {
+            if(it->full_path == change.full_path) return;
+        }
 
         asset_changes.add(change);
     }

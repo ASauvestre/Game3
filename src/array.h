@@ -110,7 +110,7 @@ int Array<T>::remove(T item) {
 
     int size = sizeof(T);
     for_array(this->data, this->count) {
-        if (memcmp( it, &item, size) == 0) {
+        if (memcmp(it, &item, size) == 0) {
             this->remove_by_index(it_index);
 
             removed += 1;

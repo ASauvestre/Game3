@@ -1,5 +1,7 @@
 #pragma once
 
+#include "string.h"
+
 struct String {
     char * data  = NULL;
     int    count = 0;
@@ -14,6 +16,11 @@ struct String {
 
         return *this;
     }
+
+    bool operator==(String & b) {
+        if(this->count != b.count) return false;
+        return (memcmp(this->data, b.data, b.count) == 0);
+    }
 };
 
 String cut_until_char(char c, String * string);
@@ -25,5 +32,5 @@ void   push(String * string, int amount = 1);
 
 char * to_c_string(String string);
 
-char * find_char_from_right(char c, char * string);
-char * find_char_from_left(char c, char * string);
+String find_char_from_right(char c, String string);
+String find_char_from_left (char c, String string);

@@ -7,8 +7,19 @@
 //     return this->table.add(asset->name, asset);
 // }
 
-void AssetManager::reload_asset(char * file_path, char * file_name, char * extension) {
-    log_print("reload_asset", "Asset %s is up for reloading, but the manager has no reload_asset funtion", file_name);
+// @Cleanup, move this to placeholder making.
+void AssetManager::init_asset(Asset * asset) {
+    asset->last_reload_time = 0.0f;
+    asset->reload_timeout   = 0.1f;
+}
+
+void AssetManager::reload_asset(String file_path, String file_name) {
+    char * c_file_name = to_c_string(file_name);
+    scope_exit(free(c_file_name));
+
+    log_print("reload_asset", "Asset %s is up for reloading, but the manager has no reload_asset funtion", c_file_name);
+
+
 }
 
 void AssetManager::perform_reloads() {
@@ -17,29 +28,20 @@ void AssetManager::perform_reloads() {
     int num_assets_to_reload = am->assets_to_reload.count;
 
     for(int i = 0; i < num_assets_to_reload; i++) {
-        char * file_path = am->assets_to_reload.data[i];
-        scope_exit(free(file_path)); // Allocated by strdup in hotloader.cpp
+        String file_path = am->assets_to_reload.data[i];
+        scope_exit(free(file_path.data)); // Allocated by strdup in hotloader.cpp
 
-        char * file_name = find_char_from_right('/', file_path); // @Redundant, this is already computed in hotloader.cpp, we could simply have another array with file names to reload.
+        // @Redundant, this is already computed in hotloader.cpp, we could simply have another array with file names to reload.
+        String file_name = find_char_from_right('/', file_path);
 
-        if(file_name == NULL) {
-            file_name = file_path + 1; // Root directory
+        if(!file_name.count) {
+            file_name = file_path;
+            push(&file_name); // Gets rid of '/'
         }
-
-        char * extension = find_char_from_left('.', file_name);
-
-        if(extension == NULL) {
-            log_print("perform_manager_reloads", "Skipped file %s because it has no extension", file_name);
-            continue;
-        }
+        // End @Redundant
 
         // @Incomplete, allow filtering by extension
-        // @Incomplete, we're getting two of those when PS saves, make sure we update only once.
-        // @Incomplete @Temporary, the extension check shouldn't happen here.
-        reload_asset(file_path, file_name, extension);
-
-        // log_print("perform_manager_reloads", "Texture with file_name %s and extension %s up for reload. Full path is : %s", file_name, extension, file_path);
-}
-
+        reload_asset(file_path, file_name);
+    }
     am->assets_to_reload.reset(true);
 }

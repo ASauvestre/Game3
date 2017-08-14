@@ -18,7 +18,7 @@ struct Shader : Asset {
 struct ShaderManager : AssetManager_Poly<Shader> {
     void init();
 
-    void reload_asset(char * file_path, char * file_name, char * extension);
+    void reload_asset(String file_path, String file_name);
 
     Shader * load_shader(char * file_name);
 };

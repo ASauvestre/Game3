@@ -96,29 +96,31 @@ String bump_to_next_line(String * string) {
     return line;
 }
 
-char * find_char_from_right(char c, char * string) {
-    char * cursor = string;
-    char * last_char_occurence = NULL;
+// Returns String right of char, non-inclusive
+String find_char_from_right(char c, String string) {
+    String rhs;
+    rhs.data = string.data + string.count; // Pointer to end of string
 
-    while(*cursor != '\0') {
-        if(*cursor == c) {
-            last_char_occurence = cursor + 1;
-        }
-        cursor += 1; // Move to next character
+    for(int i = string.count - 1; i >= 0; i--) {
+        if(string[i] == c) break;
+
+        rhs.data  -= 1;
+        rhs.count += 1;
     }
 
-    return last_char_occurence;
+    return rhs;
 }
 
-char * find_char_from_left(char c, char * string) {
-    char * cursor = string;
+// Returns String right of char, non-inclusive
+String find_char_from_left(char c, String string) {
+    String rhs = string;
 
-    while(*cursor != '\0') {
-        if(*cursor == c) {
-            return cursor + 1;
-        }
-        cursor += 1; // Move to next character
+    for(int i = 0; i < string.count; i++) {
+        rhs.data  += 1;
+        rhs.count -= 1;
+
+        if(string[i] == c) break;
     }
 
-    return NULL;
+    return rhs;
 }
