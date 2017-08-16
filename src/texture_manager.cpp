@@ -11,10 +11,9 @@ void TextureManager::init() {
 }
 
 Texture * TextureManager::create_texture(char * name, unsigned char * data, int width, int height, int bytes_per_pixel) { // Default : bytes_per_pixel = 4
-    Texture * texture = (Texture * ) malloc(sizeof(Texture));
-    init_asset(texture);
+    create_placeholder(name);
+    Texture * texture = this->table.find(name);
 
-    texture->name            = name;
     texture->bitmap          = data;
     texture->width           = width;
     texture->height          = height;
@@ -22,19 +21,51 @@ Texture * TextureManager::create_texture(char * name, unsigned char * data, int 
     texture->width_in_bytes  = width * bytes_per_pixel;
     texture->num_bytes       = width * height * bytes_per_pixel;
 
-    // These should be default values, but since we're allocating textures on
-    // the heap by default, those aren't set, so we do it here.
+    return texture;
+}
+
+void TextureManager::load_texture(char * name) {
+    Texture * texture = this->table.find(name);
+
+    if(!texture) {
+        create_placeholder(name);
+		texture = this->table.find(name);
+    }
+
+    do_load_texture(texture);
+}
+
+void TextureManager::create_placeholder(char * name) {
+    Texture * texture = (Texture * ) malloc(sizeof(Texture));
+    this->init_asset(texture);
+
+    texture->name          = name;
     texture->dirty         = false;
     texture->platform_info = NULL;
 
     this->table.add(name, texture);
+}
 
-    return texture;
+// @Think, make this part of AssetManager_Poly ?
+void TextureManager::reload_or_create_asset(String file_path, String file_name) {
+    char * c_file_name = to_c_string(file_name);
+
+    Asset * asset = this->table.find(c_file_name);
+
+    if(!asset) {
+        create_placeholder(c_file_name);
+        asset = this->table.find(c_file_name);
+    }
+
+    if((os_specific_get_time() - asset->last_reload_time) < asset->reload_timeout) {
+        return;
+    }
+
+    do_load_texture((Texture *) asset);
 }
 
 // @Incomplete Handle other file types in addition to PNG.
 void TextureManager::do_load_texture(Texture * texture) {
-
     char path[512];
     snprintf(path, 512, "data/textures/%s", texture->name);
 
@@ -65,46 +96,7 @@ void TextureManager::do_load_texture(Texture * texture) {
     texture->bytes_per_pixel  = bytes_per_pixel;
     texture->width_in_bytes   = width * bytes_per_pixel;
     texture->num_bytes        = width * height * bytes_per_pixel;
+
     texture->last_reload_time = os_specific_get_time();
-}
-
-void TextureManager::load_texture(char * name) {
-    Texture * texture = this->table.find(name);
-
-    if(!texture) {
-        texture = (Texture * ) malloc(sizeof(Texture));
-        this->init_asset(texture);
-
-        texture->name          = name;
-        texture->dirty         = false;
-        texture->platform_info = NULL;
-
-        this->table.add(name, texture);
-    }
-
-    do_load_texture(texture);
-}
-
-void TextureManager::reload_asset(String file_path, String file_name) {
-
-    char * c_file_name = to_c_string(file_name);
-    scope_exit(free(c_file_name));
-
-    Texture * texture = this->table.find(c_file_name);
-
-    if (!texture) {
-        log_print("reload_asset", "Texture file %s is not registered in the manager, so we're not reloading it", c_file_name); // @Incomplete, this still gets printed twice, It shouldn't matter since we'll probably load all the files and this will probably go away.
-        return;
-    }
-
-    if((os_specific_get_time() - texture->last_reload_time) < texture->reload_timeout) {
-        return;
-    }
-
-    log_print("reload_asset", "Asset change on file %s caught by the texture manager", c_file_name);
-
     texture->dirty = true;
-
-    do_load_texture(texture);
-
 }

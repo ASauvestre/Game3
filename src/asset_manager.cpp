@@ -13,11 +13,16 @@ void AssetManager::init_asset(Asset * asset) {
     asset->reload_timeout   = 0.1f;
 }
 
-void AssetManager::reload_asset(String file_path, String file_name) {
+// @Incomplete, make those pointers instead of v functions
+void AssetManager::create_placeholder(char * name) {
+    log_print("create_placeholder", "we ned to create a placeholder for asset %s, but the manager has no create_placeholder function", name);
+}
+
+void AssetManager::reload_or_create_asset(String file_path, String file_name) {
     char * c_file_name = to_c_string(file_name);
     scope_exit(free(c_file_name));
 
-    log_print("reload_asset", "Asset %s is up for reloading, but the manager has no reload_asset funtion", c_file_name);
+    log_print("reload_or_create_asset", "Asset %s is up for reloading, but the manager has no reload_or_create_asset function", c_file_name);
 }
 
 void AssetManager::perform_reloads() {
@@ -38,8 +43,7 @@ void AssetManager::perform_reloads() {
         }
         // End @Redundant
 
-        // @Incomplete, allow filtering by extension
-        reload_asset(file_path, file_name);
+        reload_or_create_asset(file_path, file_name);
     }
     am->assets_to_reload.reset(true);
 }

@@ -8,36 +8,39 @@ void ShaderManager::init() {
 }
 
 Shader * ShaderManager::load_shader(char * file_name) {
-    Shader * shader = (Shader *) malloc(sizeof(Shader));
-    this->init_asset(shader);
+    create_placeholder(file_name);
 
-    shader->name     = file_name;
-    shader->filename = file_name;
+    Shader * shader = this->table.find(file_name);
 
     do_load_shader(shader);
-
-    this->table.add(file_name, shader);
 
     return shader;
 }
 
-void ShaderManager::reload_asset(String file_path, String file_name) {
-    char * c_file_name = to_c_string(file_name);
-    scope_exit(free(c_file_name));
+void ShaderManager::create_placeholder(char * name) {
+    Shader * shader = (Shader * ) malloc(sizeof(Shader));
+    this->init_asset(shader);
 
-    Shader * shader = this->table.find(c_file_name);
+    shader->name     = name;
+    shader->filename = name;
 
-    if (!shader) {
-        log_print("reload_asset", "Shader file %s is not registered in the manager, so we're not reloading it", c_file_name); // @Incomplete, this still gets printed twice, It shouldn't matter since we'll probably load all the files and this will probably go away.
-        return;
-    }
-
-    if((os_specific_get_time() - shader->last_reload_time) < shader->reload_timeout) {
-        // We already reloaded it.
-        return;
-    }
-
-    log_print("reload_asset", "Asset change on file %s caught by the shader manager, previous reload was at time %f", c_file_name, shader->last_reload_time);
-    do_load_shader(shader);
+    this->table.add(name, shader);
 }
 
+// @Think, make this part of AssetManager_Poly ?
+void ShaderManager::reload_or_create_asset(String file_path, String file_name) {
+    char * c_file_name = to_c_string(file_name);
+
+    Asset * asset = this->table.find(c_file_name);
+
+    if(!asset) {
+        create_placeholder(c_file_name);
+        Asset * asset = this->table.find(c_file_name);
+    }
+
+    if((os_specific_get_time() - asset->last_reload_time) < asset->reload_timeout) {
+        return;
+    }
+
+    do_load_shader((Shader *) asset);
+}

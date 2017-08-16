@@ -4,6 +4,7 @@
 
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "stb_truetype.h"
+#include "os/layer.h"
 
 static TextureManager * tm; // Make this a member ?
 
@@ -20,9 +21,8 @@ void FontManager::init(TextureManager * texture_manager) {
 }
 
 void FontManager::load_font(char * name) {
-    Font * font = (Font *) malloc(sizeof(Font));
-
-    font->name = name;
+    create_placeholder(name);
+    Font * font = this->table.find(name);
 
     char path[512];
     snprintf(path, 512, "data/fonts/%s", font->name);
@@ -62,15 +62,31 @@ void FontManager::load_font(char * name) {
     } else {
         log_print("load_font", "Loaded font %s, but no TextureManager is assigned to the font manager, so the texture could not be registered", font->name);
     }
-
-
-
-    this->table.add(font->name, font);
 }
 
-void FontManager::reload_asset(char * file_path, char * file_name, char * extension) {
-    log_print("reload_asset", "Asset change on file %s caught by the texture manager", file_name);
-    // @Incomplete, check extension
-    load_font(file_name);
+void FontManager::create_placeholder(char * name) {
+    Font * font = (Font *) malloc(sizeof(Font));
+    this->init_asset(font);
 
+    font->name = name;
+
+    this->table.add(name, font);
+}
+
+void FontManager::reload_or_create_asset(String file_path, String file_name) {
+    char * c_file_name = to_c_string(file_name);
+    scope_exit(free(c_file_name));
+
+    Asset * asset = this->table.find(c_file_name);
+
+    if(!asset) {
+        create_placeholder(c_file_name);
+        Asset * asset = this->table.find(c_file_name);
+    }
+
+    if((os_specific_get_time() - asset->last_reload_time) < asset->reload_timeout) {
+        return;
+    }
+
+    load_font(c_file_name);
 }

@@ -286,9 +286,12 @@ void draw_batch(DrawBatch * batch) {
         // This texture was modified, so let's reset its SRV. @Incomplete @Speed, we can probably
         // just remap the data if the size and bit depth stay the same.
         if(texture->dirty) {
-            texture->platform_info->srv->Release(); // Release the D3D interface
-            free(texture->platform_info);
-			texture->platform_info = NULL;
+			if (texture->platform_info) {
+				texture->platform_info->srv->Release(); // Release the D3D interface
+				free(texture->platform_info);
+				texture->platform_info = NULL;
+			}
+			texture->dirty = false;
         }
 
         if(texture->platform_info == NULL) {

@@ -21,7 +21,8 @@ struct Texture : Asset{
 struct TextureManager : AssetManager_Poly<Texture> {
     void init();
 
-    void reload_asset(String file_path, String file_name);
+    void reload_or_create_asset(String file_path, String file_name);
+    void create_placeholder(char * name);
 
     Texture * create_texture(char * name, unsigned char * data, int width, int height, int bytes_per_pixel = 4);
 

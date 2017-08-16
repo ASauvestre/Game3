@@ -20,11 +20,14 @@ struct AssetManager {
     Array<String> assets_to_reload;
 
     // ------ Functions ------
-    virtual void reload_asset(String file_path, String file_name);
+    virtual void create_placeholder(char * name);
+    virtual void reload_or_create_asset(String file_path, String file_name);
 
     void perform_reloads();
 
     void init_asset(Asset * asset);
+
+
 };
 
 template <typename T>

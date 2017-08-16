@@ -13,7 +13,8 @@ struct Font : Asset {
 struct FontManager : AssetManager_Poly<Font> {
     void init(TextureManager * texture_manager);
 
-    void reload_asset(char * file_path, char * file_name, char * extension);
+    void reload_or_create_asset(String file_path, String file_name);
+    void create_placeholder(char * name);
 
     void load_font(char * name);
 };
