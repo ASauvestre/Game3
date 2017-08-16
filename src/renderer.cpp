@@ -204,6 +204,11 @@ void end_buffer() {
         int first_index = first_vertex_index_in_buffer;
 
         for(int i = 0; i < (current_batch->positions.count - first_vertex_index_in_buffer) / 4; i++) {
+
+            // 1---3
+            // | \ |   0->1->2 3->2->1 CW
+            // 0---2
+
             current_batch->indices.add(first_index);
             current_batch->indices.add(first_index+1);
             current_batch->indices.add(first_index+2);

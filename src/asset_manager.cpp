@@ -18,8 +18,6 @@ void AssetManager::reload_asset(String file_path, String file_name) {
     scope_exit(free(c_file_name));
 
     log_print("reload_asset", "Asset %s is up for reloading, but the manager has no reload_asset funtion", c_file_name);
-
-
 }
 
 void AssetManager::perform_reloads() {

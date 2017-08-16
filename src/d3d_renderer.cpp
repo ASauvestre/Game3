@@ -279,7 +279,7 @@ void draw_batch(DrawBatch * batch) {
         Texture * texture = batch->info.texture;
 
         if(texture == NULL) {
-            log_print("draw_buffer", "Texture %s was not found in the catalog", texture->name);
+            log_print("draw_buffer", "Attempt to draw using a NULL texture");
             return;
         }
 
@@ -288,6 +288,7 @@ void draw_batch(DrawBatch * batch) {
         if(texture->dirty) {
             texture->platform_info->srv->Release(); // Release the D3D interface
             free(texture->platform_info);
+			texture->platform_info = NULL;
         }
 
         if(texture->platform_info == NULL) {
@@ -343,6 +344,8 @@ static void bind_srv_to_texture(Texture * texture) {
     }
 
     d3d_device->CreateShaderResourceView(d3d_texture, &srv_desc, &texture->platform_info->srv);
+
+    d3d_texture->Release(); // @Robustness Am I allowed to do that ? It seems to work fine.
 }
 
 void parse_input_layout_from_file(char * file_name, char * c_file_data, Shader * shader) {

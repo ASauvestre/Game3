@@ -21,6 +21,14 @@ struct String {
         if(this->count != b.count) return false;
         return (memcmp(this->data, b.data, b.count) == 0);
     }
+
+    bool operator==(char * b) {
+        int len = strlen(b);
+
+        if(this->count != len) return false;
+        return (memcmp(this->data, b, len) == 0);
+
+    }
 };
 
 String cut_until_char(char c, String * string);

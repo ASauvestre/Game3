@@ -14,7 +14,7 @@
     for(int it_index = 0; it_index < __for_array_count; it_index++) \
         for(auto it = &__for_array_data[it_index];                  \
             JOIN(__for_array_internal,__LINE__)++ > 0;              \
-            JOIN(__for_array_internal,__LINE__) = 0)                \
+            JOIN(__for_array_internal,__LINE__) = 0)
 
 template <typename T>
 struct Array {

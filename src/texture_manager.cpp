@@ -7,7 +7,7 @@
 #include "os/layer.h"
 
 void TextureManager::init() {
-    this->directories.add("textures/");
+    this->extensions.add("png");
 }
 
 Texture * TextureManager::create_texture(char * name, unsigned char * data, int width, int height, int bytes_per_pixel) { // Default : bytes_per_pixel = 4
@@ -40,12 +40,18 @@ void TextureManager::do_load_texture(Texture * texture) {
 
     int width, height, bytes_per_pixel;
 
-    texture->bitmap = stbi_load(path, &width, &height, &bytes_per_pixel, 4);
+    unsigned char * bitmap = stbi_load(path, &width, &height, &bytes_per_pixel, 4);
 
-    if(texture->bitmap == NULL) {
+    if(bitmap == NULL) {
         log_print("do_load_texture", "Failed to load texture \"%s\"", texture->name);
         return;
     }
+
+    if(texture->dirty) {
+        free(texture->bitmap);
+    }
+
+    texture->bitmap = bitmap;
 
     if(bytes_per_pixel != 4) {
         log_print("do_load_texture", "Loaded texture \"%s\", it has %d bit depth, please convert to 32 bit depth", texture->name, bytes_per_pixel * 8);
@@ -54,28 +60,29 @@ void TextureManager::do_load_texture(Texture * texture) {
         log_print("do_load_texture", "Loaded texture \"%s\"", texture->name);
     }
 
-    texture->width           = width;
-    texture->height          = height;
-    texture->bytes_per_pixel = bytes_per_pixel;
-    texture->width_in_bytes  = width * bytes_per_pixel;
-    texture->num_bytes       = width * height * bytes_per_pixel;
-    texture->dirty           = false;
-    texture->platform_info   = NULL;
+    texture->width            = width;
+    texture->height           = height;
+    texture->bytes_per_pixel  = bytes_per_pixel;
+    texture->width_in_bytes   = width * bytes_per_pixel;
+    texture->num_bytes        = width * height * bytes_per_pixel;
+    texture->last_reload_time = os_specific_get_time();
 }
 
-// @Bug this doesn't work and leaks memory for reloads. We need a separate function.
-// @Bug this doesn't work and leaks memory for reloads. We need a separate function.
-// @Bug this doesn't work and leaks memory for reloads. We need a separate function.
-// @Bug this doesn't work and leaks memory for reloads. We need a separate function.
 void TextureManager::load_texture(char * name) {
-    Texture * texture = (Texture * ) malloc(sizeof(Texture));
-    this->init_asset(texture);
+    Texture * texture = this->table.find(name);
 
-    texture->name = name;
+    if(!texture) {
+        texture = (Texture * ) malloc(sizeof(Texture));
+        this->init_asset(texture);
+
+        texture->name          = name;
+        texture->dirty         = false;
+        texture->platform_info = NULL;
+
+        this->table.add(name, texture);
+    }
 
     do_load_texture(texture);
-
-    this->table.add(name, texture);
 }
 
 void TextureManager::reload_asset(String file_path, String file_name) {
@@ -85,17 +92,19 @@ void TextureManager::reload_asset(String file_path, String file_name) {
 
     Texture * texture = this->table.find(c_file_name);
 
-    if((os_specific_get_time() - texture->last_reload_time) < texture->reload_timeout) {
-        // We already reloaded it.
+    if (!texture) {
+        log_print("reload_asset", "Texture file %s is not registered in the manager, so we're not reloading it", c_file_name); // @Incomplete, this still gets printed twice, It shouldn't matter since we'll probably load all the files and this will probably go away.
         return;
     }
 
-    String extension = find_char_from_left('.', file_name);
-
-
-    if(memcmp(".png", extension.data, extension.count) == 0) {
-        log_print("reload_asset", "Asset change on file %s caught by the texture manager", c_file_name);
-        load_texture(c_file_name);
+    if((os_specific_get_time() - texture->last_reload_time) < texture->reload_timeout) {
+        return;
     }
+
+    log_print("reload_asset", "Asset change on file %s caught by the texture manager", c_file_name);
+
+    texture->dirty = true;
+
+    do_load_texture(texture);
 
 }

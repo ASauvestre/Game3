@@ -15,7 +15,7 @@ static int get_file_size(FILE * file) {
 }
 
 void FontManager::init(TextureManager * texture_manager) {
-    this->directories.add("fonts/");
+    this->extensions.add("ttf");
     tm = texture_manager;
 }
 

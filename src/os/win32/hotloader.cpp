@@ -1,7 +1,6 @@
 #include <assert.h>
 #include <windows.h>
 #include <stdio.h>
-#include <malloc.h> // For alloca
 
 #include "macros.h"
 #include "asset_manager.h"
@@ -81,27 +80,17 @@ void register_manager(AssetManager * am) {
 void check_hotloader_modifications() {
     handle_notifications();
 
-    for(int i = 0; i < asset_changes.count; i++) {
+    for(int i = 0; i < asset_changes.count; i++) { // for_array
         AssetChange * change = &asset_changes.data[i];
 
-        // log_print("check_hotloader_modifications", "Detected modication on file %s", change->file_name);
+        String extension = find_char_from_left('.', change->file_name);
 
-        String directory = change->full_path;
-        directory.count = change->full_path.count - change->file_name.count;
-
-        char * c_directory = to_c_string(directory);
-        scope_exit(free(c_directory));
-
-        // Look for a manager who's interested in changes from this directory
-        int num_managers = managers.count;
-
-        for(int i = 0; i < num_managers; i++) {
-            AssetManager * am = managers.data[i];
-
-            int num_subscribed_directories = am->directories.count;
-
-            for(int j = 0; j < num_subscribed_directories; j++) {
-                if(strcmp(am->directories.data[j], c_directory) == 0) {
+        // Look for a manager who's interested in changes of files with this extension
+        for_array(managers.data, managers.count) {
+            AssetManager * am = *it;
+            for(int j = 0; j < am->extensions.count; j++) { // @Cleanup This should be another for_array, but I can't nest them without redeclaring it and it_index, which is no good. We should be able to name it manually
+                if(extension == am->extensions.data[j]) {
+                    // printf("Match\n");
                     am->assets_to_reload.add(change->full_path);
                 }
             }
@@ -146,62 +135,69 @@ static void handle_notifications() {
         else if (notification->Action == FILE_ACTION_ADDED)            {} // @Incomplete, maybe send the action to the relevant catalogs
         else if (notification->Action == FILE_ACTION_RENAMED_NEW_NAME) {} // @Incomplete, maybe send the action to the relevant catalogs
         else {
-            // log_print("check_hotloader_modifications", "Ignored action %d", notification->Action);
+            // log_print("check_hotloader_modifications", "Ignored action %d, NextEntryOffset is %d", notification->Action, notification->NextEntryOffset);
             notification = bump_ptr_to_next_notification(notification);
             continue;
         }
 
-        const int NAME_BUFFER_LENGHT = 1000;
-        char name_buffer[NAME_BUFFER_LENGHT];
+        const int NAME_BUFFER_LENGTH = 1000;
+        char name_buffer[NAME_BUFFER_LENGTH];
 
         int path_length = WideCharToMultiByte(CP_ACP, WC_NO_BEST_FIT_CHARS, notification->FileName,
                                          notification->FileNameLength / sizeof(WCHAR),
-                                         name_buffer, NAME_BUFFER_LENGHT, NULL, NULL);
+                                         name_buffer, NAME_BUFFER_LENGTH, NULL, NULL);
 
         if(path_length == 0) {
-            log_print("check_hotloader_modifications", "Failed to convert filename. PANIC");
+            // log_print("check_hotloader_modifications", "Failed to convert filename. PANIC");
             assert(false);
         }
+
+        notification = bump_ptr_to_next_notification(notification); // We'll bump it now to allow easy early-outs later
 
         change.full_path.data = (char *) malloc(path_length);
         memcpy(change.full_path.data, name_buffer, path_length);
 
         change.full_path.count = path_length;
 
-        notification = bump_ptr_to_next_notification(notification);
-
         // Replace Windows' \ by /
-		for (int i = 0; i < path_length; i++) {
-			if (change.full_path[i] == '\\') change.full_path[i] = '/';
-		}
+        for (int i = 0; i < path_length; i++) {
+            if (change.full_path[i] == '\\') change.full_path[i] = '/';
+        }
 
         // Isolate file name from the path
-		String t = find_char_from_right('/', change.full_path);
-		if (t.count) {
-			change.file_name = t;
+        String file_name = find_char_from_right('/', change.full_path);
+        if (file_name.count) {
+            change.file_name = file_name;
+        } else {
+			change.file_name = change.full_path;
+		}
+
+		String extension = find_char_from_left('.', change.file_name);
+
+		if (extension.count) { // Check that we have an extension
+			if (extension == "tmp") continue; // PS tmp file. We skip those.
+			// change.file_name = change.full_path;
 		} else {
-
-            // The change didn't happen in a directory, so it's either a file at the root
-            // folder or a directory change notification, let's try and see if it has an extension
-
-            String t = find_char_from_right('.', change.full_path);
-
-            if(t.count) {
-                // File at root folder
-                change.file_name = change.full_path;
-            } else {
-                // Directory change (eg. deleted file, we ignore this for now.) @Incomplete, could be a file without an extension.
-                continue;
-            }
-
+			// printf("Change in directory %s, skipping notification\n", to_c_string(change.full_path));
+			continue; // Directory change, we ignore that.
 		}
 
         // Check uniqueness @Meh
+        bool success = true;
         for_array(asset_changes.data, asset_changes.count) {
-            if(it->full_path == change.full_path) return;
+			if (it->full_path == change.full_path) {
+                success = false;
+                it_index = asset_changes.count; // Break
+            }
         }
 
-        asset_changes.add(change);
+        if(success) {
+            // printf("Added %s\n", to_c_string(change.full_path));
+            asset_changes.add(change);
+        } else {
+            // printf("Skipped duplicate %s\n", to_c_string(change.full_path));
+
+        }
     }
 }
 
@@ -217,7 +213,7 @@ static FILE_NOTIFY_INFORMATION * bump_ptr_to_next_notification(FILE_NOTIFY_INFOR
 static void issue_read_directory(Directory * directory) {
     bool success = ReadDirectoryChangesW(directory->handle, directory->notifications,
                                          NOTIFICATION_BUFFER_LENGTH, true,
-                                         FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_LAST_WRITE,
+                                         FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_ATTRIBUTES | FILE_NOTIFY_CHANGE_CREATION | FILE_NOTIFY_CHANGE_LAST_WRITE,
                                          NULL, &directory->overlapped, NULL);
 
     if(!success) {

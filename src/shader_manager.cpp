@@ -4,7 +4,7 @@
 #include "os/layer.h"
 
 void ShaderManager::init() {
-    this->directories.add("shaders/");
+    this->extensions.add("hlsl");
 }
 
 Shader * ShaderManager::load_shader(char * file_name) {
@@ -22,15 +22,13 @@ Shader * ShaderManager::load_shader(char * file_name) {
 }
 
 void ShaderManager::reload_asset(String file_path, String file_name) {
-    // @Incomplete, check extension
-
     char * c_file_name = to_c_string(file_name);
     scope_exit(free(c_file_name));
 
     Shader * shader = this->table.find(c_file_name);
 
     if (!shader) {
-        log_print("reload_asset", "Shader file %s is not registered in the manager, so we're not reloading it", c_file_name);
+        log_print("reload_asset", "Shader file %s is not registered in the manager, so we're not reloading it", c_file_name); // @Incomplete, this still gets printed twice, It shouldn't matter since we'll probably load all the files and this will probably go away.
         return;
     }
 

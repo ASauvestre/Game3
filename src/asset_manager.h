@@ -15,7 +15,7 @@ struct Asset {
 };
 
 struct AssetManager {
-    Array<char *> directories;
+    Array<char *> extensions;
 
     Array<String> assets_to_reload;
 
