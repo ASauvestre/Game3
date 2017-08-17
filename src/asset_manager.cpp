@@ -14,7 +14,7 @@ void AssetManager::init_asset(Asset * asset) {
 }
 
 // @Incomplete, make those pointers instead of v functions
-void AssetManager::create_placeholder(char * name) {
+void AssetManager::create_placeholder(char * name, char * path) {
     log_print("create_placeholder", "we ned to create a placeholder for asset %s, but the manager has no create_placeholder function", name);
 }
 

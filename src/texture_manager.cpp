@@ -11,7 +11,7 @@ void TextureManager::init() {
 }
 
 Texture * TextureManager::create_texture(char * name, unsigned char * data, int width, int height, int bytes_per_pixel) { // Default : bytes_per_pixel = 4
-    create_placeholder(name);
+    create_placeholder(name, ""); // @Temporary, we'll need to parse the name from the path.
     Texture * texture = this->table.find(name);
 
     texture->bitmap          = data;
@@ -24,22 +24,12 @@ Texture * TextureManager::create_texture(char * name, unsigned char * data, int 
     return texture;
 }
 
-void TextureManager::load_texture(char * name) {
-    Texture * texture = this->table.find(name);
-
-    if(!texture) {
-        create_placeholder(name);
-		texture = this->table.find(name);
-    }
-
-    do_load_texture(texture);
-}
-
-void TextureManager::create_placeholder(char * name) {
+void TextureManager::create_placeholder(char * name, char * path) {
     Texture * texture = (Texture * ) malloc(sizeof(Texture));
     this->init_asset(texture);
 
     texture->name          = name;
+    texture->full_path     = path;
     texture->dirty         = false;
     texture->platform_info = NULL;
 
@@ -47,14 +37,18 @@ void TextureManager::create_placeholder(char * name) {
 }
 
 // @Think, make this part of AssetManager_Poly ?
-void TextureManager::reload_or_create_asset(String file_path, String file_name) {
+void TextureManager::reload_or_create_asset(String full_path, String file_name) {
     char * c_file_name = to_c_string(file_name);
+    char * c_full_path = to_c_string(full_path);
 
     Asset * asset = this->table.find(c_file_name);
 
     if(!asset) {
-        create_placeholder(c_file_name);
+        create_placeholder(c_file_name, c_full_path);
         asset = this->table.find(c_file_name);
+    } else {
+        free(c_file_name);
+        free(c_full_path);
     }
 
     if((os_specific_get_time() - asset->last_reload_time) < asset->reload_timeout) {

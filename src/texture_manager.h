@@ -22,11 +22,9 @@ struct TextureManager : AssetManager_Poly<Texture> {
     void init();
 
     void reload_or_create_asset(String file_path, String file_name);
-    void create_placeholder(char * name);
+    void create_placeholder(char * name, char * path);
 
     Texture * create_texture(char * name, unsigned char * data, int width, int height, int bytes_per_pixel = 4);
-
-    void load_texture(char * name);
 
 private:
     void do_load_texture(Texture * texture);

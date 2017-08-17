@@ -10,3 +10,5 @@ void register_manager(AssetManager * am);
 void check_hotloader_modifications();
 
 void shutdown_hotloader();
+
+void hotloader_register_loose_files();

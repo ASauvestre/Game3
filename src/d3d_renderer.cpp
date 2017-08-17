@@ -279,7 +279,7 @@ void draw_batch(DrawBatch * batch) {
         Texture * texture = batch->info.texture;
 
         if(texture == NULL) {
-            log_print("draw_buffer", "Attempt to draw using a NULL texture");
+            // log_print("draw_buffer", "Attempt to draw using a NULL texture");
             return;
         }
 
@@ -494,7 +494,7 @@ bool compile_shader(Shader * shader) {
 
 
     char path[512];
-    snprintf(path, 512, "data/shaders/%s", shader->filename);
+    snprintf(path, 512, "data/shaders/%s", shader->name);
     HANDLE file_handle = CreateFile(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 
     int file_size = GetFileSize(file_handle, NULL);
@@ -506,7 +506,7 @@ bool compile_shader(Shader * shader) {
 
     if(!ReadFile(file_handle, file_data, file_size, &shader_size, NULL)) {
         log_print("compile_shader", "An error occured while reading the file \"%s\", could not compile the shaders. Error code is 0x%x",
-                  shader->filename, GetLastError());
+                  shader->name, GetLastError());
 
         return false;
     }
@@ -515,7 +515,7 @@ bool compile_shader(Shader * shader) {
                        "VS", "vs_5_0", 0, 0, &VS_bytecode, &error);
 
     if(error) {
-        log_print("compile_shader", "Vertex shader in %s failed to compile, error given is : \n---------\n%s---------", shader->filename, (char *)error->GetBufferPointer());
+        log_print("compile_shader", "Vertex shader in %s failed to compile, error given is : \n---------\n%s---------", shader->name, (char *)error->GetBufferPointer());
 
         error->Release();
 
@@ -525,7 +525,7 @@ bool compile_shader(Shader * shader) {
     if (error_code > S_FALSE) {
         log_print("compile_shader",
                   "An error occured while compiling the file \"%s\", could not compile the shaders. Error code is 0x%x",
-                  shader->filename, error_code);
+                  shader->name, error_code);
 
         return false;
     }
@@ -534,7 +534,7 @@ bool compile_shader(Shader * shader) {
                        "PS", "ps_5_0", 0, 0, &PS_bytecode, &error);
 
     if(error) {
-        log_print("compile_shader", "Pixel shader in %s failed to compile, error given is : \n---------\n%s---------", shader->filename, (char *)error->GetBufferPointer());
+        log_print("compile_shader", "Pixel shader in %s failed to compile, error given is : \n---------\n%s---------", shader->name, (char *)error->GetBufferPointer());
 
         error->Release();
         VS_bytecode->Release();
@@ -542,7 +542,7 @@ bool compile_shader(Shader * shader) {
         return false;
     }
 
-    parse_input_layout_from_file(shader->filename, file_data, shader);
+    parse_input_layout_from_file(shader->name, file_data, shader);
     InputLayout * input_layout = assign_or_create_input_layout(shader);
 
     if (!input_layout->layout) {
@@ -563,11 +563,11 @@ bool compile_shader(Shader * shader) {
     return true;
 }
 
-static bool create_shader(char * filename, Shader * shader){
-    shader->filename = filename;
+static bool create_shader(char * filename, Shader * shader){ // @Temporary, used for dummy_shader.
+    shader->name = filename;
 
-    char path[512];;
-    snprintf(path, 512, "data/shaders/%s", shader->filename);
+    char path[512];
+    snprintf(path, 512, "data/shaders/%s", shader->name);
 
     return compile_shader(shader);
 }

@@ -128,10 +128,6 @@ void init_game();
 
 void init_shaders();
 
-void init_textures();
-
-void init_fonts();
-
 void game();
 
 void handle_user_input();
@@ -182,6 +178,7 @@ static Shader * font_shader;
 static Shader * textured_shader;
 static Shader * colored_shader;
 
+
 static WindowData window_data;
 
 static Keyboard keyboard;
@@ -209,30 +206,14 @@ static TextureManager texture_manager;
 static FontManager font_manager;
 static ShaderManager shader_manager;
 
+static Array<AssetManager *> managers;
+
 static Font * my_font;
 
-// @Temporary? Just have the hotloader send notifications for every
-// files on startup (or provide a list when a catalog requests it).
-static void init_textures() {
-    texture_manager.load_texture("grass1.png");
-    texture_manager.load_texture("grass2.png");
-    texture_manager.load_texture("grass3.png");
-    texture_manager.load_texture("dirt_road.png");
-    texture_manager.load_texture("dirt_road_bottom.png");
-    texture_manager.load_texture("dirt_road_top.png");
-    texture_manager.load_texture("megaperson.png");
-    texture_manager.load_texture("tree.png");
-}
-
-// @Temporary See comment for init_textures() above.
-static void init_fonts() {
-    font_manager.load_font("Inconsolata.ttf");
-}
-
 static void init_shaders() {
-    font_shader = shader_manager.load_shader("font_shader.hlsl");
-    textured_shader = shader_manager.load_shader("textured_shader.hlsl");
-    colored_shader = shader_manager.load_shader("colored_shader.hlsl");
+    font_shader = shader_manager.table.find("font_shader.hlsl");
+    textured_shader = shader_manager.table.find("textured_shader.hlsl");
+    colored_shader = shader_manager.table.find("colored_shader.hlsl");
 }
 
 int find_tile_index_from_coords(int x, int y, Room * room) {
@@ -1022,6 +1003,10 @@ void buffer_textured_quad(float x, float y, Alignement alignement, float width, 
 
     Texture * texture = texture_manager.table.find(texture_name);
 
+    if(!texture) {
+      //  log_print("Drawing", "Could not find texture %s", texture_name);
+    }
+
     set_shader(textured_shader);
     set_texture(texture);
 
@@ -1081,6 +1066,19 @@ void update_time() {
 
     last_time = now;
 }
+void init_managers(){
+    texture_manager.init();
+    shader_manager.init();
+    font_manager.init(&texture_manager);
+
+    register_manager(&texture_manager);
+    register_manager(&font_manager);
+    register_manager(&shader_manager);
+
+    managers.add(&texture_manager);
+    managers.add(&shader_manager);
+    managers.add(&font_manager);
+}
 
 void main() {
     scope_exit(printf("Exiting."));
@@ -1101,29 +1099,21 @@ void main() {
         window_data.handle = os_specific_create_window(window_data.width, window_data.height, window_name);
     }
 
-    texture_manager.init();
-    shader_manager.init();
-    font_manager.init(&texture_manager);
+    init_renderer(window_data.width, window_data.height, window_data.handle); // Has to happen before we load the shaders
 
-    register_manager(&texture_manager);
-    register_manager(&font_manager);
-    register_manager(&shader_manager);
-
-    // @Temporary
-    init_textures();
-
-    // @Temporary
-    init_fonts();
-
-    init_renderer(window_data.width, window_data.height, window_data.handle);
-
-    //@Temporary ?
-    init_shaders(); // Needs to happen after init_renderer because we need the graphics dll to compile the shaders
-
-    init_game();
+    init_managers();
 
     init_hotloader();
 
+    hotloader_register_loose_files();
+
+    for_array(managers.data, managers.count) {
+        (*it)->perform_reloads();
+    }
+
+    init_shaders();
+
+    init_game();
 
     my_font = font_manager.table.find("Inconsolata.ttf");
 

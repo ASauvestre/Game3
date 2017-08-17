@@ -5,6 +5,7 @@
 #include "macros.h"
 #include "asset_manager.h"
 #include "parsing.h"
+#include "os/layer.h"
 
 struct Directory {
     char * name;
@@ -26,6 +27,7 @@ static void handle_notifications();
 
 static FILE_NOTIFY_INFORMATION * bump_ptr_to_next_notification(FILE_NOTIFY_INFORMATION * notification);
 
+static void dispatch_file_to_managers(String full_path);
 // Const
 const int NOTIFICATION_BUFFER_LENGTH = 10000; // @Temporary figure out how much space is actually reasonably required
 
@@ -80,24 +82,25 @@ void register_manager(AssetManager * am) {
 void check_hotloader_modifications() {
     handle_notifications();
 
-    for(int i = 0; i < asset_changes.count; i++) { // for_array
-        AssetChange * change = &asset_changes.data[i];
-
-        String extension = find_char_from_left('.', change->file_name);
-
-        // Look for a manager who's interested in changes of files with this extension
-        for_array(managers.data, managers.count) {
-            AssetManager * am = *it;
-            for(int j = 0; j < am->extensions.count; j++) { // @Cleanup This should be another for_array, but I can't nest them without redeclaring it and it_index, which is no good. We should be able to name it manually
-                if(extension == am->extensions.data[j]) {
-                    // printf("Match\n");
-                    am->assets_to_reload.add(change->full_path);
-                }
-            }
-        }
+    for_array(asset_changes.data, asset_changes.count) {
+        dispatch_file_to_managers(it->full_path);
     }
 
     asset_changes.reset(true);
+}
+
+static void dispatch_file_to_managers(String full_path) {
+    String extension = find_char_from_left('.', full_path);
+
+    // Look for a manager who's interested in changes of files with this extension
+    for_array(managers.data, managers.count) {
+        AssetManager * am = *it;
+        for(int j = 0; j < am->extensions.count; j++) { // @Cleanup This should be another for_array, but I can't nest them without redeclaring it and it_index, which is no good. We should be able to name it manually
+            if(extension == am->extensions.data[j]) {
+                am->assets_to_reload.add(full_path);
+            }
+        }
+    }
 }
 
 static void handle_notifications() {
@@ -148,7 +151,7 @@ static void handle_notifications() {
                                          name_buffer, NAME_BUFFER_LENGTH, NULL, NULL);
 
         if(path_length == 0) {
-            // log_print("check_hotloader_modifications", "Failed to convert filename. PANIC");
+            log_print("check_hotloader_modifications", "Failed to convert filename. PANIC");
             assert(false);
         }
 
@@ -176,9 +179,7 @@ static void handle_notifications() {
 
 		if (extension.count) { // Check that we have an extension
 			if (extension == "tmp") continue; // PS tmp file. We skip those.
-			// change.file_name = change.full_path;
 		} else {
-			// printf("Change in directory %s, skipping notification\n", to_c_string(change.full_path));
 			continue; // Directory change, we ignore that.
 		}
 
@@ -195,11 +196,26 @@ static void handle_notifications() {
             // printf("Added %s\n", to_c_string(change.full_path));
             asset_changes.add(change);
         } else {
-            // printf("Skipped duplicate %s\n", to_c_string(change.full_path));
-
+            continue;
         }
     }
 }
+
+void hotloader_register_loose_files() {
+    Array<char *> files = os_specific_list_all_files_in_directory("data");
+
+    for_array(files.data, files.count) {
+        printf("File %s found\n", *it);
+    }
+
+    for_array(files.data, files.count) {
+        String path;
+        path.data  = *it;
+        path.count = strlen(*it);
+        dispatch_file_to_managers(path);
+    }
+}
+
 
 static FILE_NOTIFY_INFORMATION * bump_ptr_to_next_notification(FILE_NOTIFY_INFORMATION * notification) {
     int offset = notification->NextEntryOffset;
@@ -213,7 +229,7 @@ static FILE_NOTIFY_INFORMATION * bump_ptr_to_next_notification(FILE_NOTIFY_INFOR
 static void issue_read_directory(Directory * directory) {
     bool success = ReadDirectoryChangesW(directory->handle, directory->notifications,
                                          NOTIFICATION_BUFFER_LENGTH, true,
-                                         FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_ATTRIBUTES | FILE_NOTIFY_CHANGE_CREATION | FILE_NOTIFY_CHANGE_LAST_WRITE,
+                                         FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_LAST_ACCESS | FILE_NOTIFY_CHANGE_SECURITY | FILE_NOTIFY_CHANGE_ATTRIBUTES | FILE_NOTIFY_CHANGE_CREATION | FILE_NOTIFY_CHANGE_LAST_WRITE,
                                          NULL, &directory->overlapped, NULL);
 
     if(!success) {

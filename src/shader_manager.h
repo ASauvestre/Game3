@@ -2,8 +2,6 @@
 
 // Lots of void * because this is going to be used by multiple Graphics APIs
 struct Shader : Asset {
-    char * filename;
-
     void * VS;
     void * PS;
 
@@ -19,7 +17,5 @@ struct ShaderManager : AssetManager_Poly<Shader> {
     void init();
 
     void reload_or_create_asset(String file_path, String file_name);
-    void create_placeholder(char * name);
-
-    Shader * load_shader(char * file_name);
+    void create_placeholder(char * name, char * path);
 };
