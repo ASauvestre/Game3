@@ -6,6 +6,7 @@
 #include "d3d_renderer.h"
 
 #include "parsing.h"
+#include "os/layer.h"
 
 #include "texture_manager.h"
 #include "shader_manager.h"
@@ -351,11 +352,7 @@ static void bind_srv_to_texture(Texture * texture) {
     d3d_texture->Release(); // @Robustness Am I allowed to do that ? It seems to work fine.
 }
 
-void parse_input_layout_from_file(char * file_name, char * c_file_data, Shader * shader) {
-    String file_data;
-    file_data.data = c_file_data;
-    file_data.count = strlen(c_file_data);
-
+void parse_input_layout_from_file(char * file_name, String file_data, Shader * shader) {
     String line = bump_to_next_line(&file_data);
 
     int found = -1;
@@ -408,6 +405,7 @@ void parse_input_layout_from_file(char * file_name, char * c_file_data, Shader *
                 char * c_token = to_c_string(token); // @Incomplete @Speed Use a memcmp here, no need to malloc a string.
                 scope_exit(free(c_token));
 
+                // @Incomplete, check that we don't have the same twice (actually we might have multiple TEXCOORD, I'll have to figure out how to differentiate them.)
                 if     (strcmp("POSITION", c_token) == 0) shader->position_index = arg_index;
                 else if(strcmp("COLOR"   , c_token) == 0) shader->color_index    = arg_index;
                 else if(strcmp("TEXCOORD", c_token) == 0) shader->uv_index       = arg_index;
@@ -437,22 +435,29 @@ void parse_input_layout_from_file(char * file_name, char * c_file_data, Shader *
 InputLayout * assign_or_create_input_layout(Shader * shader) {
     InputLayout layout;
 
-    // @Incomplete: add_at_index can overwrite, there's no real way to check if it happens right now,
-    // but it shouldn't.
-    //
-    // @Incomplete: We should also probably check that the indices are continuous.
+    // @Incomplete: We should probably check that the indices are continuous.
 
     if(shader->position_index >= 0) {
         layout.layout_desc.reserve(shader->position_index + 1);
         layout.layout_desc.add_at_index(position_row_desc, shader->position_index);
     }
 
+
     if(shader->color_index >= 0) {
+
+        assert(shader->position_index != shader->color_index);
+
         layout.layout_desc.reserve(shader->color_index + 1);
         layout.layout_desc.add_at_index(color_row_desc, shader->color_index);
     }
 
+
+
     if(shader->uv_index >= 0) {
+
+        assert(shader->uv_index != shader->color_index);
+        assert(shader->uv_index != shader->position_index);
+
         layout.layout_desc.reserve(shader->uv_index + 1);
         layout.layout_desc.add_at_index(uv_row_desc, shader->uv_index);
     }
@@ -463,7 +468,6 @@ InputLayout * assign_or_create_input_layout(Shader * shader) {
         if(it->layout_desc.count == layout.layout_desc.count) {
             if(memcmp(it->layout_desc.data, layout.layout_desc.data, layout.layout_desc.count * sizeof(D3D11_INPUT_ELEMENT_DESC)) == 0) {
                 match_index = it_index;
-                // printf("Found match !\n");
             }
         }
     }
@@ -492,26 +496,13 @@ bool compile_shader(Shader * shader) {
 
     ID3DBlob * error = NULL;
 
+    String file_data = os_specific_read_file(shader->full_path);
 
-    char path[512];
-    snprintf(path, 512, "data/shaders/%s", shader->name);
-    HANDLE file_handle = CreateFile(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-
-    int file_size = GetFileSize(file_handle, NULL);
-
-    char * file_data = (char *) malloc(file_size);
-    scope_exit(free(file_data));
-
-    DWORD shader_size = 0;
-
-    if(!ReadFile(file_handle, file_data, file_size, &shader_size, NULL)) {
-        log_print("compile_shader", "An error occured while reading the file \"%s\", could not compile the shaders. Error code is 0x%x",
-                  shader->name, GetLastError());
-
-        return false;
+    if(!file_data.data) {
+        return false; // we already reported an error.
     }
 
-    HRESULT error_code = D3DCompile(file_data, file_size, NULL, NULL, D3D_COMPILE_STANDARD_FILE_INCLUDE,
+    HRESULT error_code = D3DCompile(file_data.data, file_data.count, NULL, NULL, D3D_COMPILE_STANDARD_FILE_INCLUDE,
                        "VS", "vs_5_0", 0, 0, &VS_bytecode, &error);
 
     if(error) {
@@ -530,7 +521,7 @@ bool compile_shader(Shader * shader) {
         return false;
     }
 
-    D3DCompile(file_data, file_size, NULL, NULL, D3D_COMPILE_STANDARD_FILE_INCLUDE,
+    D3DCompile(file_data.data, file_data.count, NULL, NULL, D3D_COMPILE_STANDARD_FILE_INCLUDE,
                        "PS", "ps_5_0", 0, 0, &PS_bytecode, &error);
 
     if(error) {
@@ -567,7 +558,10 @@ static bool create_shader(char * filename, Shader * shader){ // @Temporary, used
     shader->name = filename;
 
     char path[512];
-    snprintf(path, 512, "data/shaders/%s", shader->name);
+    int path_length = snprintf(path, 512, "data/shaders/%s", shader->name);
+
+    shader->full_path = (char *) malloc(path_length + 1);
+    memcpy(shader->full_path, path, path_length + 1);
 
     return compile_shader(shader);
 }

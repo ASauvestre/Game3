@@ -205,10 +205,6 @@ void hotloader_register_loose_files() {
     Array<char *> files = os_specific_list_all_files_in_directory("data");
 
     for_array(files.data, files.count) {
-        printf("File %s found\n", *it);
-    }
-
-    for_array(files.data, files.count) {
         String path;
         path.data  = *it;
         path.count = strlen(*it);

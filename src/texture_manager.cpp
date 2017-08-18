@@ -11,7 +11,7 @@ void TextureManager::init() {
 }
 
 Texture * TextureManager::create_texture(char * name, unsigned char * data, int width, int height, int bytes_per_pixel) { // Default : bytes_per_pixel = 4
-    create_placeholder(name, ""); // @Temporary, we'll need to parse the name from the path.
+    create_placeholder(name, "");
     Texture * texture = this->table.find(name);
 
     texture->bitmap          = data;
@@ -60,12 +60,10 @@ void TextureManager::reload_or_create_asset(String full_path, String file_name) 
 
 // @Incomplete Handle other file types in addition to PNG.
 void TextureManager::do_load_texture(Texture * texture) {
-    char path[512];
-    snprintf(path, 512, "data/textures/%s", texture->name);
+    String file_data = os_specific_read_file(texture->full_path);
 
     int width, height, bytes_per_pixel;
-
-    unsigned char * bitmap = stbi_load(path, &width, &height, &bytes_per_pixel, 4);
+    unsigned char * bitmap = stbi_load_from_memory((unsigned char *) file_data.data, file_data.count, &width, &height, &bytes_per_pixel, 4);
 
     if(bitmap == NULL) {
         log_print("do_load_texture", "Failed to load texture \"%s\"", texture->name);

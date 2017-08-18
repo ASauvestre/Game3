@@ -25,4 +25,5 @@
 #define os_specific_get_address_from_dll          GENERATE_FUNC_NAME(PLATFORM, get_address_from_dll)
 
 // Files
-#define os_specific_list_all_files_in_directory GENERATE_FUNC_NAME(PLATFORM, list_all_files_in_directory)
+#define os_specific_read_file                     GENERATE_FUNC_NAME(PLATFORM, read_file)
+#define os_specific_list_all_files_in_directory   GENERATE_FUNC_NAME(PLATFORM, list_all_files_in_directory)

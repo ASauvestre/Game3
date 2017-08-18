@@ -12,11 +12,12 @@ REM if the dll flag is set, recompile the dlls
 FOR %%A IN (%*) DO (
     IF "%%A"=="/dll" (
     echo --------------------- Compiling DLLs ---------------------
-    cl /nologo /LD /D %platform% /Zi /EHsc /Fe:d3d_renderer ^
+    cl /LD /nologo /Zi /EHsc /D %platform% /I ..\src /Fe:d3d_renderer ^
         ..\src\d3d_renderer.cpp ^
         ..\src\asset_manager.cpp ^
         ..\src\hash.cpp ^
         ..\src\parsing.cpp ^
+        ..\src\os\win32\file_loader.cpp ^
     /link D3Dcompiler.lib d3d11.lib
     echo --------------------- DLLs Compiled ----------------------
     echo __________________________________________________________
@@ -26,7 +27,7 @@ FOR %%A IN (%*) DO (
 
 REM main files
 echo ------------------ Compiling Main files ------------------
-cl /Zi /EHsc /D %platform% /I ..\src /Fe:win32_game ^
+cl /nologo /Zi /EHsc /D %platform% /I ..\src /Fe:win32_game ^
     ..\src\game_main.cpp ^
     ..\src\renderer.cpp ^
     ..\src\asset_manager.cpp ^
@@ -38,7 +39,7 @@ cl /Zi /EHsc /D %platform% /I ..\src /Fe:win32_game ^
     ..\src\os\win32\hotloader.cpp ^
     ..\src\os\win32\file_loader.cpp ^
     ..\src\parsing.cpp ^
-/link /nologo user32.lib Gdi32.lib d3d11.lib D3DCompiler.lib Winmm.lib
+/link user32.lib
 echo ------------------ Main files Compiled -------------------
 
 echo.

@@ -3,6 +3,30 @@
 #include "string.h"
 #include "macros.h"
 
+#include "parsing.h"
+
+String win32_read_file(char * path) {
+    String file_data;
+
+    HANDLE file_handle = CreateFile(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL); // @Incomplete Allow to set access and sharing flags
+
+    int file_size = GetFileSize(file_handle, NULL);
+
+    file_data.data = (char *) malloc(file_size);
+
+    if(!ReadFile(file_handle, file_data.data, file_size, (LPDWORD) &(file_data.count), NULL)) {
+        log_print("read_file", "An error occured while reading the file \"%s\". Error code is 0x%x", path, GetLastError());
+        file_data.data = NULL;
+        return file_data;
+    }
+
+    assert(file_size == file_data.count);
+
+    CloseHandle(file_handle);
+
+    return file_data;
+}
+
 Array<char *> win32_list_all_files_in_directory(char * directory, bool search_recursively) { // @Default search_recursively = true
     Array<char *> files;
 
@@ -23,11 +47,9 @@ Array<char *> win32_list_all_files_in_directory(char * directory, bool search_re
 
         char * file_name = result.cFileName;
 
-        if(strlen(file_name) <= 2) {
-            if((strcmp(file_name, ".") == 0) || (strcmp(file_name, "..") == 0)) {
-                done = !(FindNextFile(handle, &result));
-                continue;
-            }
+        if((strcmp(file_name, ".") == 0) || (strcmp(file_name, "..") == 0)) {
+            done = !(FindNextFile(handle, &result));
+            continue;
         }
 
         char full_path[256];

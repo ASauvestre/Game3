@@ -21,33 +21,16 @@ void FontManager::init(TextureManager * texture_manager) {
 }
 
 void FontManager::do_load_font(Font * font) {
-    char path[512];
-    snprintf(path, 512, "data/fonts/%s", font->name); // @Temporary
+    String file_data = os_specific_read_file(font->full_path);
 
-    FILE * font_file = fopen(path, "rb");
+    if(!file_data.data) return;
 
-    if(font_file == NULL) {
-        log_print("load_font", "Font %s not found at %s", font->name, path)
-        free(font);
+    unsigned char * bitmap = (unsigned char *) malloc(512 * 512 * 4); // Our bitmap is 512x512 pixels and each pixel takes 4 bytes @Robustness, make sure the bitmap is big enough for the font
 
-        return;
-    }
+    unsigned char * c_file_data = (unsigned char *) to_c_string(file_data);
+    scope_exit(free(c_file_data));
 
-    int font_file_size = get_file_size(font_file);
-
-    unsigned char * font_file_buffer = (unsigned char *) malloc(font_file_size);
-    scope_exit(free(font_file_buffer));
-
-    // log_print("font_loading", "Font file for %s is %d bytes long", my_font->name, font_file_size);
-
-    fread(font_file_buffer, 1, font_file_size, font_file);
-
-    // We no longer need the file
-    fclose(font_file);
-
-    unsigned char * bitmap = (unsigned char *) malloc(256 * 256 * 4); // Our bitmap is 512x512 pixels and each pixel takes 4 bytes @Robustness, make sure the bitmap is big enough for the font
-
-    int result = stbtt_BakeFontBitmap(font_file_buffer, 0, 16.0, bitmap, 512, 512, 32, 96, font->char_data); // From stb_truetype.h : "no guarantee this fits!""
+    int result = stbtt_BakeFontBitmap(c_file_data, 0, 16.0, bitmap, 512, 512, 32, 96, font->char_data); // @Robustness From stb_truetype.h : "no guarantee this fits!""
 
     if(result <= 0) {
         log_print("load_font", "The font %s could not be loaded, it is too large to fit in a 512x512 bitmap", font->name);
