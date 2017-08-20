@@ -871,7 +871,7 @@ void buffer_entity(Entity entity) {
         screen_size.x = tile_size.x * entity.size;
         screen_size.y = tile_size.y * entity.size;
 
-        float z = (1.0f - (entity.position.y + entity.size)/current_room->height) * RANGE_ENTITY_Z + MIN_ENTITY_Z;
+        float z = entity.position.y * tile_size.y * RANGE_ENTITY_Z + MIN_ENTITY_Z;
 
         buffer_textured_quad(screen_pos.x, screen_pos.y, BOTTOM_LEFT, screen_size.x, screen_size.y, z, entity.texture);
 }
