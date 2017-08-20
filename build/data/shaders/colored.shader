@@ -1,4 +1,4 @@
-#include "data/shaders/common.hlsl"
+#include "data/shaders/common.shader-include"
 
 struct VS_OUTPUT
 {

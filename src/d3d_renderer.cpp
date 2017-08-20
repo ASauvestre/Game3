@@ -220,7 +220,7 @@ void init_platform_renderer(Vector2f rendering_resolution, void * handle) {
     // Dummy shader
     dummy_shader = (Shader *) malloc(sizeof(Shader));
 
-    create_shader("dummy_shader.hlsl", dummy_shader);
+    create_shader("dummy", dummy_shader);
 }
 
 void init_frame() {
@@ -442,7 +442,6 @@ InputLayout * assign_or_create_input_layout(Shader * shader) {
         layout.layout_desc.add_at_index(position_row_desc, shader->position_index);
     }
 
-
     if(shader->color_index >= 0) {
 
         assert(shader->position_index != shader->color_index);
@@ -450,8 +449,6 @@ InputLayout * assign_or_create_input_layout(Shader * shader) {
         layout.layout_desc.reserve(shader->color_index + 1);
         layout.layout_desc.add_at_index(color_row_desc, shader->color_index);
     }
-
-
 
     if(shader->uv_index >= 0) {
 
@@ -554,7 +551,7 @@ bool compile_shader(Shader * shader) {
     return true;
 }
 
-static bool create_shader(char * filename, Shader * shader){ // @Temporary, used for dummy_shader.
+static bool create_shader(char * filename, Shader * shader){
     shader->name = filename;
 
     char path[512];
@@ -573,7 +570,6 @@ static void switch_to_shader(Shader * shader) {
         d3d_shader.position_index = dummy_shader->position_index;
         d3d_shader.color_index    = dummy_shader->color_index;
         d3d_shader.uv_index       = dummy_shader->uv_index;
-
     } else {
         d3d_shader.VS             = shader->VS;
         d3d_shader.input_layout   = shader->input_layout;

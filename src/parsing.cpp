@@ -41,8 +41,17 @@ void push(String * string, int amount) { // @Default amount = 1
     string->count -= amount;
 }
 
-void cut_spaces(String * string) {
+int cut_spaces(String * string) {
+    int orig_count = string->count;
     while((*string)[0] == ' ') push(string);
+    return orig_count - string->count;
+}
+
+
+int cut_trailing_spaces(String * string) {
+    int orig_count = string->count;
+    while((*string)[string->count - 1] == ' ') string->count -= 1;
+    return orig_count - string->count;
 }
 
 String bump_to_next_line(String * string) {
@@ -92,6 +101,8 @@ String bump_to_next_line(String * string) {
             }
         }
     }
+
+    cut_trailing_spaces(&line);
 
     return line;
 }

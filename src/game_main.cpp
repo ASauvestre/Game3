@@ -211,9 +211,9 @@ static Array<AssetManager *> managers;
 static Font * my_font;
 
 static void init_shaders() {
-    font_shader = shader_manager.table.find("font_shader.hlsl");
-    textured_shader = shader_manager.table.find("textured_shader.hlsl");
-    colored_shader = shader_manager.table.find("colored_shader.hlsl");
+    font_shader     = shader_manager.table.find("font.shader");
+    textured_shader = shader_manager.table.find("textured.shader");
+    colored_shader  = shader_manager.table.find("colored.shader");
 }
 
 int find_tile_index_from_coords(int x, int y, Room * room) {
@@ -327,7 +327,7 @@ void init_game() {
 
         room->outer_tiles[5].type = SWITCH_ROOM;
         room->outer_tiles[5].room_target_id = 1;
-        room->outer_tiles[5].target_tile_coords = Vector2(5, 13);
+        room->outer_tiles[5].target_tile_coords = {5, 13};
 
         room->tiles[5].texture = "dirt_road.png";
         room->tiles[55].texture = "dirt_road_bottom.png";
@@ -340,7 +340,7 @@ void init_game() {
 
         room->outer_tiles[61].type = SWITCH_ROOM;
         room->outer_tiles[61].room_target_id = 0;
-        room->outer_tiles[61].target_tile_coords = Vector2(5, 0);
+        room->outer_tiles[61].target_tile_coords = {5, 0};
 
         room->tiles[369].texture = "dirt_road.png";
         room->tiles[341].texture = "dirt_road_top.png";
@@ -631,7 +631,7 @@ void buffer_editor_left_panel() {
 
     // Background
     {
-        Color4f color = Color4f(0.1f, 0.1f, 0.2f, 0.8f);
+        Color4f color = { 0.1f, 0.1f, 0.2f, 0.8f };
         buffer_colored_quad(0.0f, 0.0f, BOTTOM_LEFT, EDITOR_LEFT_PANEL_WIDTH, 1.0f, EDITOR_LEFT_PANEL_BACKGROUND_Z, color);
     }
 
@@ -681,9 +681,9 @@ void buffer_editor_click_menu() {
         {
             Color4f color;
             if(i % 2 == 0) {
-                color = Color4f(0.2f, 0.2f, 0.3f, 0.8f);
+                color = { 0.2f, 0.2f, 0.3f, 0.8f };
             } else {
-                color = Color4f(0.3f, 0.3f, 0.4f, 0.7f);
+                color = { 0.3f, 0.3f, 0.4f, 0.7f };
             }
 
             buffer_colored_quad(x, y, BOTTOM_LEFT, EDITOR_CLICK_MENU_WIDTH, EDITOR_CLICK_MENU_ROW_HEIGHT, DEBUG_OVERLAY_BACKGROUND_Z, color);
@@ -740,9 +740,9 @@ void buffer_debug_overlay() {
             Color4f color;
 
             if(i % 2 == 0) {
-                color = Color4f(0.2f, 0.2f, 0.3f, 0.8f);
+                color = { 0.2f, 0.2f, 0.3f, 0.8f };
             } else {
-                color = Color4f(0.3f, 0.3f, 0.4f, 0.7f);
+                color = { 0.3f, 0.3f, 0.4f, 0.7f };
             }
 
             buffer_colored_quad(position, TOP_LEFT, DEBUG_OVERLAY_WIDTH, DEBUG_OVERLAY_ROW_HEIGHT, DEBUG_OVERLAY_BACKGROUND_Z, color);
@@ -809,12 +809,12 @@ void do_buffer_editor_tile_overlay(Tile * tiles, int num_tiles) {
         if (row + 1 < main_camera.offset.y - main_camera.size.y * 0.5f) continue;
         if (row     > main_camera.offset.y + main_camera.size.y * 0.5f) continue;
 
-        Color4f color = Color4f(1.0f, 1.0f, 1.0f, 0.0f); // transparent, for now @Temporary
+        Color4f color = { 1.0f, 1.0f, 1.0f, 0.0f }; // transparent, for now @Temporary
 
         if(tile.type == SWITCH_ROOM) {
-            color = Color4f(1.0f, 0.0f, 0.0f, 0.5f);
+            color = { 1.0f, 0.0f, 0.0f, 0.5f };
         } else if(tile.type == BLOCK) {
-            color = Color4f(0.0f, 1.0f, 1.0f, 0.5f);
+            color = { 0.0f, 1.0f, 1.0f, 0.5f };
         } else {
             // No color for this tile type, so skip it.
             return;

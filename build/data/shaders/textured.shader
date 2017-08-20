@@ -1,4 +1,4 @@
-#include "data/shaders/common.hlsl" // @Cleanup Make the compile working dir data/shaders somehow
+#include "data/shaders/common.shader-include" // @Cleanup Make the compile working dir data/shaders somehow
 
 Texture2D m_texture : register(t0);
 SamplerState m_sampler_state;

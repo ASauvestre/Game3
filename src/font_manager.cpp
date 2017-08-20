@@ -38,7 +38,7 @@ void FontManager::do_load_font(Font * font) {
     }
     if(tm) {
         font->texture = tm->create_texture(font->name, bitmap, 512, 512, 1);
-        log_print("load_font", "Loaded font %s", font->name);
+        // log_print("load_font", "Loaded font %s", font->name);
     } else {
         log_print("load_font", "Loaded font %s, but no TextureManager is assigned to the font manager, so the texture could not be registered", font->name);
     }

@@ -51,20 +51,20 @@ static void load_graphics_dll() {
     void * graphics_library_dll = os_specific_load_dll("d3d_renderer.dll"); //@Robustness Handle failed loading (maybe try another dll or at least die gracefully)
 
     init_platform_renderer = (INIT_PLATFORM_RENDERER_FUNC) os_specific_get_address_from_dll(graphics_library_dll, "init_platform_renderer");
-	compile_shader         = (COMPILE_SHADER_FUNC)         os_specific_get_address_from_dll(graphics_library_dll, "compile_shader");
+    compile_shader         = (COMPILE_SHADER_FUNC)         os_specific_get_address_from_dll(graphics_library_dll, "compile_shader");
     init_frame             = (INIT_FRAME)                  os_specific_get_address_from_dll(graphics_library_dll, "init_frame");
     draw_batch             = (DRAW_BATCH)                  os_specific_get_address_from_dll(graphics_library_dll, "draw_batch");
     present_frame          = (PRESENT_FRAME)               os_specific_get_address_from_dll(graphics_library_dll, "present_frame");
 }
 
 void init_renderer(int width, int height, void * handle) {
-	rendering_resolution.width = width;
-	rendering_resolution.height = height;
+    rendering_resolution.width = width;
+    rendering_resolution.height = height;
 
-	load_graphics_dll();
+    load_graphics_dll();
 
-	// From platform renderer
-	init_platform_renderer(rendering_resolution, handle);
+    // From platform renderer
+    init_platform_renderer(rendering_resolution, handle);
 }
 
 void draw_frame() {
@@ -169,9 +169,10 @@ void find_or_create_compatible_batch() {
 
 void start_buffer() {
     assert(buffering == false);
-    buffering = true;
 
     find_or_create_compatible_batch();
+
+    buffering = true;
 }
 
 void add_vertex(float x, float y, float z, float u, float v) {
@@ -222,7 +223,7 @@ void end_buffer() {
 
     previous_batch_info = current_batch_info;
 
-	buffering = false;
+    buffering = false;
 }
 
 static void clear_buffers() {
@@ -236,7 +237,7 @@ static void clear_buffers() {
     graphics_buffer.batches.reset();
 
     previous_batch_info.shader = NULL;
-	previous_batch_info.texture = NULL;
+    previous_batch_info.texture = NULL;
 
     num_buffers = 0;
 }

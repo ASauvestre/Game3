@@ -33,7 +33,9 @@ struct String {
 
 String cut_until_char(char c, String * string);
 String cut_until_space(String * string);
-void   cut_spaces(String * string);
+
+int    cut_spaces(String * string);
+int    cut_trailing_spaces(String * string);
 
 String bump_to_next_line(String * string);
 void   push(String * string, int amount = 1);

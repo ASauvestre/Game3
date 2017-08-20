@@ -11,17 +11,10 @@ struct DrawBatchInfo;
 struct Texture;
 
 struct Color4f {
-    Color4f() {}
-    Color4f(float r, float g, float b, float a) {
-        this->r = r;
-        this->g = g;
-        this->b = b;
-        this->a = a;
-    }
-    float r = 0.0f;
-    float g = 0.0f;
-    float b = 0.0f;
-    float a = 1.0f;
+    float r;
+    float g;
+    float b;
+    float a;
 };
 
 enum BufferMode {

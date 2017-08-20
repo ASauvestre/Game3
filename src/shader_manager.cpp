@@ -4,7 +4,7 @@
 #include "os/layer.h"
 
 void ShaderManager::init() {
-    this->extensions.add("hlsl");
+    this->extensions.add("shader");
 }
 
 void ShaderManager::create_placeholder(char * name, char * path) {
