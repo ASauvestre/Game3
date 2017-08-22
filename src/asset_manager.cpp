@@ -2,11 +2,6 @@
 #include "parsing.h"
 #include "macros.h"
 
-void AssetManager::init_asset(Asset * asset) {
-    asset->last_reload_time = 0.0f;
-    asset->reload_timeout   = 0.1f;
-}
-
 // @Incomplete, make those pointers instead of v functions
 void AssetManager::create_placeholder(char * name, char * path) {
     log_print("create_placeholder", "we ned to create a placeholder for asset %s, but the manager has no create_placeholder function", name);

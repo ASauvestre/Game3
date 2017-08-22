@@ -25,12 +25,14 @@ void FontManager::do_load_font(Font * font) {
 
     if(!file_data.data) return;
 
+    scope_exit(free(file_data.data));
+
     unsigned char * bitmap = (unsigned char *) malloc(512 * 512 * 4); // Our bitmap is 512x512 pixels and each pixel takes 4 bytes @Robustness, make sure the bitmap is big enough for the font
 
     unsigned char * c_file_data = (unsigned char *) to_c_string(file_data);
     scope_exit(free(c_file_data));
 
-    int result = stbtt_BakeFontBitmap(c_file_data, 0, 16.0, bitmap, 512, 512, 32, 96, font->char_data); // @Robustness From stb_truetype.h : "no guarantee this fits!""
+    int result = stbtt_BakeFontBitmap(c_file_data, 0, 12.0, bitmap, 512, 512, 32, 96, font->char_data); // @Robustness From stb_truetype.h : "no guarantee this fits!""
 
     if(result <= 0) {
         log_print("load_font", "The font %s could not be loaded, it is too large to fit in a 512x512 bitmap", font->name);
@@ -46,7 +48,6 @@ void FontManager::do_load_font(Font * font) {
 
 void FontManager::create_placeholder(char * name, char * path) {
     Font * font = (Font *) malloc(sizeof(Font));
-    this->init_asset(font);
 
     font->name      = name;
     font->full_path = path;
@@ -66,10 +67,6 @@ void FontManager::reload_or_create_asset(String full_path, String file_name) {
     } else {
         free(c_file_name);
         free(c_full_path);
-    }
-
-    if((os_specific_get_time() - asset->last_reload_time) < asset->reload_timeout) {
-        return;
     }
 
     do_load_font((Font *) asset);

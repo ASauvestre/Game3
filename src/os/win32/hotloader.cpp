@@ -23,7 +23,7 @@ struct AssetChange {
 // Private functions
 static void issue_read_directory(Directory * directory);
 
-static void handle_notifications();
+static bool handle_notifications();
 
 static FILE_NOTIFY_INFORMATION * bump_ptr_to_next_notification(FILE_NOTIFY_INFORMATION * notification);
 
@@ -80,7 +80,9 @@ void register_manager(AssetManager * am) {
 }
 
 void check_hotloader_modifications() {
-    handle_notifications();
+    while(handle_notifications()) {
+        printf("Keep going\n");
+    }
 
     for_array(asset_changes.data, asset_changes.count) {
         dispatch_file_to_managers(it->full_path);
@@ -103,10 +105,10 @@ static void dispatch_file_to_managers(String full_path) {
     }
 }
 
-static void handle_notifications() {
+static bool handle_notifications() {
     // Check if the read request has completed or not
     if(!HasOverlappedIoCompleted(&dir.overlapped)) {
-        return;
+        return false;
     }
 
     int bytes_transferred;
@@ -124,7 +126,7 @@ static void handle_notifications() {
 
     // No notifications to report
     if(bytes_transferred == 0) {
-        return;
+        return false;
     }
 
     // log_print("check_hotloader_modifications", "Hotloader notification, bytes_transferred = %d", bytes_transferred);
@@ -199,6 +201,8 @@ static void handle_notifications() {
             continue;
         }
     }
+
+    return true;
 }
 
 void hotloader_register_loose_files() {

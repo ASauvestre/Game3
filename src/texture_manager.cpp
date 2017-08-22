@@ -26,7 +26,6 @@ Texture * TextureManager::create_texture(char * name, unsigned char * data, int 
 
 void TextureManager::create_placeholder(char * name, char * path) {
     Texture * texture = (Texture * ) malloc(sizeof(Texture));
-    this->init_asset(texture);
 
     texture->name          = name;
     texture->full_path     = path;
@@ -51,16 +50,13 @@ void TextureManager::reload_or_create_asset(String full_path, String file_name) 
         free(c_full_path);
     }
 
-    if((os_specific_get_time() - asset->last_reload_time) < asset->reload_timeout) {
-        return;
-    }
-
     do_load_texture((Texture *) asset);
 }
 
 // @Incomplete Handle other file types in addition to PNG.
 void TextureManager::do_load_texture(Texture * texture) {
     String file_data = os_specific_read_file(texture->full_path);
+    scope_exit(free(file_data.data));
 
     int width, height, bytes_per_pixel;
     unsigned char * bitmap = stbi_load_from_memory((unsigned char *) file_data.data, file_data.count, &width, &height, &bytes_per_pixel, 4);
@@ -80,7 +76,7 @@ void TextureManager::do_load_texture(Texture * texture) {
         log_print("do_load_texture", "Loaded texture \"%s\", it has %d bit depth, please convert to 32 bit depth", texture->name, bytes_per_pixel * 8);
         bytes_per_pixel = 4;
     } else {
-        // log_print("do_load_texture", "Loaded texture \"%s\"", texture->name);
+        log_print("do_load_texture", "Loaded texture \"%s\"", texture->name);
     }
 
     texture->width           = width;
@@ -88,7 +84,5 @@ void TextureManager::do_load_texture(Texture * texture) {
     texture->bytes_per_pixel = bytes_per_pixel;
     texture->width_in_bytes  = width * bytes_per_pixel;
     texture->num_bytes       = width * height * bytes_per_pixel;
-
-    texture->last_reload_time = os_specific_get_time();
     texture->dirty = true;
 }

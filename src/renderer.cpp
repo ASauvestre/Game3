@@ -244,6 +244,5 @@ static void clear_buffers() {
 
 // Meh
 void do_load_shader(Shader * shader) {
-    shader->last_reload_time = os_specific_get_time();
     compile_shader(shader);
 }

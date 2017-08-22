@@ -9,7 +9,6 @@ void ShaderManager::init() {
 
 void ShaderManager::create_placeholder(char * name, char * path) {
     Shader * shader = (Shader * ) malloc(sizeof(Shader));
-    this->init_asset(shader);
 
     shader->name      = name;
     shader->full_path = path;
@@ -30,10 +29,6 @@ void ShaderManager::reload_or_create_asset(String full_path, String file_name) {
     } else{
         free(c_file_name);
         free(c_full_path);
-    }
-
-    if((os_specific_get_time() - asset->last_reload_time) < asset->reload_timeout) {
-        return;
     }
 
     do_load_shader((Shader *) asset);

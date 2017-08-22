@@ -8,9 +8,11 @@
 #include "macros.h"
 
 #include "renderer.h"
+
 #include "texture_manager.h"
 #include "font_manager.h"
 #include "shader_manager.h"
+#include "room_manager.h"
 
 // Structs
 //struct Shader; // API specific definition
@@ -34,12 +36,6 @@ enum GameMode {
     EDITOR
 };
 
-enum TileType {
-    DEFAULT,
-    BLOCK,
-    SWITCH_ROOM
-};
-
 enum Alignement {
     TOP_LEFT,
     TOP_RIGHT,
@@ -60,20 +56,6 @@ struct Entity {
     float size; // relative to tile
 };
 
-struct Tile {
-    char * texture;
-    int local_x;
-    int local_y;
-
-    TileType type = DEFAULT;
-    int room_target_id;         // Used if type is SWITCH_ROOM
-    Vector2 target_tile_coords; // Used if type is SWITCH_ROOM
-
-    Vector2f collision_box;
-
-    bool collision_enabled = false;
-};
-
 enum ObjectType {
     TILE,
     ENTITY
@@ -85,37 +67,6 @@ struct Object {
         Tile * tile;
         Entity * entity;
     };
-};
-
-struct Room {
-    // @Temporary. Have a separate function for this constructor, I want this struct to be POD.
-    Room(char * n, int w, int h) {
-        name = n;
-        width = w;
-        height = h;
-
-        num_tiles = w * h;
-        num_outer_tiles = 2 * (w + h);
-
-        tiles = (Tile *) malloc(num_tiles * sizeof(Tile));
-        outer_tiles = (Tile *) malloc(num_outer_tiles * sizeof(Tile));
-    }
-
-    ~Room() {
-        free(tiles);
-    }
-
-    char * name;
-
-    int width;
-    int height;
-    int num_tiles;
-    Tile * tiles;
-
-    // @Temporary. Either makes those normal tiles with a special type, or use another
-    // system. I don't like having those be in a separate array.
-    int num_outer_tiles;
-    Tile * outer_tiles; // Border tiles, used for teleport triggers.
 };
 
 struct Camera {
@@ -142,7 +93,7 @@ void buffer_entities();
 
 void buffer_entity(Entity entity);
 
-void buffer_tiles(Room * room);
+void buffer_tiles(Array<Tile> tile);
 
 void buffer_debug_overlay();
 
@@ -205,6 +156,7 @@ static Vector2f editor_click_menu_position;
 static TextureManager texture_manager;
 static FontManager font_manager;
 static ShaderManager shader_manager;
+static RoomManager room_manager;
 
 static Array<AssetManager *> managers;
 
@@ -216,42 +168,18 @@ static void init_shaders() {
     colored_shader  = shader_manager.table.find("colored.shader");
 }
 
-int find_tile_index_from_coords(int x, int y, Room * room) {
-    return (x + 1) * room->width + y - 1;
-}
-
-int find_outer_tile_index_from_coords(int x, int y, Room * room) {
-    if(y == -1) {
-        return x;
-    } else if(y == room->height) {
-        return room->width + 2*room->height + x;
-    } else if (x == -1) {
-        return room->width + 2*(y - 1);
-    }  else if (x == room->width) {
-        return room->width + 2*(y - 1) + 1;
-    } else {
-        return -1;
-    }
-}
-
-Vector2f find_tile_coords_from_index(int index, Room * room) {
-    Vector2f result;
-    result.x = room->tiles[index].local_x;
-    result.y = room->tiles[index].local_y;
-    return result;
-}
-
-Vector2f find_outer_tile_coords_from_index(int index, Room * room) {
-    Vector2f result;
-    result.x = room->outer_tiles[index].local_x;
-    result.y = room->outer_tiles[index].local_y;
-    return result;
-}
-
 Room * generate_room(char * name, int width, int height) {
-    Room * room = new Room(name, width, height);
+    Room * room = (Room *) malloc(sizeof(Room));
 
-    for(int i=0; i<(room->num_tiles); i++) {
+    // @Cleanup.
+    Room default;
+    *room = default;
+
+    room->name   = name;
+    room->width  = width;
+    room->height = height;
+
+    for(int i = 0; i < room->width * room->height; i++) {
         Tile tile;
 
         if((i % 7 == 0) || (i % 7 == 2)) {
@@ -262,40 +190,10 @@ Room * generate_room(char * name, int width, int height) {
             tile.texture = "grass3.png";
         }
 
-        tile.local_x = i % room->width;
-        tile.local_y = i / room->width;
+        tile.position.x = i % room->width;
+        tile.position.y = i / room->width;
 
-        room->tiles[i] = tile;
-    }
-
-    for(int i=0; i<(room->num_outer_tiles); i++) {
-        Tile tile;
-
-        if(i<room->width) {
-            tile.local_x = i;
-            tile.local_y = -1;
-
-        } else if(i > (room->num_outer_tiles - room->width - 1)) {
-            tile.local_x = (i - (room->num_outer_tiles - room->width));
-            tile.local_y = room->height;
-
-        } else {
-            tile.local_x = room->width - (room->width + 1)*((i - room->width)%2);
-            tile.local_y = (i - room->width)/2;
-
-        }
-
-        tile.collision_box.x = tile.local_x;
-        tile.collision_box.y = tile.local_y;
-        tile.collision_box.width = 1;
-        tile.collision_box.height = 1;
-
-        tile.type = BLOCK;
-        tile.collision_enabled = true;
-
-        // log_print("outer_tiles_generation", "Created tile %d at (%d, %d)", i, tile.local_x, tile.local_y);
-
-        room->outer_tiles[i] = tile;
+        room->tiles.add(tile);
     }
 
     return room;
@@ -325,12 +223,8 @@ void init_game() {
 
         Room * room = generate_room("main_room", 50, 30);
 
-        room->outer_tiles[5].type = SWITCH_ROOM;
-        room->outer_tiles[5].room_target_id = 1;
-        room->outer_tiles[5].target_tile_coords = {5, 13};
-
-        room->tiles[5].texture = "dirt_road.png";
-        room->tiles[55].texture = "dirt_road_bottom.png";
+        room->tiles.data[5].texture = "dirt_road.png";
+        room->tiles.data[55].texture = "dirt_road_bottom.png";
 
         rooms[0] = room;
 
@@ -338,12 +232,8 @@ void init_game() {
 
         room = generate_room("small_room", 28, 14);
 
-        room->outer_tiles[61].type = SWITCH_ROOM;
-        room->outer_tiles[61].room_target_id = 0;
-        room->outer_tiles[61].target_tile_coords = {5, 0};
-
-        room->tiles[369].texture = "dirt_road.png";
-        room->tiles[341].texture = "dirt_road_top.png";
+        room->tiles.data[369].texture = "dirt_road.png";
+        room->tiles.data[341].texture = "dirt_road_top.png";
 
         rooms[1] = room;
 
@@ -377,7 +267,7 @@ void game() {
 
     handle_user_input();
 
-    buffer_tiles(current_room);
+    buffer_tiles(current_room->tiles);
 
     buffer_entities();
 
@@ -451,31 +341,31 @@ void handle_user_input() {
             if(keyboard.key_down)  player.position.y += position_delta;
         }
 
-        // Early collision detection, find current tile
-        {
-            // @Optimisation We can probably infer the tiles we collide with from the player's x and y coordinates and information about the room's size
-            for(int i = 0; i < current_room->num_outer_tiles; i++) {
-                Tile tile = current_room->outer_tiles[i];
+        // // Early collision detection, find current tile
+        // {
+        //     // @Optimisation We can probably infer the tiles we collide with from the player's x and y coordinates and information about the room's size
+        //     for(int i = 0; i < current_room->num_outer_tiles; i++) {
+        //         Tile tile = current_room->outer_tiles[i];
 
-                bool should_compute_collision = tile.collision_enabled;
+        //         bool should_compute_collision = tile.collision_enabled;
 
-                if(should_compute_collision) {
-                    if((player.position.x < tile.local_x + tile.collision_box.width) && (tile.local_x < player.position.x + player.size) && // X tests
-                       (player.position.y < tile.local_y + tile.collision_box.height) && (tile.local_y < player.position.y + player.size)) {    // Y tests
+        //         if(should_compute_collision) {
+        //             if((player.position.x < tile.local_x + tile.collision_box.width) && (tile.local_x < player.position.x + player.size) && // X tests
+        //                (player.position.y < tile.local_y + tile.collision_box.height) && (tile.local_y < player.position.y + player.size)) {    // Y tests
 
-                        if(tile.type == SWITCH_ROOM) {
-                            // log_print("collision", "Player is on a tile with type SWITCH_ROOM, switching to room %d", tile.room_target_id);
-                            current_room = rooms[tile.room_target_id];
+        //                 if(tile.type == SWITCH_ROOM) {
+        //                     // log_print("collision", "Player is on a tile with type SWITCH_ROOM, switching to room %d", tile.room_target_id);
+        //                     current_room = rooms[tile.room_target_id];
 
-                            player.position.x = tile.target_tile_coords.x + (player.position.x - tile.local_x);
-                            player.position.y = tile.target_tile_coords.y + (player.position.y - tile.local_y);
+        //                     player.position.x = tile.target_tile_coords.x + (player.position.x - tile.local_x);
+        //                     player.position.y = tile.target_tile_coords.y + (player.position.y - tile.local_y);
 
-                            break;
-                        }
-                    }
-                }
-            }
-        }
+        //                     break;
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
 
         // Clamp player position
         {
@@ -601,18 +491,19 @@ void handle_user_input() {
     }
 }
 
-int get_objects_colliding_at(Vector2f position, Object objects[], int max_collisions) {
+int get_objects_colliding_at(Vector2f point, Object objects[], int max_collisions) {
 
     int num_objects = 0;
 
     // @Optimisation We can probably infer the tiles we collide with from the player's x and y coordinates and information about the room's size
-    for(int i = 0; i < current_room->num_tiles; i++) {
-        Tile tile = current_room->tiles[i];
+    for(int i = 0; i < current_room->tiles.count; i++) {
+        Tile * tile = &current_room->tiles.data[i];
+        Vector2 position = tile->position;
 
-        if((position.x <= tile.local_x + 1) && (position.x >= tile.local_x) &&
-           (position.y <= tile.local_y + 1) && (position.y >= tile.local_y)) {
+        if((point.x <= position.x + 1) && (point.x >= position.x) &&
+           (point.y <= position.y + 1) && (point.y >= position.y)) {
             objects[num_objects].type = TILE;
-            objects[num_objects].tile = &current_room->tiles[i];
+            objects[num_objects].tile = tile;
 
             num_objects++;
 
@@ -694,7 +585,10 @@ void buffer_editor_click_menu() {
             if(objects[i].type == TILE) {
                 // log_print("editor_mouse_collision", "Colliding with object of type TILE at (%d, %d)", objects[i].tile->local_x, objects[i].tile->local_y);
                 char tile_name[64];
-                snprintf(tile_name, 64, "Tile%d_%d", objects[i].tile->local_x, objects[i].tile->local_y);
+
+                Vector2 tile_position = objects[i].tile->position;
+
+                snprintf(tile_name, 64, "Tile%d_%d", tile_position.x, tile_position.y);
 
                 buffer_string(tile_name, x + EDITOR_MENU_PADDING, y + EDITOR_MENU_PADDING * window_data.aspect_ratio, DEBUG_OVERLAY_Z, my_font, BOTTOM_LEFT);
             }
@@ -797,11 +691,11 @@ void buffer_debug_overlay() {
     }
 }
 
-void do_buffer_editor_tile_overlay(Tile * tiles, int num_tiles) {
-    for(int tile_index = 0; tile_index < num_tiles; tile_index++) {
-        Tile tile = tiles[tile_index];
-        int col = tile.local_x;
-        int row = tile.local_y;
+void do_buffer_editor_tile_overlay(Array<Tile> tiles) {
+    for(int tile_index = 0; tile_index < tiles.count; tile_index++) {
+        Tile * tile = &tiles.data[tile_index];
+        int col = tile->position.x;
+        int row = tile->position.y;
 
         // Don't buffer out of screen tiles
         if (col + 1 < main_camera.offset.x - main_camera.size.x * 0.5f) continue;
@@ -811,9 +705,9 @@ void do_buffer_editor_tile_overlay(Tile * tiles, int num_tiles) {
 
         Color4f color = { 1.0f, 1.0f, 1.0f, 0.0f }; // transparent, for now @Temporary
 
-        if(tile.type == SWITCH_ROOM) {
+        if(tile->type == SWITCH_ROOM) {
             color = { 1.0f, 0.0f, 0.0f, 0.5f };
-        } else if(tile.type == BLOCK) {
+        } else if(tile->type == BLOCK) {
             color = { 0.0f, 1.0f, 1.0f, 0.5f };
         } else {
             // No color for this tile type, so skip it.
@@ -835,8 +729,8 @@ void do_buffer_editor_tile_overlay(Tile * tiles, int num_tiles) {
 }
 
 void buffer_editor_tile_overlay(Room * room) {
-    do_buffer_editor_tile_overlay(room->tiles, room->num_tiles);
-    do_buffer_editor_tile_overlay(room->outer_tiles, room->num_outer_tiles);
+    do_buffer_editor_tile_overlay(room->tiles);
+//    do_buffer_editor_tile_overlay(room->outer_tiles, room->num_outer_tiles);
 }
 
 void buffer_entities() {
@@ -849,6 +743,7 @@ void buffer_player() {
     buffer_entity(player);
 }
 
+// @Refactor with buffer_tiles
 void buffer_entity(Entity entity) {
         // Don't buffer is the entity is out of screen
         if (entity.position.x + entity.size < main_camera.offset.x - main_camera.size.x * 0.5f) return;
@@ -871,16 +766,16 @@ void buffer_entity(Entity entity) {
         screen_size.x = tile_size.x * entity.size;
         screen_size.y = tile_size.y * entity.size;
 
-        float z = entity.position.y * tile_size.y * RANGE_ENTITY_Z + MIN_ENTITY_Z;
+        float z = entity.position.y * tile_size.y * RANGE_ENTITY_Z * (main_camera.size.height / current_room->height) + MIN_ENTITY_Z;
 
         buffer_textured_quad(screen_pos.x, screen_pos.y, BOTTOM_LEFT, screen_size.x, screen_size.y, z, entity.texture);
 }
 
-void buffer_tiles(Room * room) {
-    for(int tile_index = 0; tile_index < room->num_tiles; tile_index++) {
-        Tile tile = room->tiles[tile_index];
-        int col = tile.local_x;
-        int row = tile.local_y;
+void buffer_tiles(Array<Tile> tiles) {
+    for(int tile_index = 0; tile_index < tiles.count; tile_index++) {
+        Tile * tile = &tiles.data[tile_index];
+        int col = tile->position.x;
+        int row = tile->position.y;
 
         // Don't buffer out of screen tiles
         if (col + 1 <= main_camera.offset.x - main_camera.size.x * 0.5f) continue;
@@ -898,7 +793,7 @@ void buffer_tiles(Room * room) {
         tile_offset.x = tile_size.x * (col - main_camera.offset.x) + 0.5f;
         tile_offset.y = 0.5f - tile_size.y * (row + 1 - main_camera.offset.y); // @Temporary see other one and also figure out why we needed a +1 here. :CoordsConversion
 
-        buffer_textured_quad(tile_offset.x, tile_offset.y, BOTTOM_LEFT, tile_size.x, tile_size.y, TILES_Z, tile.texture);
+        buffer_textured_quad(tile_offset.x, tile_offset.y, BOTTOM_LEFT, tile_size.x, tile_size.y, TILES_Z, tile->texture);
     }
 }
 
@@ -960,15 +855,10 @@ float buffer_string(char * text, float x, float y, float z,  Font * font, Aligne
             float inverted_y_top   = (int)((pixel_y - height_below_bl) + 0.5f);
             float inverted_y_below = (int)((pixel_y - height_above_bl) + 0.5f);
 
-            // Vertex v1 = {q.x0/window_data.width, inverted_y_top  /window_data.height, z, q.s0, q.t0};
-            // Vertex v2 = {q.x1/window_data.width, inverted_y_below/window_data.height, z, q.s1, q.t1};
-            // Vertex v3 = {q.x0/window_data.width, inverted_y_below/window_data.height, z, q.s0, q.t1};
-            // Vertex v4 = {q.x1/window_data.width, inverted_y_top  /window_data.height, z, q.s1, q.t0};
-
-            float x0 = q.x0/window_data.width;
+            float x0 = q.x0            /window_data.width;
             float y0 = inverted_y_below/window_data.height;
-            float x1 = q.x1/window_data.width;
-            float y1 = inverted_y_top/window_data.height;
+            float x1 = q.x1            /window_data.width;
+            float y1 = inverted_y_top  /window_data.height;
 
             if((alignement == TOP_RIGHT) || (alignement == BOTTOM_RIGHT)) {
                 x0 -= text_width;
@@ -1004,7 +894,7 @@ void buffer_textured_quad(float x, float y, Alignement alignement, float width, 
     Texture * texture = texture_manager.table.find(texture_name);
 
     if(!texture) {
-      //  log_print("Drawing", "Could not find texture %s", texture_name);
+      log_print("Drawing", "Could not find texture %s", texture_name);
     }
 
     set_shader(textured_shader);
@@ -1070,14 +960,17 @@ void init_managers(){
     texture_manager.init();
     shader_manager.init();
     font_manager.init(&texture_manager);
+    room_manager.init();
 
     register_manager(&texture_manager);
     register_manager(&font_manager);
     register_manager(&shader_manager);
+    register_manager(&room_manager);
 
     managers.add(&texture_manager);
     managers.add(&shader_manager);
     managers.add(&font_manager);
+    managers.add(&room_manager);
 }
 
 void main() {
@@ -1136,5 +1029,6 @@ void main() {
         texture_manager.perform_reloads();
         // font_manager.perform_reloads(); // @Incomplete: make sure this works
         shader_manager.perform_reloads();
+        room_manager.perform_reloads();
     }
 }

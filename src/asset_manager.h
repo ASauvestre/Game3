@@ -10,9 +10,6 @@
 struct Asset {
     char * name;
     char * full_path;
-
-    double last_reload_time = 0.0f;
-    double reload_timeout   = 0.1f;
 };
 
 struct AssetManager {
@@ -25,8 +22,6 @@ struct AssetManager {
     virtual void reload_or_create_asset(String file_path, String file_name);
 
     void perform_reloads();
-
-    void init_asset(Asset * asset);
 };
 
 template <typename T>
