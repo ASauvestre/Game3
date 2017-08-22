@@ -57,3 +57,13 @@ _ScopeExit<F> _MakeScopeExit(F f) { return _ScopeExit<F>(f); };
 #else
     #define perf_monitor()
 #endif
+
+// This macro loops over all the elements of an array and gives a pointer
+// to the current value "it" and the current index "it_index". Very ugly,
+// but this is about as good as it gets.
+#define for_array(__for_array_data, __for_array_count)              \
+    int STRING_JOIN(__for_array_internal,__LINE__) = 1;             \
+    for(int it_index = 0; it_index < __for_array_count; it_index++) \
+        for(auto it = &__for_array_data[it_index];                  \
+            STRING_JOIN(__for_array_internal,__LINE__)++ > 0;       \
+            STRING_JOIN(__for_array_internal,__LINE__) = 0)

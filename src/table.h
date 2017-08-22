@@ -1,5 +1,6 @@
 #include "hash.h"
 #include "array.h"
+#include "macros.h"
 
 // @Note: This is a variant of an OA hash table where keys, values, hashes and states are stored in their own array. Good for iterating, but very bad for resizing when it gets big. we only use it to load our assets, which are all loaded at startup, so it's fine.
 template <typename K, typename V>

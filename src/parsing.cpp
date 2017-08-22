@@ -2,6 +2,23 @@
 #include <string.h>
 
 #include "parsing.h"
+#include "macros.h"
+
+void skip_empty_lines(String * string) {
+    String line;
+    String prev_string;
+
+    while(!line.count) {
+        prev_string = *string;
+        line = bump_to_next_line(string);
+
+        if(line.count < 0) return;
+    }
+
+    *string = prev_string;
+
+    return;
+}
 
 // Right-side inclusive
 String cut_until_char(char c, String * string) {
@@ -26,6 +43,20 @@ String cut_until_space(String * string) {
 
     return left;
 
+}
+
+//@Speed we probably could make a faster version of this, but who cares?
+bool string_to_int(String string, int * result) {
+    for_array(string.data, string.count) {
+        if(*it < '0' || *it > '9') return false;
+    }
+
+    char * c_string = to_c_string(string);
+
+    *result = atoi(c_string);
+
+    free(c_string);
+    return true;
 }
 
 char * to_c_string(String string) { // @Incomplete take pointer here ?

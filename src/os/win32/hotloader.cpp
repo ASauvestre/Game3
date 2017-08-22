@@ -81,7 +81,7 @@ void register_manager(AssetManager * am) {
 
 void check_hotloader_modifications() {
     while(handle_notifications()) {
-        printf("Keep going\n");
+        // Keep going.
     }
 
     for_array(asset_changes.data, asset_changes.count) {

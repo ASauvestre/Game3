@@ -2,20 +2,6 @@
 
 #include <assert.h>
 
-#define JOIN2(a,b) a##_##b
-#define JOIN(a,b) JOIN2(a,b)
-
-// This macro loops over all the elements of an array and gives a pointer
-// to the current value "it" and the current index "it_index". Very ugly,
-// but this is about as good as it gets.
-
-#define for_array(__for_array_data, __for_array_count)              \
-    int JOIN(__for_array_internal,__LINE__) = 1;                    \
-    for(int it_index = 0; it_index < __for_array_count; it_index++) \
-        for(auto it = &__for_array_data[it_index];                  \
-            JOIN(__for_array_internal,__LINE__)++ > 0;              \
-            JOIN(__for_array_internal,__LINE__) = 0)
-
 template <typename T>
 struct Array {
 

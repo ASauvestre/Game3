@@ -76,7 +76,7 @@ void TextureManager::do_load_texture(Texture * texture) {
         log_print("do_load_texture", "Loaded texture \"%s\", it has %d bit depth, please convert to 32 bit depth", texture->name, bytes_per_pixel * 8);
         bytes_per_pixel = 4;
     } else {
-        log_print("do_load_texture", "Loaded texture \"%s\"", texture->name);
+        // log_print("do_load_texture", "Loaded texture \"%s\"", texture->name);
     }
 
     texture->width           = width;
