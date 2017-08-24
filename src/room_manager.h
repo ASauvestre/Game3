@@ -8,7 +8,7 @@ enum TileType {
 };
 
 struct Tile {
-    char * texture;
+    char * texture = NULL;
     Vector2 position;
 
     TileType type = DEFAULT;

@@ -12,10 +12,11 @@ String win32_read_file(char * path) {
 
     int file_size = GetFileSize(file_handle, NULL);
 
-    file_data.data = (char *) malloc(file_size + 1);
+    file_data.data = (char *) malloc(file_size);
 
     if(!ReadFile(file_handle, file_data.data, file_size, (LPDWORD) &(file_data.count), NULL)) {
         log_print("read_file", "An error occured while reading the file \"%s\". Error code is 0x%x", path, GetLastError());
+        free(file_data.data);
         file_data.data = NULL;
         return file_data;
     }

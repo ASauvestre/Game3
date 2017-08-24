@@ -190,6 +190,7 @@ static bool handle_notifications() {
         for_array(asset_changes.data, asset_changes.count) {
 			if (it->full_path == change.full_path) {
                 success = false;
+
                 it_index = asset_changes.count; // Break
             }
         }

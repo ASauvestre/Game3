@@ -99,7 +99,7 @@ void buffer_debug_overlay();
 
 void buffer_editor_tile_overlay(Room * room);
 
-int get_objects_colliding_at(Vector2f position, Object objects[], int max_collisions);
+void get_objects_colliding_at(Vector2f position, Array<Object> * _objects);
 
 void buffer_textured_quad(float x, float y, Alignement alignement, float width, float height, float depth, char * texture);
 
@@ -239,7 +239,8 @@ void init_game() {
 
     }
 
-    current_room = rooms[0];
+    // current_room = rooms[0];
+    current_room = room_manager.table.find("main-room.room");
     game_mode = GAME;
 
     // TEST Init trees
@@ -284,8 +285,7 @@ void game() {
     }
 }
 
-Object objects[64];
-int num_objects = 0;
+Array<Object> objects;
 
 float EDITOR_MENU_PADDING = 0.004f;
 
@@ -444,7 +444,8 @@ void handle_user_input() {
                     game_space_position.x = main_camera.size.x * (keyboard.mouse_left_pressed_position.x - 0.5f) + main_camera.offset.x;
                     game_space_position.y = main_camera.size.y * (keyboard.mouse_left_pressed_position.y - 0.5f) + main_camera.offset.y;
 
-                    num_objects = get_objects_colliding_at(game_space_position, objects, 64);
+
+                    get_objects_colliding_at(game_space_position, &objects);
 
                     editor_click_menu_position = keyboard.mouse_position;
 
@@ -458,7 +459,7 @@ void handle_user_input() {
                 if(editor_click_menu_open) {
                     if((position.x <= editor_click_menu_position.x + EDITOR_CLICK_MENU_WIDTH)
                     && (position.x >= editor_click_menu_position.x)
-                    && (position.y >= editor_click_menu_position.y - EDITOR_CLICK_MENU_ROW_HEIGHT * num_objects)
+                    && (position.y >= editor_click_menu_position.y - EDITOR_CLICK_MENU_ROW_HEIGHT * objects.count)
                     && (position.y <= editor_click_menu_position.y)) {
 
                         int element_number = 0;
@@ -480,10 +481,11 @@ void handle_user_input() {
                         //     objects[element_number].tile->texture = "grass.png"; // = m_texture_manager->find_texture("dirt_road.png");
                         // }
 
-                        editor_left_panel_displayed_object = objects[element_number];
+                        editor_left_panel_displayed_object = objects.data[element_number];
                     }
 
-                    editor_click_menu_open = false;
+                    objects.reset();
+                    editor_click_menu_open     = false;
                     editor_click_menu_was_open = true;
                 }
             }
@@ -491,10 +493,7 @@ void handle_user_input() {
     }
 }
 
-int get_objects_colliding_at(Vector2f point, Object objects[], int max_collisions) {
-
-    int num_objects = 0;
-
+void get_objects_colliding_at(Vector2f point, Array<Object> * _objects) {
     // @Optimisation We can probably infer the tiles we collide with from the player's x and y coordinates and information about the room's size
     for(int i = 0; i < current_room->tiles.count; i++) {
         Tile * tile = &current_room->tiles.data[i];
@@ -502,23 +501,19 @@ int get_objects_colliding_at(Vector2f point, Object objects[], int max_collision
 
         if((point.x <= position.x + 1) && (point.x >= position.x) &&
            (point.y <= position.y + 1) && (point.y >= position.y)) {
-            objects[num_objects].type = TILE;
-            objects[num_objects].tile = tile;
+            Object obj;
 
-            num_objects++;
+            obj.type = TILE;
+            obj.tile = tile;
 
-            if(num_objects == max_collisions) {
-                break;
-            }
+            _objects->add(obj);
         }
     }
-
-    return num_objects;
 }
 
 void buffer_editor_left_panel() {
 
-    EDITOR_LEFT_PANEL_ROW_HEIGHT = EDITOR_LEFT_PANEL_PADDING * window_data.aspect_ratio + 14.0f / window_data.height; // @Temporary Current distance from baseline to top of capital letter is 12px
+    EDITOR_LEFT_PANEL_ROW_HEIGHT = EDITOR_LEFT_PANEL_PADDING * 2 * window_data.aspect_ratio + 14.0f / window_data.height; // @Temporary Current distance from baseline to top of capital letter is 12px
 
     // Background
     {
@@ -548,9 +543,6 @@ void buffer_editor_left_panel() {
                 y -= texture_display_size * aspect_ratio + texture_top_padding;
             }
 
-            y -= EDITOR_LEFT_PANEL_PADDING  * window_data.aspect_ratio;
-
-
             buffer_string("Texture :", EDITOR_LEFT_PANEL_PADDING, y, EDITOR_LEFT_PANEL_CONTENT_Z, my_font, TOP_LEFT);
 
             y -= EDITOR_LEFT_PANEL_ROW_HEIGHT;
@@ -571,7 +563,7 @@ void buffer_editor_click_menu() {
     float x = editor_click_menu_position.x;
     float y = editor_click_menu_position.y - EDITOR_CLICK_MENU_ROW_HEIGHT;
 
-    for(int i = 0; i < num_objects; i++) {
+    for(int i = 0; i < objects.count; i++) {
         // Buffer menu background
         {
             Color4f color;
@@ -586,11 +578,11 @@ void buffer_editor_click_menu() {
 
         // Buffer strings
         {
-            if(objects[i].type == TILE) {
+            if(objects.data[i].type == TILE) {
                 // log_print("editor_mouse_collision", "Colliding with object of type TILE at (%d, %d)", objects[i].tile->local_x, objects[i].tile->local_y);
                 char tile_name[64];
 
-                Vector2 tile_position = objects[i].tile->position;
+                Vector2 tile_position = objects.data[i].tile->position;
 
                 snprintf(tile_name, 64, "Tile%d_%d", tile_position.x, tile_position.y);
 

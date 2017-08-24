@@ -10,10 +10,17 @@ void RoomManager::init() {
 void RoomManager::create_placeholder(char * name, char * path) {
     Room * room = (Room * ) malloc(sizeof(Room));
 
-    room->name          = name;
-    room->full_path     = path;
-	room->dimensions.x  = -1;
-	room->dimensions.y  = -1;
+    room->name            = name;
+    room->full_path       = path;
+
+    // @Cleanup Those init shouldn't be here, either make a manual initializer or use new instead of malloc.
+
+    // Init position vector
+	room->dimensions.x    = -1;
+	room->dimensions.y    = -1;
+
+    // Init tile array
+	room->tiles = {};
 
     this->table.add(name, room);
 }
@@ -41,6 +48,8 @@ void RoomManager::do_load_room(Room * room) {
     scope_exit(free(file_data.data));
 
     Room new_room = *room;
+
+    Array<Tile> new_tile_array;
 
     // Parse version number @Refactor
     {
@@ -103,6 +112,8 @@ void RoomManager::do_load_room(Room * room) {
     int line_number = 1;
     bool successfully_parsed_file = true;
 
+    int current_tile_index = -1;
+
     while(true) {
         String line = bump_to_next_line(&file_data);
         line_number += 1;
@@ -118,6 +129,9 @@ void RoomManager::do_load_room(Room * room) {
 
             if(!arg.count) {
                 log_print("do_load_room", "Expected a name after \"name\" on line %d of file %s.", line_number, room->name);
+
+                successfully_parsed_file = false;
+                continue;
             }
 
             if(line.count) {
@@ -147,8 +161,82 @@ void RoomManager::do_load_room(Room * room) {
             }
 
             new_room.dimensions = dimensions;
-        } else if(field_name == "tile") {
-            // Oh boy.
+        } else if(field_name == "begin_tile") {
+            if(current_tile_index != -1) {
+                log_print("do_load_room", "Got a \"begin_tile\" before getting an \"end_tile\" on line %d of file %s", line_number, room->name);
+
+                successfully_parsed_file = false;
+                continue;
+            }
+
+            Vector2 coords;
+
+            bool success = string_to_v2(line, &coords);
+
+            if(!success) {
+                char * c_line = to_c_string(line);
+                scope_exit(free(c_line));
+
+                log_print("do_load_room", "Failed to parse coordinates of the tile on line %d of file %s, string was \"%s\".", line_number, room->name, c_line);
+
+                successfully_parsed_file = false;
+                continue;
+            }
+
+            // @Incomplete, we allow to have multiple tile on the same spot for now. Probably shouldn't.
+
+            Tile tile;
+            tile.position = coords;
+            new_tile_array.add(tile);
+
+            current_tile_index = new_tile_array.count - 1;
+
+        } else if(field_name == "end_tile") {
+            if(current_tile_index == -1) {
+                log_print("do_load_room", "Got an \"end_tile\" before getting an \"begin_tile\" on line %d of file %s", line_number, room->name);
+
+                successfully_parsed_file = false;
+                continue;
+            }
+
+            // Reset tile index
+            current_tile_index = -1;
+
+        } else if(field_name == "texture") {
+            if(current_tile_index == -1) {
+                log_print("do_load_room", "Got a \"texture\" before outside if a tile block on line %d of file %s", line_number, room->name);
+
+                successfully_parsed_file = false;
+                continue;
+            }
+
+            if(new_tile_array.data[current_tile_index].texture != NULL) {
+                log_print("do_load_room", "Trying to set \"texture\" on line %d of file %s, but it has aleady been set. (Current: %s)", line_number, room->name, new_tile_array.data[current_tile_index].texture);
+
+                successfully_parsed_file = false;
+                continue;
+            }
+
+            String arg = cut_until_space(&line);
+
+            if(!arg.count) {
+                log_print("do_load_room", "Expected a texture name after \"texture\" on line %d of file %s.", line_number, room->name);
+
+                successfully_parsed_file = false;
+                continue;
+            }
+
+            if(line.count) {
+                char * c_line = to_c_string(line);
+                scope_exit(free(c_line));
+
+                log_print("do_load_room", "Garbage left on line %d of file %s after the texture name: \"%s\".", line_number, room->name, c_line);
+
+                successfully_parsed_file = false;
+                continue;
+            }
+
+            new_tile_array.data[current_tile_index].texture = to_c_string(arg); // @Leak
         } else {
                 char * c_field = to_c_string(field_name);
                 scope_exit(free(c_field));
@@ -157,12 +245,22 @@ void RoomManager::do_load_room(Room * room) {
                 scope_exit(free(c_line));
                 log_print("do_load_room", "Unknown field      \"%s\"     on line %d of file %s, remainder was \"%s\".", c_field, line_number, room->name, c_line);
 
-                continue; // Not failing, we just ignore this line.
+                continue; // Not failing, we just ignore this line. @Temporary, we should probably fail here.
         }
     }
 
     if(successfully_parsed_file) {
-        *room = new_room;
-        log_print("do_load_room", "Successfully parsed dimensions of room in file %s, they're (%d, %d) ", room->name, room->dimensions.width, room->dimensions.height);
+		*room = new_room;
+
+        // @Incomplete
+        // Those resets are going to mess up things that have pointers to this tile, eg. Editor panel.
+        // Should mostly be solved after we start using a vector hash table (but problem of duplicates will remain.)
+		for_array(room->tiles.data, room->tiles.count) {
+			free(it->texture);
+		}
+
+		room->tiles.reset(true);
+
+        room->tiles = new_tile_array;
     }
 }
