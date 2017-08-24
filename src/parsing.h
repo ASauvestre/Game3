@@ -2,6 +2,8 @@
 
 #include "string.h"
 
+struct Vector2;
+
 struct String {
     char * data  = NULL;
     int    count = 0;
@@ -51,6 +53,8 @@ String bump_to_next_line(String * string);
 void   push(String * string, int amount = 1);
 
 bool string_to_int(String string, int * result);
+bool string_to_v2 (String string, Vector2 * result);
+
 
 char * to_c_string(String string);
 

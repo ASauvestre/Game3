@@ -32,7 +32,7 @@ void FontManager::do_load_font(Font * font) {
     unsigned char * c_file_data = (unsigned char *) to_c_string(file_data);
     scope_exit(free(c_file_data));
 
-    int result = stbtt_BakeFontBitmap(c_file_data, 0, 12.0, bitmap, 512, 512, 32, 96, font->char_data); // @Robustness From stb_truetype.h : "no guarantee this fits!""
+    int result = stbtt_BakeFontBitmap(c_file_data, 0, 16.0f, bitmap, 512, 512, 32, 96, font->char_data); // @Robustness From stb_truetype.h : "no guarantee this fits!""
 
     if(result <= 0) {
         log_print("load_font", "The font %s could not be loaded, it is too large to fit in a 512x512 bitmap", font->name);

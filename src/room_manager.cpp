@@ -12,6 +12,8 @@ void RoomManager::create_placeholder(char * name, char * path) {
 
     room->name          = name;
     room->full_path     = path;
+	room->dimensions.x  = -1;
+	room->dimensions.y  = -1;
 
     this->table.add(name, room);
 }
@@ -40,7 +42,7 @@ void RoomManager::do_load_room(Room * room) {
 
     Room new_room = *room;
 
-    // Parse version number
+    // Parse version number @Refactor
     {
         String line = bump_to_next_line(&file_data);
         if(line.count < 0) {
@@ -98,75 +100,69 @@ void RoomManager::do_load_room(Room * room) {
         }
     }
 
-    skip_empty_lines(&file_data);
-    String line = bump_to_next_line(&file_data);
+    int line_number = 1;
+    bool successfully_parsed_file = true;
 
-    if(line.count < 0) {
-        log_print("do_load_room", "Failed to parse %s. It's empty.", room->name);
-        return;
+    while(true) {
+        String line = bump_to_next_line(&file_data);
+        line_number += 1;
+
+        if(line.count == -1) break; // EOF
+
+        if(line.count == 0) continue; // Empty line
+
+        String field_name = cut_until_space(&line);
+
+        if(field_name == "name") {
+            String arg = cut_until_space(&line);
+
+            if(!arg.count) {
+                log_print("do_load_room", "Expected a name after \"name\" on line %d of file %s.", line_number, room->name);
+            }
+
+            if(line.count) {
+                char * c_line = to_c_string(line);
+                scope_exit(free(c_line));
+
+                log_print("do_load_room", "Garbage left on line %d of file %s after the name: \"%s\".", line_number, room->name, c_line);
+
+                successfully_parsed_file = false;
+                continue;
+            }
+
+            // @Incomplete, do something with the name
+
+        } else if(field_name == "dimensions") {
+            Vector2 dimensions;
+            bool success = string_to_v2(line, &dimensions);
+
+            if(!success) {
+                char * c_line = to_c_string(line);
+                scope_exit(free(c_line));
+
+                log_print("do_load_room", "Failed to parse dimensions on line %d of file %s, string was \"%s\".", line_number, room->name, c_line);
+
+                successfully_parsed_file = false;
+                continue;
+            }
+
+            new_room.dimensions = dimensions;
+        } else if(field_name == "tile") {
+            // Oh boy.
+        } else {
+                char * c_field = to_c_string(field_name);
+                scope_exit(free(c_field));
+
+                char * c_line = to_c_string(line);
+                scope_exit(free(c_line));
+                log_print("do_load_room", "Unknown field      \"%s\"     on line %d of file %s, remainder was \"%s\".", c_field, line_number, room->name, c_line);
+
+                continue; // Not failing, we just ignore this line.
+        }
     }
 
-    String name = cut_until_space(&line);
-    if(line.count) {
-        char * c_line = to_c_string(line);
-        scope_exit(free(c_line));
-
-        log_print("do_load_room", "We parsed a name for file %s, but the was garbage left on the line: %s", room->name, c_line);
-
-        return;
+    if(successfully_parsed_file) {
+        *room = new_room;
+        log_print("do_load_room", "Successfully parsed dimensions of room in file %s, they're (%d, %d) ", room->name, room->dimensions.width, room->dimensions.height);
     }
-
-    // Nothing. // @Temporary, we actually don't care about the name, at least for now, since it's being occupied but the name of the file.
-
-    skip_empty_lines(&file_data);
-    line = bump_to_next_line(&file_data);
-
-    if(line.count < 0) {
-        log_print("do_load_room", "Failed to parse %s. It ended before we could find the height and width of the room.", room->name);
-        return;
-    }
-
-    bool success;
-    String width_token = cut_until_space(&line);
-
-    success = string_to_int(width_token, &new_room.width);
-
-    if(!success) {
-        char * c_token = to_c_string(width_token);
-        scope_exit(free(c_token));
-
-        log_print("do_load_room", "We failed to parse the width of the room in file %s, make sure it's an integer. Got %s", room->name, c_token);
-
-        return;
-    }
-
-    if(!line.count) {
-        log_print("do_load_room", "We parsed the width of the room in file %s, but there was no height given on the same line.", room->name);
-        return;
-    }
-
-    String height_token = cut_until_space(&line);
-
-    success = string_to_int(height_token, &new_room.height);
-
-    if(!success) {
-        char * c_token = to_c_string(height_token);
-        scope_exit(free(c_token));
-
-        log_print("do_load_room", "We failed to parse the height of the room in file %s, make sure it's an integer. Got %s", room->name, c_token);
-
-        return;
-    }
-
-    if(line.count) {
-        char * c_line = to_c_string(line);
-        scope_exit(free(c_line));
-
-        log_print("do_load_room", "We parsed height and width in file %s, but the was garbage left on the line: %s", room->name, c_line);
-
-        return;
-    }
-
-    log_print("do_load_room", "Successfully parsed dimensions of room in file %s, they're (%d, %d) ", room->name, new_room.width, new_room.height);
-
 }

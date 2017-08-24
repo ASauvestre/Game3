@@ -22,8 +22,7 @@ struct Tile {
 };
 
 struct Room : Asset{
-    int width;
-    int height;
+    Vector2 dimensions;
     Array<Tile> tiles;
 };
 

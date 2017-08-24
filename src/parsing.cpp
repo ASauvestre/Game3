@@ -3,6 +3,7 @@
 
 #include "parsing.h"
 #include "macros.h"
+#include "math_m.h" // Vector parsing
 
 void skip_empty_lines(String * string) {
     String line;
@@ -36,13 +37,11 @@ String cut_until_char(char c, String * string) {
 }
 
 String cut_until_space(String * string) {
-
     String left = cut_until_char(' ', string);
 
     cut_spaces(string);
 
     return left;
-
 }
 
 //@Speed we probably could make a faster version of this, but who cares?
@@ -56,6 +55,16 @@ bool string_to_int(String string, int * result) {
     *result = atoi(c_string);
 
     free(c_string);
+    return true;
+}
+
+bool string_to_v2(String string, Vector2 * result) {
+    String lhs = cut_until_space(&string);
+
+    if(!string_to_int(lhs, &result->x)) return false;
+
+    if(!string_to_int(string, &result->y)) return false;
+
     return true;
 }
 
@@ -94,7 +103,7 @@ String bump_to_next_line(String * string) {
 
     // Empty line / EOF check.
     {
-        if((*string)[0] == '\0') {
+        if(string->count == 0) {
             line.count = -1; // @Temporary, this signals that we should stop getting new lines from the buffer, we should probably find a better way to do it.
             return line; // EOF
         }
@@ -117,7 +126,7 @@ String bump_to_next_line(String * string) {
 
         // End of line/file check
         {
-            if((*string)[0] == '\0') {
+           if(string->count == 0) {
                 break; // EOF
             }
 

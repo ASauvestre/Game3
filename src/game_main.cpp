@@ -176,10 +176,10 @@ Room * generate_room(char * name, int width, int height) {
     *room = default;
 
     room->name   = name;
-    room->width  = width;
-    room->height = height;
+    room->dimensions.width  = width;
+    room->dimensions.height = height;
 
-    for(int i = 0; i < room->width * room->height; i++) {
+    for(int i = 0; i < room->dimensions.width * room->dimensions.height; i++) {
         Tile tile;
 
         if((i % 7 == 0) || (i % 7 == 2)) {
@@ -190,8 +190,8 @@ Room * generate_room(char * name, int width, int height) {
             tile.texture = "grass3.png";
         }
 
-        tile.position.x = i % room->width;
-        tile.position.y = i / room->width;
+        tile.position.x = i % room->dimensions.width;
+        tile.position.y = i / room->dimensions.width;
 
         room->tiles.add(tile);
     }
@@ -248,8 +248,8 @@ void init_game() {
             char name [64];
             snprintf(name, 64, "tree%d", i);
             entities[i].name = name;
-            entities[i].position.x = (int)(8.9*i)%(current_room->width-2) + 5;
-            entities[i].position.y = (int)(2.3*i)%(current_room->height-2) + 3;
+            entities[i].position.x = (int)(8.9*i)%(current_room->dimensions.width-2) + 5;
+            entities[i].position.y = (int)(2.3*i)%(current_room->dimensions.height-2) + 3;
             entities[i].texture = "tree.png";
             entities[i].is_player = false;
             entities[i].size = 3;
@@ -373,16 +373,16 @@ void handle_user_input() {
                 player.position.x = 0;
             }
 
-            if(player.position.x >  current_room->width - 1)  {
-                player.position.x = current_room->width - 1;
+            if(player.position.x >  current_room->dimensions.width - 1)  {
+                player.position.x = current_room->dimensions.width - 1;
             }
 
             if(player.position.y < 0) {
                 player.position.y = 0;
             }
 
-            if(player.position.y >  current_room->height - 1)  {
-                player.position.y = current_room->height - 1;
+            if(player.position.y >  current_room->dimensions.height - 1)  {
+                player.position.y = current_room->dimensions.height - 1;
             }
         }
     }
@@ -392,24 +392,24 @@ void handle_user_input() {
         if(game_mode == GAME) {
             main_camera.offset = player.position;
 
-            if(current_room->width <= main_camera.size.x) { // If the room is too small for the the camera, center it.
-                main_camera.offset.x = current_room->width/2.0f;
+            if(current_room->dimensions.width <= main_camera.size.x) { // If the room is too small for the the camera, center it.
+                main_camera.offset.x = current_room->dimensions.width/2.0f;
             }
             else if(main_camera.offset.x < main_camera.size.x/2.0f) { // If the camera touches an edge of the room, block it
                 main_camera.offset.x = main_camera.size.x/2.0f;
             }
-            else if(main_camera.offset.x > current_room->width - main_camera.size.x/2.0f) { // See above
-                main_camera.offset.x = current_room->width - main_camera.size.x/2.0f;
+            else if(main_camera.offset.x > current_room->dimensions.width - main_camera.size.x/2.0f) { // See above
+                main_camera.offset.x = current_room->dimensions.width - main_camera.size.x/2.0f;
             }
 
-            if(current_room->height <= main_camera.size.y) { // If the room is too small for the the camera, center it.
-                main_camera.offset.y = current_room->height/2.0f;
+            if(current_room->dimensions.height <= main_camera.size.y) { // If the room is too small for the the camera, center it.
+                main_camera.offset.y = current_room->dimensions.height/2.0f;
             }
             else if(main_camera.offset.y < main_camera.size.y/2.0f) { // If the camera touches an edge of the room, block it
                 main_camera.offset.y = main_camera.size.y/2.0f;
             }
-            else if(main_camera.offset.y > current_room->height - main_camera.size.y/2.0f) { // See above
-                main_camera.offset.y = current_room->height - main_camera.size.y/2.0f;
+            else if(main_camera.offset.y > current_room->dimensions.height - main_camera.size.y/2.0f) { // See above
+                main_camera.offset.y = current_room->dimensions.height - main_camera.size.y/2.0f;
             }
         } else if (game_mode == EDITOR) {
             //  @Refactor Same code as player movement
@@ -518,7 +518,7 @@ int get_objects_colliding_at(Vector2f point, Object objects[], int max_collision
 
 void buffer_editor_left_panel() {
 
-    EDITOR_LEFT_PANEL_ROW_HEIGHT = EDITOR_LEFT_PANEL_PADDING * window_data.aspect_ratio + 12.0f / window_data.height; // @Temporary Current distance from baseline to top of capital letter is 12px
+    EDITOR_LEFT_PANEL_ROW_HEIGHT = EDITOR_LEFT_PANEL_PADDING * window_data.aspect_ratio + 14.0f / window_data.height; // @Temporary Current distance from baseline to top of capital letter is 12px
 
     // Background
     {
@@ -541,28 +541,32 @@ void buffer_editor_left_panel() {
 
                 char * texture = editor_left_panel_displayed_object.tile->texture;
 
-                buffer_textured_quad(texture_side_padding,  1.0f - texture_top_padding, TOP_LEFT, texture_display_size, texture_display_size * aspect_ratio, EDITOR_LEFT_PANEL_CONTENT_Z, texture);
+                y -= texture_top_padding;
 
-                y -= texture_display_size * aspect_ratio + 2 * texture_top_padding;
+                buffer_textured_quad(texture_side_padding,  y, TOP_LEFT, texture_display_size, texture_display_size * aspect_ratio, EDITOR_LEFT_PANEL_CONTENT_Z, texture);
+
+                y -= texture_display_size * aspect_ratio + texture_top_padding;
             }
 
-            y -= EDITOR_LEFT_PANEL_PADDING;
+            y -= EDITOR_LEFT_PANEL_PADDING  * window_data.aspect_ratio;
 
-            buffer_string("Texture :", EDITOR_LEFT_PANEL_PADDING, y - EDITOR_LEFT_PANEL_PADDING * window_data.aspect_ratio, EDITOR_LEFT_PANEL_CONTENT_Z, my_font, BOTTOM_LEFT);
+
+            buffer_string("Texture :", EDITOR_LEFT_PANEL_PADDING, y, EDITOR_LEFT_PANEL_CONTENT_Z, my_font, TOP_LEFT);
 
             y -= EDITOR_LEFT_PANEL_ROW_HEIGHT;
 
             buffer_string(editor_left_panel_displayed_object.tile->texture,
-                          EDITOR_LEFT_PANEL_WIDTH - EDITOR_LEFT_PANEL_PADDING, y - EDITOR_LEFT_PANEL_PADDING * window_data.aspect_ratio,
+                          EDITOR_LEFT_PANEL_WIDTH - EDITOR_LEFT_PANEL_PADDING, y,
                           EDITOR_LEFT_PANEL_CONTENT_Z, my_font, BOTTOM_RIGHT);
 
+//            y -= EDITOR_LEFT_PANEL_ROW_HEIGHT;
         }
     }
 
 }
 
 void buffer_editor_click_menu() {
-    EDITOR_CLICK_MENU_ROW_HEIGHT = EDITOR_MENU_PADDING * 2 * window_data.aspect_ratio + 12.0f / window_data.height; // @Temporary Current distance from baseline to top of capital letter is 12px
+    EDITOR_CLICK_MENU_ROW_HEIGHT = EDITOR_MENU_PADDING * 2 * window_data.aspect_ratio + 14.0f / window_data.height; // @Temporary Current distance from baseline to top of capital letter is 12px
 
     float x = editor_click_menu_position.x;
     float y = editor_click_menu_position.y - EDITOR_CLICK_MENU_ROW_HEIGHT;
@@ -619,9 +623,9 @@ void buffer_debug_overlay() {
     float DEBUG_OVERLAY_PADDING = 0.004f;
 
     float DEBUG_OVERLAY_WIDTH = 0.15f;
-    float DEBUG_OVERLAY_ROW_HEIGHT = DEBUG_OVERLAY_PADDING * 2 * window_data.aspect_ratio + 12.0f / window_data.height; // @Temporary Current distance from baseline to top of capital letter is 12px
+    float DEBUG_OVERLAY_ROW_HEIGHT = DEBUG_OVERLAY_PADDING * 2 * window_data.aspect_ratio + 14.0f / window_data.height; // @Temporary Current distance from baseline to top of capital letter is 12px
 
-    float DEBUG_OVERLAY_NUM_ROWS = 4;
+    float DEBUG_OVERLAY_NUM_ROWS = 4; // @Harcoded
 
     // Buffer debug overlay background
     {
@@ -657,22 +661,20 @@ void buffer_debug_overlay() {
     summed_frame_rate += window_data.current_dt;
     frame_time_print_counter--;
 
-    float left_x = 1.0f - DEBUG_OVERLAY_WIDTH + DEBUG_OVERLAY_PADDING;
+    float left_x  = 1.0f - DEBUG_OVERLAY_WIDTH + DEBUG_OVERLAY_PADDING;
     float right_x = 1.0f - DEBUG_OVERLAY_PADDING;
-    float y = DEBUG_OVERLAY_ROW_HEIGHT;
+    float y       = 1.0f - DEBUG_OVERLAY_ROW_HEIGHT + DEBUG_OVERLAY_PADDING * window_data.aspect_ratio;
     // Buffer Frame time (text must always be buffered last if it has AA / transparency);
     {
         char buffer[64];
 
         snprintf(buffer, sizeof(buffer), "%.3f", displayed_frame_time * 1000);
 
-        buffer_string("Frame Time (ms):", left_x, 1.0f - (y - DEBUG_OVERLAY_PADDING * window_data.aspect_ratio), DEBUG_OVERLAY_Z, my_font, BOTTOM_LEFT);
+        buffer_string("Frame Time (ms):", left_x, y, DEBUG_OVERLAY_Z, my_font, BOTTOM_LEFT);
+        y -= DEBUG_OVERLAY_ROW_HEIGHT;
 
-        y += DEBUG_OVERLAY_ROW_HEIGHT;
-
-        buffer_string(buffer, right_x, 1.0f - (y  - DEBUG_OVERLAY_PADDING * window_data.aspect_ratio), DEBUG_OVERLAY_Z, my_font, BOTTOM_RIGHT);
-
-        y += DEBUG_OVERLAY_ROW_HEIGHT;
+        buffer_string(buffer, right_x, y, DEBUG_OVERLAY_Z, my_font, BOTTOM_RIGHT);
+        y -= DEBUG_OVERLAY_ROW_HEIGHT;
     }
 
     // Buffer Current world (text must always be buffered last if it has AA / transparency);
@@ -681,13 +683,13 @@ void buffer_debug_overlay() {
 
         snprintf(buffer, sizeof(buffer), "%s", current_room->name);
 
-        buffer_string("Current World :", left_x, 1.0f - (y - DEBUG_OVERLAY_PADDING * window_data.aspect_ratio), DEBUG_OVERLAY_Z, my_font, BOTTOM_LEFT);
+        buffer_string("Current World :", left_x, y, DEBUG_OVERLAY_Z, my_font, BOTTOM_LEFT);
 
-        y += DEBUG_OVERLAY_ROW_HEIGHT;
+        y -= DEBUG_OVERLAY_ROW_HEIGHT;
 
-        buffer_string(buffer, right_x, 1.0f - (y  - DEBUG_OVERLAY_PADDING * window_data.aspect_ratio), DEBUG_OVERLAY_Z, my_font, BOTTOM_RIGHT);
+        buffer_string(buffer, right_x, y, DEBUG_OVERLAY_Z, my_font, BOTTOM_RIGHT);
 
-        y += DEBUG_OVERLAY_ROW_HEIGHT;
+        y -= DEBUG_OVERLAY_ROW_HEIGHT;
     }
 }
 
@@ -766,7 +768,7 @@ void buffer_entity(Entity entity) {
         screen_size.x = tile_size.x * entity.size;
         screen_size.y = tile_size.y * entity.size;
 
-        float z = entity.position.y * tile_size.y * RANGE_ENTITY_Z * (main_camera.size.height / current_room->height) + MIN_ENTITY_Z;
+        float z = entity.position.y * tile_size.y * RANGE_ENTITY_Z * (main_camera.size.height / current_room->dimensions.height) + MIN_ENTITY_Z;
 
         buffer_textured_quad(screen_pos.x, screen_pos.y, BOTTOM_LEFT, screen_size.x, screen_size.y, z, entity.texture);
 }
