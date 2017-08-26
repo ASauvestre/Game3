@@ -7,6 +7,10 @@ enum TileType {
     SWITCH_ROOM
 };
 
+struct CollisionBlock {
+    Quad quad;
+};
+
 struct Tile {
     char * texture = NULL;
     Vector2 position;
@@ -15,15 +19,12 @@ struct Tile {
 
     int room_target_id;         // Used if type is SWITCH_ROOM
     Vector2 target_tile_coords; // Used if type is SWITCH_ROOM
-
-    Vector2f collision_box;
-
-    bool collision_enabled = false;
 };
 
 struct Room : Asset{
     Vector2 dimensions;
     Array<Tile> tiles;
+    Array<CollisionBlock> collision_blocks;
 };
 
 struct RoomManager : AssetManager_Poly<Room> {

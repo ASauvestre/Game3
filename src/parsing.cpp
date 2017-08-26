@@ -44,7 +44,7 @@ String cut_until_space(String * string) {
     return left;
 }
 
-//@Speed we probably could make a faster version of this, but who cares?
+// @Speed we probably could make a faster version of this, but who cares?
 bool string_to_int(String string, int * result) {
     for_array(string.data, string.count) {
         if(*it < '0' || *it > '9') return false;
@@ -58,12 +58,52 @@ bool string_to_int(String string, int * result) {
     return true;
 }
 
+// @Speed we probably could make a faster version of this, but who cares?
+// @Incomplete Allow exponents to match C90 spec as well as INF
+bool string_to_float(String string, float * result) {
+    float sign = 1.0f;
+
+    if(string[0] == '-') {
+        push(&string);
+        sign = -1.0f;
+    }
+    if(string[0] == '+') {
+        push(&string);
+    }
+
+    bool found_dot = false;
+    for_array(string.data, string.count) {
+        if(*it == '.') {
+            if(found_dot) return false;
+            found_dot = true;
+            continue;
+        }
+
+        if(*it < '0' || *it > '9') return false;
+    }
+
+    char * c_string = to_c_string(string);
+
+    *result = atoi(c_string) * sign;
+
+    free(c_string);
+    return true;
+}
+
 bool string_to_v2(String string, Vector2 * result) {
     String lhs = cut_until_space(&string);
 
-    if(!string_to_int(lhs, &result->x)) return false;
+    if(lhs.count    == 0 || !string_to_int(lhs,    &result->x)) return false;
+    if(string.count == 0 || !string_to_int(string, &result->y)) return false;
 
-    if(!string_to_int(string, &result->y)) return false;
+    return true;
+}
+
+bool string_to_v2f(String string, Vector2f * result) {
+    String lhs = cut_until_space(&string);
+
+    if(lhs.count    == 0 || !string_to_float(lhs,    &result->x)) return false;
+    if(string.count == 0 || !string_to_float(string, &result->y)) return false;
 
     return true;
 }
@@ -127,7 +167,7 @@ String bump_to_next_line(String * string) {
         // End of line/file check
         {
            if(string->count == 0) {
-                break; // EOF
+                break; // EOF, will be handled next call (if first char is 0, we set count to -1)
             }
 
             if((*string)[0] == '\n') {

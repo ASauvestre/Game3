@@ -67,3 +67,10 @@ _ScopeExit<F> _MakeScopeExit(F f) { return _ScopeExit<F>(f); };
         for(auto it = &__for_array_data[it_index];                  \
             STRING_JOIN(__for_array_internal,__LINE__)++ > 0;       \
             STRING_JOIN(__for_array_internal,__LINE__) = 0)
+
+#define swap(a, b)                                      \
+    {                                                   \
+        auto STRING_JOIN(__swap_internal,__LINE__) = a; \
+        a = b;                                          \
+        b = STRING_JOIN(__swap_internal,__LINE__);      \
+    }

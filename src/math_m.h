@@ -1,8 +1,14 @@
 #pragma once
 
+struct Quad;
 struct Vector2;
 struct Vector2f;
 struct Vector3f;
+
+struct Quad {
+    float x0, y0;
+    float x1, y1;
+};
 
 struct Vector2 {
     union {

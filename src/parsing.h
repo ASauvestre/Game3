@@ -3,6 +3,7 @@
 #include "string.h"
 
 struct Vector2;
+struct Vector2f;
 
 struct String {
     char * data  = NULL;
@@ -53,8 +54,10 @@ String bump_to_next_line(String * string);
 void   push(String * string, int amount = 1);
 
 bool string_to_int(String string, int * result);
-bool string_to_v2 (String string, Vector2 * result);
+bool string_to_float(String string, float * result);
 
+bool string_to_v2 (String string, Vector2 * result);
+bool string_to_v2f(String string, Vector2f * result);
 
 char * to_c_string(String string);
 

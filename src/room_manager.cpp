@@ -50,6 +50,7 @@ void RoomManager::do_load_room(Room * room) {
     Room new_room = *room;
 
     Array<Tile> new_tile_array;
+    Array<CollisionBlock> new_collision_block_array;
 
     // Parse version number @Refactor
     {
@@ -113,6 +114,7 @@ void RoomManager::do_load_room(Room * room) {
     bool successfully_parsed_file = true;
 
     int current_tile_index = -1;
+    int current_collision_block_index = -1;
 
     while(true) {
         String line = bump_to_next_line(&file_data);
@@ -237,17 +239,253 @@ void RoomManager::do_load_room(Room * room) {
             }
 
             new_tile_array.data[current_tile_index].texture = to_c_string(arg); // @Leak
+        } else if(field_name == "begin_collision") {
+            if(current_collision_block_index != -1) {
+                log_print("do_load_room", "Got a \"begin_collision\" before getting an \"end_collision\" on line %d of file %s", line_number, room->name);
+
+                successfully_parsed_file = false;
+                continue;
+            }
+
+            bool success = true;
+
+            bool set_x = false;
+            bool set_y = false;
+
+            float x0;
+            float x1;
+            float y0;
+            float y1;
+
+            String orig_line = line;
+            while(line.count) {
+
+                String param_name = cut_until_space(&line);
+
+                if(param_name == "x") {
+
+                    if(set_x) {
+                        char * c_line = to_c_string(orig_line);
+                        scope_exit(free(c_line));
+
+                        log_print("do_load_room", "Tried to set x coordinates of collision block twice at line %d of file %s, string was \"%s\".", line_number, room->name, c_line);
+
+
+                        success = false;
+                        break;
+                    }
+
+                    String x_str = cut_until_space(&line);
+
+                    float x;
+                    bool param_success = string_to_float(x_str, &x);
+
+                    if(param_success) {
+                        set_x = true;
+                        x0 = x;
+                        x1 = x;
+                    } else {
+                        char * c_line = to_c_string(x_str);
+                        scope_exit(free(c_line));
+
+                        log_print("do_load_room", "Failed to parse x coordinate of the collision block on line %d of file %s, string was \"%s\".", line_number, room->name, c_line);
+
+                        success = false;
+                        break;
+                    }
+                } else if(param_name == "y") {
+
+                    if(set_y) {
+                        char * c_line = to_c_string(orig_line);
+                        scope_exit(free(c_line));
+
+                        log_print("do_load_room", "Tried to set y coordinates of collision block twice at line %d of file %s, string was \"%s\".", line_number, room->name, c_line);
+
+
+                        success = false;
+                        break;
+                    }
+
+                    String y_str = cut_until_space(&line);
+
+                    float y;
+                    bool param_success = string_to_float(y_str, &y);
+
+                    if(param_success) {
+                        set_y = true;
+                        y0 = y;
+                        y1 = y;
+                    } else {
+                        char * c_line = to_c_string(y_str);
+                        scope_exit(free(c_line));
+
+                        log_print("do_load_room", "Failed to parse y coordinate of the collision block on line %d of file %s, string was \"%s\".", line_number, room->name, c_line);
+
+                        success = false;
+                        break;
+                    }
+                } else if(param_name == "x_range") {
+
+                    if(set_x) {
+                        char * c_line = to_c_string(orig_line);
+                        scope_exit(free(c_line));
+
+                        log_print("do_load_room", "Tried to set x coordinates of collision block twice at line %d of file %s, string was \"%s\".", line_number, room->name, c_line);
+
+                        success = false;
+                        break;
+                    }
+
+                    Vector2f result;
+
+                    String x0_str;
+                    String x1_str;
+
+                    x0_str = cut_until_space(&line);
+                    x1_str = cut_until_space(&line);
+
+                    bool param_success = true;
+
+                    if(!x0_str.count) param_success = false;
+                    if(!x1_str.count) param_success = false;
+
+                    float tx0, tx1;
+
+                    param_success &= string_to_float(x0_str, &tx0);
+                    param_success &= string_to_float(x1_str, &tx1);
+
+                    if(param_success) {
+                        set_x = true;
+                        x0 = tx0;
+                        x1 = tx1;
+                    } else {
+                        char * c_x0 = to_c_string(x0_str);
+                        scope_exit(free(c_x0));
+
+                        char * c_x1 = to_c_string(x1_str);
+                        scope_exit(free(c_x1));
+
+                        log_print("do_load_room", "Failed to parse x coordinate of the collision block on line %d of file %s, range was \"%s\" - \"%s\" .", line_number, room->name, c_x0, c_x1);
+
+                        success = false;
+                        break;
+                    }
+                } else if(param_name == "y_range") {
+
+                    if(set_y) {
+                        char * c_line = to_c_string(orig_line);
+                        scope_exit(free(c_line));
+
+                        log_print("do_load_room", "Tried to set y coordinates of collision block twice at line %d of file %s, string was \"%s\".", line_number, room->name, c_line);
+
+                        success = false;
+                        break;
+                    }
+
+                    Vector2f result;
+
+                    String y0_str;
+                    String y1_str;
+
+                    y0_str = cut_until_space(&line);
+                    y1_str = cut_until_space(&line);
+
+                    bool param_success = true;
+
+                    if(!y0_str.count) param_success = false;
+                    if(!y1_str.count) param_success = false;
+
+                    float ty0, ty1;
+
+                    param_success &= string_to_float(y0_str, &ty0);
+                    param_success &= string_to_float(y1_str, &ty1);
+
+                    if(param_success) {
+                        set_y = true;
+                        y0 = ty0;
+                        y1 = ty1;
+                    } else {
+                        char * c_y0 = to_c_string(y0_str);
+                        scope_exit(free(c_y0));
+
+                        char * c_y1 = to_c_string(y1_str);
+                        scope_exit(free(c_y1));
+
+                        log_print("do_load_room", "Failed to parse y coordinate of the collision block on line %d of file %s, range was \"%s\" - \"%s\" .", line_number, room->name, c_y0, c_y1);
+
+                        success = false;
+                        break;
+                    }
+                } else {
+                    char * c_param = to_c_string(param_name);
+                    scope_exit(free(c_param));
+
+                    char * c_line = to_c_string(line);
+                    scope_exit(free(c_line));
+
+                    log_print("do_load_room", "Unknown parameter \"%s\" for collision block on line %d of file %s, remainder was \"%s\".", c_param, line_number, room->name, c_line);
+
+                    success = false;
+                    break;
+                }
+            }
+
+            if(!success) {
+                successfully_parsed_file = false;
+                continue;
+            }
+
+            if(!set_x) {
+                log_print("do_load_room", "Missing x coordinates of the collision block on line %d of file %s, please use \"x\" or \"x_range\" to set them.", line_number, room->name);
+                successfully_parsed_file = false;
+                continue;
+            }
+
+            if(!set_y) {
+                log_print("do_load_room", "Missing y coordinates of the collision block on line %d of file %s, please use \"y\" or \"y_range\" to set them.", line_number, room->name);
+                successfully_parsed_file = false;
+                continue;
+            }
+
+            CollisionBlock block;
+
+            if(x0 > x1) swap(x0, x1);
+            if(y0 > y1) swap(y0, y1);
+
+            block.quad.x0 = x0;
+            block.quad.x1 = x1;
+            block.quad.y0 = y0;
+            block.quad.y1 = y1;
+
+            new_collision_block_array.add(block);
+
+            current_collision_block_index = new_collision_block_array.count - 1;
+
+            log_print("do_load_room", "Added block in room %s with coords (x0: %f, y0: %f, x1: %f, y1: %f)", room->name, x0 , y0, x1, y1);
+
+        } else if(field_name == "end_collision") {
+            if(current_collision_block_index == -1) {
+                log_print("do_load_room", "Got an \"end_collision\" before getting a valid \"begin_collision\" on line %d of file %s", line_number, room->name);
+
+                successfully_parsed_file = false;
+                continue;
+            }
+
+            // Reset block index
+            current_collision_block_index = -1;
         } else {
                 char * c_field = to_c_string(field_name);
                 scope_exit(free(c_field));
 
                 char * c_line = to_c_string(line);
                 scope_exit(free(c_line));
-                log_print("do_load_room", "Unknown field      \"%s\"     on line %d of file %s, remainder was \"%s\".", c_field, line_number, room->name, c_line);
+                log_print("do_load_room", "Unknown field  \"%s\"  on line %d of file %s, remainder was \"%s\".", c_field, line_number, room->name, c_line);
 
                 continue; // Not failing, we just ignore this line. @Temporary, we should probably fail here.
         }
     }
+
+
 
     if(successfully_parsed_file) {
 		*room = new_room;
@@ -260,7 +498,9 @@ void RoomManager::do_load_room(Room * room) {
 		}
 
 		room->tiles.reset(true);
+        room->collision_blocks.reset(true);
 
-        room->tiles = new_tile_array;
+        room->tiles            = new_tile_array;
+        room->collision_blocks = new_collision_block_array;
     }
 }
