@@ -84,7 +84,7 @@ bool string_to_float(String string, float * result) {
 
     char * c_string = to_c_string(string);
 
-    *result = atoi(c_string) * sign;
+    *result = atof(c_string) * sign;
 
     free(c_string);
     return true;

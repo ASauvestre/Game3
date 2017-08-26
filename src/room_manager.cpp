@@ -16,11 +16,11 @@ void RoomManager::create_placeholder(char * name, char * path) {
     // @Cleanup Those init shouldn't be here, either make a manual initializer or use new instead of malloc.
 
     // Init position vector
-	room->dimensions.x    = -1;
-	room->dimensions.y    = -1;
+	room->dimensions = { -1, -1 };
 
-    // Init tile array
-	room->tiles = {};
+    // Init arrays
+	room->tiles            = {};
+	room->collision_blocks = {};
 
     this->table.add(name, room);
 }
@@ -461,7 +461,7 @@ void RoomManager::do_load_room(Room * room) {
 
             current_collision_block_index = new_collision_block_array.count - 1;
 
-            log_print("do_load_room", "Added block in room %s with coords (x0: %f, y0: %f, x1: %f, y1: %f)", room->name, x0 , y0, x1, y1);
+            // log_print("do_load_room", "Added block in room %s with coords (x0: %f, y0: %f, x1: %f, y1: %f)", room->name, x0 , y0, x1, y1);
 
         } else if(field_name == "end_collision") {
             if(current_collision_block_index == -1) {

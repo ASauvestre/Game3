@@ -128,7 +128,7 @@ begin_tile 7 4
     texture grass1.png
 end_tile
 
-begin_collision x_range 7.0 6.0 y_range 1.0 -2.0
+begin_collision x_range 1.5 3.5 y_range 0.5 2.0
     teleport 4.0 5.0 second-room
     restriction player_only
 end_collision

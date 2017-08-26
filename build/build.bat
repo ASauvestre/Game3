@@ -12,6 +12,7 @@ echo.
 
 
 REM Enable optimization if release flag is set
+set release_flags="/Od"
 FOR %%A IN (%*) DO (
     IF "%%A"=="/release" (
         set release_flags="/Ox /GL /Gw"
@@ -39,10 +40,10 @@ FOR %%A IN (%*) DO (
 
 
     cl %min_build% %release_flags% /LD /nologo /Zi /EHsc /D %platform% /I ..\src /Fed3d_renderer ^
-        ..\src\d3d_renderer.cpp ^
-        ..\src\asset_manager.cpp ^
-        ..\src\hash.cpp ^
-        ..\src\parsing.cpp ^
+        ..\src\d3d_renderer.cpp         ^
+        ..\src\asset_manager.cpp        ^
+        ..\src\hash.cpp                 ^
+        ..\src\parsing.cpp              ^
         ..\src\os\win32\file_loader.cpp ^
     /link D3Dcompiler.lib d3d11.lib
 
@@ -58,18 +59,18 @@ echo ------------------ Compiling Main files ------------------
 
 
 cl %min_build% %release_flags% /nologo /Zi /EHsc /D %platform% /I ..\src /Fewin32_game ^
-    ..\src\game_main.cpp ^
-    ..\src\renderer.cpp ^
-    ..\src\asset_manager.cpp ^
-    ..\src\texture_manager.cpp ^
-    ..\src\shader_manager.cpp ^
-    ..\src\font_manager.cpp ^
-    ..\src\room_manager.cpp ^
-    ..\src\hash.cpp ^
-    ..\src\os\win32\core.cpp ^
-    ..\src\os\win32\hotloader.cpp ^
+    ..\src\game_main.cpp            ^
+    ..\src\renderer.cpp             ^
+    ..\src\asset_manager.cpp        ^
+    ..\src\texture_manager.cpp      ^
+    ..\src\shader_manager.cpp       ^
+    ..\src\font_manager.cpp         ^
+    ..\src\room_manager.cpp         ^
+    ..\src\hash.cpp                 ^
+    ..\src\os\win32\core.cpp        ^
+    ..\src\os\win32\hotloader.cpp   ^
     ..\src\os\win32\file_loader.cpp ^
-    ..\src\parsing.cpp ^
+    ..\src\parsing.cpp              ^
 /link user32.lib
 
 

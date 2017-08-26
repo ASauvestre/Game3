@@ -15,8 +15,6 @@
 #include "room_manager.h"
 
 // Structs
-//struct Shader; // API specific definition
-
 struct WindowData {
     int width;
     int height;
@@ -97,7 +95,8 @@ void buffer_tiles(Array<Tile> tile);
 
 void buffer_debug_overlay();
 
-void buffer_editor_tile_overlay(Room * room);
+void buffer_editor_blocks_overlay(Room * room);
+// void buffer_editor_tile_overlay(Room * room);
 
 void get_objects_colliding_at(Vector2f position, Array<Object> * _objects);
 
@@ -105,6 +104,7 @@ void buffer_textured_quad(float x, float y, Alignement alignement, float width, 
 
 void buffer_colored_quad(Vector2f position, Alignement alignement, float width, float height, float depth, Color4f color);
 void buffer_colored_quad(float x, float y, Alignement alignement, float width, float height, float depth, Color4f color);
+void buffer_colored_quad(Quad quad, float depth, Color4f color);
 
 void convert_top_left_coords_to_centered(Vector3f * v1, Vector3f * v2, Vector3f * v3, Vector3f * v4);
 
@@ -596,7 +596,7 @@ void buffer_editor_click_menu() {
 
 void buffer_editor_overlay() {
 
-    buffer_editor_tile_overlay(current_room);
+    buffer_editor_blocks_overlay(current_room);
     buffer_editor_left_panel();
 
     if(editor_click_menu_open) {
@@ -686,46 +686,86 @@ void buffer_debug_overlay() {
 }
 
 void do_buffer_editor_tile_overlay(Array<Tile> tiles) {
-    for(int tile_index = 0; tile_index < tiles.count; tile_index++) {
-        Tile * tile = &tiles.data[tile_index];
-        int col = tile->position.x;
-        int row = tile->position.y;
 
-        // Don't buffer out of screen tiles
-        if (col + 1 < main_camera.offset.x - main_camera.size.x * 0.5f) continue;
-        if (col     > main_camera.offset.x + main_camera.size.x * 0.5f) continue;
-        if (row + 1 < main_camera.offset.y - main_camera.size.y * 0.5f) continue;
-        if (row     > main_camera.offset.y + main_camera.size.y * 0.5f) continue;
+}
 
-        Color4f color = { 1.0f, 1.0f, 1.0f, 0.0f }; // transparent, for now @Temporary
+void buffer_editor_blocks_overlay(Room * room) {
+    for_array(room->collision_blocks.data, room->collision_blocks.count) {
+        Quad quad = it->quad;
 
-        if(tile->type == SWITCH_ROOM) {
-            color = { 1.0f, 0.0f, 0.0f, 0.5f };
-        } else if(tile->type == BLOCK) {
-            color = { 0.0f, 1.0f, 1.0f, 0.5f };
-        } else {
-            // No color for this tile type, so skip it.
-            return;
-        }
+        // Don't buffer out of screen blocks
+        if (quad.x0 > main_camera.offset.x + main_camera.size.x * 0.5f) continue;
+        if (quad.x1 < main_camera.offset.x - main_camera.size.x * 0.5f) continue;
+        if (quad.y0 > main_camera.offset.y + main_camera.size.y * 0.5f) continue;
+        if (quad.y1 < main_camera.offset.y - main_camera.size.y * 0.5f) continue;
+
+        Color4f color = { 0.0f, 1.0f, 1.0f, 0.5f };
 
         Vector2f tile_size;
 
         tile_size.x = 1.0f/main_camera.size.x;
-        tile_size.y = 1.0f/main_camera.size.y; // @Optimization, use multiplication here ?
+        tile_size.y = 1.0f/main_camera.size.y;
 
-        Vector2f tile_offset;
+        Vector2f offset;
 
-        tile_offset.x = 0.5f + tile_size.x * (col - main_camera.offset.x);
-        tile_offset.y = 0.5f - tile_size.y * (row - main_camera.offset.y); // @Temporary "-", make the tile at (0,0) be the bottom left one.  :CoordsConversion Also why didn't I need a +1 here ?
+        quad.x0 *=   tile_size.x;
+        quad.x1 *=   tile_size.x;
+        quad.y0 *= - tile_size.y;
+        quad.y1 *= - tile_size.y;
 
-        buffer_colored_quad(tile_offset, TOP_LEFT, tile_size.x, tile_size.y, EDITOR_OVERLAY_Z, color);
+        offset.x = 0.5f - tile_size.x * main_camera.offset.x;
+        offset.y = 0.5f + tile_size.y * main_camera.offset.y;
+
+        quad.x0 += offset.x;
+        quad.x1 += offset.x;
+        quad.y0 += offset.y;
+        quad.y1 += offset.y;
+
+        swap(quad.y0, quad.y1);
+
+        // printf("Drawing at %f, %f, %f, %f\n", quad.x0, quad.x1, quad.y0, quad.y1);
+
+        buffer_colored_quad(quad, EDITOR_OVERLAY_Z, color);
     }
+
 }
 
-void buffer_editor_tile_overlay(Room * room) {
-    do_buffer_editor_tile_overlay(room->tiles);
-//    do_buffer_editor_tile_overlay(room->outer_tiles, room->num_outer_tiles);
-}
+// void buffer_editor_tile_overlay(Room * room) {
+//     for(int tile_index = 0; tile_index < room->tiles.count; tile_index++) {
+//         Tile * tile = &tiles.data[tile_index];
+//         int col = tile->position.x;
+//         int row = tile->position.y;
+
+//         // Don't buffer out of screen tiles
+//         if (col + 1 < main_camera.offset.x - main_camera.size.x * 0.5f) continue;
+//         if (col     > main_camera.offset.x + main_camera.size.x * 0.5f) continue;
+//         if (row + 1 < main_camera.offset.y - main_camera.size.y * 0.5f) continue;
+//         if (row     > main_camera.offset.y + main_camera.size.y * 0.5f) continue;
+
+//         Color4f color = { 1.0f, 1.0f, 1.0f, 0.0f }; // transparent, for now @Temporary
+
+//         if(tile->type == SWITCH_ROOM) {
+//             color = { 1.0f, 0.0f, 0.0f, 0.5f };
+//         } else if(tile->type == BLOCK) {
+//             color = { 0.0f, 1.0f, 1.0f, 0.5f };
+//         } else {
+//             // No color for this tile type, so skip it.
+//             return;
+//         }
+
+//         Vector2f tile_size;
+
+//         tile_size.x = 1.0f/main_camera.size.x;
+//         tile_size.y = 1.0f/main_camera.size.y; // @Optimization, use multiplication here ?
+
+//         Vector2f tile_offset;
+
+//         tile_offset.x = 0.5f + tile_size.x * (col - main_camera.offset.x);
+//         tile_offset.y = 0.5f - tile_size.y * (row - main_camera.offset.y); // @Temporary "-", make the tile at (0,0) be the bottom left one.  :CoordsConversion Also why didn't I need a +1 here ?
+
+//         buffer_colored_quad(tile_offset, TOP_LEFT, tile_size.x, tile_size.y, EDITOR_OVERLAY_Z, color);
+//     }
+// }
 
 void buffer_entities() {
     for(int i = 0; i< array_size(entities); i++) {
@@ -904,31 +944,37 @@ void buffer_textured_quad(float x, float y, Alignement alignement, float width, 
     end_buffer();
 }
 
+void buffer_colored_quad(Quad quad, float depth, Color4f color) {
+    set_shader(colored_shader);
+
+    start_buffer();
+
+    add_vertex(quad.x0, quad.y0, depth, color);
+    add_vertex(quad.x0, quad.y1, depth, color);
+    add_vertex(quad.x1, quad.y0, depth, color);
+    add_vertex(quad.x1, quad.y1, depth, color);
+
+    end_buffer();
+}
+
 void buffer_colored_quad(Vector2f position, Alignement alignement, float width, float height, float depth, Color4f color) {
     buffer_colored_quad(position.x, position.y, alignement, width, height, depth, color);
 }
 
 void buffer_colored_quad(float x, float y, Alignement alignement, float width, float height, float depth, Color4f color) {
-    float x0 = x;
-    float y0 = y;
-    float x1 = x + width;
-    float y1 = y + height;
+    Quad quad;
+
+    quad.x0 = x;
+    quad.y0 = y;
+    quad.x1 = x + width;
+    quad.y1 = y + height;
 
     if(alignement == TOP_LEFT) {
-        y0 -= height;
-        y1 -= height;
+        quad.y0 -= height;
+        quad.y1 -= height;
     }
 
-    set_shader(colored_shader);
-
-    start_buffer();
-
-    add_vertex(x0, y0, depth, color);
-    add_vertex(x0, y1, depth, color);
-    add_vertex(x1, y0, depth, color);
-    add_vertex(x1, y1, depth, color);
-
-    end_buffer();
+    buffer_colored_quad(quad, depth, color);
 }
 
 void update_time() {
@@ -950,6 +996,7 @@ void update_time() {
 
     last_time = now;
 }
+
 void init_managers(){
     texture_manager.init();
     shader_manager.init();
