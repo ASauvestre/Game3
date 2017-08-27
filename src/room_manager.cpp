@@ -336,8 +336,6 @@ void RoomManager::do_load_room(Room * room) {
                         break;
                     }
 
-                    Vector2f result;
-
                     String x0_str;
                     String x1_str;
 
@@ -382,8 +380,6 @@ void RoomManager::do_load_room(Room * room) {
                         break;
                     }
 
-                    Vector2f result;
-
                     String y0_str;
                     String y1_str;
 
@@ -423,7 +419,7 @@ void RoomManager::do_load_room(Room * room) {
                     char * c_line = to_c_string(line);
                     scope_exit(free(c_line));
 
-                    log_print("do_load_room", "Unknown parameter \"%s\" for collision block on line %d of file %s, remainder was \"%s\".", c_param, line_number, room->name, c_line);
+                    log_print("do_load_room", "Unknown parameter \"%s\" for \"begin_collision\" on line %d of file %s, remainder was \"%s\".", c_param, line_number, room->name, c_line);
 
                     success = false;
                     break;
@@ -462,7 +458,75 @@ void RoomManager::do_load_room(Room * room) {
             current_collision_block_index = new_collision_block_array.count - 1;
 
             // log_print("do_load_room", "Added block in room %s with coords (x0: %f, y0: %f, x1: %f, y1: %f)", room->name, x0 , y0, x1, y1);
+        } else if(field_name == "teleport") {
+            if(current_collision_block_index == -1) {
+                log_print("do_load_room", "Got a \"teleport\" outside of a collision block on line %d of file %s", line_number, room->name);
 
+                successfully_parsed_file = false;
+                continue;
+            }
+
+            CollisionBlock * current_block = &new_collision_block_array.data[current_collision_block_index];
+
+            if(current_block->action_type != UNSET) {
+                log_print("do_load_room", "Trying to set multiple actions for the collision block on line %d of file %s, previous action was %d", line_number, room->name, current_block->action_type);
+
+                successfully_parsed_file = false;
+                continue;
+            }
+
+            String x_str;
+            String y_str;
+
+            x_str = cut_until_space(&line);
+            y_str = cut_until_space(&line);
+
+            bool param_success = true;
+
+            if(!x_str.count) param_success = false;
+            if(!y_str.count) param_success = false;
+
+            float x, y;
+
+            param_success &= string_to_float(x_str, &x);
+            param_success &= string_to_float(y_str, &y);
+
+            if(param_success) {
+                String target_room;
+
+                if(line.count) {
+                    target_room = cut_until_space(&line);
+
+                    if(line.count) {
+                        char * c_line = to_c_string(line);
+                        scope_exit(free(c_line));
+
+                        log_print("do_load_room", "Garbage left on line %d of file %s after the target room name: \"%s\".", line_number, room->name, c_line);
+
+                        successfully_parsed_file = false;
+                        continue;
+                    }
+                }
+
+                TeleportCollisionAction * action = (TeleportCollisionAction *) malloc(sizeof(TeleportCollisionAction));
+                action->target = {x, y};
+                action->target_room_name = to_c_string(target_room);
+
+                current_block->action      = action;
+                current_block->action_type = TELEPORT;
+
+            } else {
+                char * c_x = to_c_string(x_str);
+                scope_exit(free(c_x));
+
+                char * c_y = to_c_string(y_str);
+                scope_exit(free(c_y));
+
+                log_print("do_load_room", "Failed to parse coordinates of the target for the \"teleport\" on line %d of file %s, coords were \"%s\" - \"%s\" .", line_number, room->name, c_x, c_y);
+
+                successfully_parsed_file = false;
+                continue;
+            }
         } else if(field_name == "end_collision") {
             if(current_collision_block_index == -1) {
                 log_print("do_load_room", "Got an \"end_collision\" before getting a valid \"begin_collision\" on line %d of file %s", line_number, room->name);

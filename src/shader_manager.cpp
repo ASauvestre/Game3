@@ -1,7 +1,6 @@
 #include "shader_manager.h"
 #include "renderer.h"
 #include "macros.h"
-#include "os/layer.h"
 
 void ShaderManager::init() {
     this->extensions.add("shader");

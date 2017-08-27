@@ -84,5 +84,5 @@ void TextureManager::do_load_texture(Texture * texture) {
     texture->bytes_per_pixel = bytes_per_pixel;
     texture->width_in_bytes  = width * bytes_per_pixel;
     texture->num_bytes       = width * height * bytes_per_pixel;
-    texture->dirty = true;
+    texture->dirty           = true;
 }

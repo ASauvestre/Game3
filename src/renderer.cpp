@@ -107,13 +107,7 @@ void set_buffer_mode(BufferMode buffer_mode) {
 }
 
 //
-// Renderer optimization to begin making it group draw calls when two consecutive calls use the same
-// shader and texture (if applicable) -> Almost no performance impact due to drawing editor overlay,
-// but since our textures are quite varied (5 of 'em !) little impact on game mode perf. We could sort
-// those calls by texture, but then this would mess with the draw order, but we probably shouldn't
-// rely much on the order in which we draw things expect for transparent last.
-//
-// @Think @Optimization
+// @Think @Optimization Look up virtual textures to improve batching.
 //
 void find_or_create_compatible_batch() {
 

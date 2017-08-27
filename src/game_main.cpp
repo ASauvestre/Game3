@@ -98,7 +98,7 @@ void buffer_debug_overlay();
 void buffer_editor_blocks_overlay(Room * room);
 // void buffer_editor_tile_overlay(Room * room);
 
-void get_objects_colliding_at(Vector2f position, Array<Object> * _objects);
+void get_objects_colliding_at(Vector2f position, Array<Object> * _objects); // @Cleanup name collision here.
 
 void buffer_textured_quad(float x, float y, Alignement alignement, float width, float height, float depth, char * texture);
 
@@ -685,10 +685,6 @@ void buffer_debug_overlay() {
     }
 }
 
-void do_buffer_editor_tile_overlay(Array<Tile> tiles) {
-
-}
-
 void buffer_editor_blocks_overlay(Room * room) {
     for_array(room->collision_blocks.data, room->collision_blocks.count) {
         Quad quad = it->quad;
@@ -700,6 +696,10 @@ void buffer_editor_blocks_overlay(Room * room) {
         if (quad.y1 < main_camera.offset.y - main_camera.size.y * 0.5f) continue;
 
         Color4f color = { 0.0f, 1.0f, 1.0f, 0.5f };
+
+        if(it->action_type == TELEPORT) {
+            color = { 1.0f, 0.0f, 1.0f, 0.5f };
+        }
 
         Vector2f tile_size;
 
@@ -716,6 +716,14 @@ void buffer_editor_blocks_overlay(Room * room) {
         offset.x = 0.5f - tile_size.x * main_camera.offset.x;
         offset.y = 0.5f + tile_size.y * main_camera.offset.y;
 
+
+        if(it->action_type == TELEPORT) {
+            TeleportCollisionAction * teleport_action = (TeleportCollisionAction *) it->action;
+
+            buffer_string(teleport_action->target_room_name, offset.x, offset.y, EDITOR_OVERLAY_Z , my_font);
+        }
+
+
         quad.x0 += offset.x;
         quad.x1 += offset.x;
         quad.y0 += offset.y;
@@ -727,45 +735,7 @@ void buffer_editor_blocks_overlay(Room * room) {
 
         buffer_colored_quad(quad, EDITOR_OVERLAY_Z, color);
     }
-
 }
-
-// void buffer_editor_tile_overlay(Room * room) {
-//     for(int tile_index = 0; tile_index < room->tiles.count; tile_index++) {
-//         Tile * tile = &tiles.data[tile_index];
-//         int col = tile->position.x;
-//         int row = tile->position.y;
-
-//         // Don't buffer out of screen tiles
-//         if (col + 1 < main_camera.offset.x - main_camera.size.x * 0.5f) continue;
-//         if (col     > main_camera.offset.x + main_camera.size.x * 0.5f) continue;
-//         if (row + 1 < main_camera.offset.y - main_camera.size.y * 0.5f) continue;
-//         if (row     > main_camera.offset.y + main_camera.size.y * 0.5f) continue;
-
-//         Color4f color = { 1.0f, 1.0f, 1.0f, 0.0f }; // transparent, for now @Temporary
-
-//         if(tile->type == SWITCH_ROOM) {
-//             color = { 1.0f, 0.0f, 0.0f, 0.5f };
-//         } else if(tile->type == BLOCK) {
-//             color = { 0.0f, 1.0f, 1.0f, 0.5f };
-//         } else {
-//             // No color for this tile type, so skip it.
-//             return;
-//         }
-
-//         Vector2f tile_size;
-
-//         tile_size.x = 1.0f/main_camera.size.x;
-//         tile_size.y = 1.0f/main_camera.size.y; // @Optimization, use multiplication here ?
-
-//         Vector2f tile_offset;
-
-//         tile_offset.x = 0.5f + tile_size.x * (col - main_camera.offset.x);
-//         tile_offset.y = 0.5f - tile_size.y * (row - main_camera.offset.y); // @Temporary "-", make the tile at (0,0) be the bottom left one.  :CoordsConversion Also why didn't I need a +1 here ?
-
-//         buffer_colored_quad(tile_offset, TOP_LEFT, tile_size.x, tile_size.y, EDITOR_OVERLAY_Z, color);
-//     }
-// }
 
 void buffer_entities() {
     for(int i = 0; i< array_size(entities); i++) {

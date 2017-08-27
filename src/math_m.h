@@ -20,11 +20,6 @@ struct Vector2 {
         int y;
         int height;
     };
-
-    void operator=(Vector2 b) {
-        x = b.x;
-        y = b.y;
-    }
 };
 
 struct Vector2f {
@@ -37,11 +32,6 @@ struct Vector2f {
         float y;
         float height;
     };
-
-    void operator=(Vector2 b) {
-        x = b.x;
-        y = b.y;
-    }
 };
 
 struct Vector3f {
