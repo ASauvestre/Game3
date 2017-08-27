@@ -47,6 +47,8 @@ void RoomManager::do_load_room(Room * room) {
     String file_data = os_specific_read_file(room->full_path);
     scope_exit(free(file_data.data));
 
+	if (!file_data.data) return; // Should have already errored.
+
     Room new_room = *room;
 
     Array<Tile> new_tile_array;
@@ -560,6 +562,14 @@ void RoomManager::do_load_room(Room * room) {
 		for_array(room->tiles.data, room->tiles.count) {
 			free(it->texture);
 		}
+
+        for_array(room->collision_blocks.data, room->collision_blocks.count) {
+            if(it->action_type == TELEPORT) {
+                TeleportCollisionAction * action = (TeleportCollisionAction *) it->action;
+                free(action->target_room_name);
+            }
+
+        }
 
 		room->tiles.reset(true);
         room->collision_blocks.reset(true);

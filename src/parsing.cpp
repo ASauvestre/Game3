@@ -5,6 +5,7 @@
 #include "macros.h"
 #include "math_m.h" // Vector parsing
 
+// @Cleanup, this didn't end up being used, maybe remove it ?
 void skip_empty_lines(String * string) {
     String line;
     String prev_string;
@@ -109,6 +110,8 @@ bool string_to_v2f(String string, Vector2f * result) {
 }
 
 char * to_c_string(String string) { // @Incomplete take pointer here ?
+    if(!string.count) return NULL;
+
     char * c = (char *) malloc(string.count + 1);
     memcpy(c, string.data, string.count);
     c[string.count] = 0;

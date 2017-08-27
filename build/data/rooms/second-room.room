@@ -1,6 +1,6 @@
 VERSION <1>
 
-name main-room
+name second-room
 dimensions 8 5
 
 begin_tile 0 0
@@ -16,7 +16,7 @@ begin_tile 3 0
     texture grass1.png
 end_tile
 begin_tile 4 0
-    texture dirt_road.png
+    texture grass1.png
 end_tile
 begin_tile 5 0
     texture grass1.png
@@ -41,7 +41,7 @@ begin_tile 3 1
     texture grass1.png
 end_tile
 begin_tile 4 1
-    texture dirt_road_bottom.png
+    texture grass1.png
 end_tile
 begin_tile 5 1
     texture grass1.png
@@ -91,7 +91,7 @@ begin_tile 3 3
     texture grass1.png
 end_tile
 begin_tile 4 3
-    texture grass1.png
+    texture dirt_road_top.png
 end_tile
 begin_tile 5 3
     texture grass1.png
@@ -116,7 +116,7 @@ begin_tile 3 4
     texture grass1.png
 end_tile
 begin_tile 4 4
-    texture grass1.png
+    texture dirt_road.png
 end_tile
 begin_tile 5 4
     texture grass1.png
@@ -128,7 +128,7 @@ begin_tile 7 4
     texture grass1.png
 end_tile
 
-begin_collision x_range 4.15 4.85 y_range -0.3 0.0
-    teleport 4.0 5.0 second-room.room
+begin_collision x_range 4.15 4.85 y_range 5.3 5.0
+    teleport 4.0 0.0 main-room.room
     restriction player_only
 end_collision

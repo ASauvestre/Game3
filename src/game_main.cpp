@@ -308,14 +308,19 @@ EditorLeftPanelMode editor_left_panel_mode = TILE_INFO;
 
 Object editor_left_panel_displayed_object;
 
+bool check_collision(Quad q1, Quad q2) {
+    return (q1.x0 < q2.x1) && (q1.x1 > q2.x0) && (q1.y0 < q2.y1) && (q1.y1 > q2.y0);
+}
+
+void switch_to_room(Room * room) {
+    // @Incomplete, make sure this doesn't mess up anything.
+    current_room = room;
+}
+
 void handle_user_input() {
     if(keyboard.key_F1 && !previous_keyboard.key_F1) {
-        if(game_mode == GAME) {
-            game_mode = EDITOR;
-        }
-        else if(game_mode == EDITOR) {
-            game_mode = GAME;
-        }
+        if(game_mode == GAME) game_mode = EDITOR;
+        else if(game_mode == EDITOR) game_mode = GAME;
     }
 
     if(keyboard.key_F2 && !previous_keyboard.key_F2) {
@@ -344,31 +349,43 @@ void handle_user_input() {
             if(keyboard.key_down)  player.position.y += position_delta;
         }
 
-        // // Early collision detection, find current tile
-        // {
-        //     // @Optimisation We can probably infer the tiles we collide with from the player's x and y coordinates and information about the room's size
-        //     for(int i = 0; i < current_room->num_outer_tiles; i++) {
-        //         Tile tile = current_room->outer_tiles[i];
+        // Test player collision with blocks
+        {
+            Quad player_quad = {player.position.x              , player.position.y,                // x0, y0
+                                player.position.x + player.size, player.position.y + player.size}; // x1, y1
 
-        //         bool should_compute_collision = tile.collision_enabled;
+            for_array(current_room->collision_blocks.data, current_room->collision_blocks.count) {
+                bool colliding = check_collision(player_quad, it->quad);
 
-        //         if(should_compute_collision) {
-        //             if((player.position.x < tile.local_x + tile.collision_box.width) && (tile.local_x < player.position.x + player.size) && // X tests
-        //                (player.position.y < tile.local_y + tile.collision_box.height) && (tile.local_y < player.position.y + player.size)) {    // Y tests
+                if(colliding) {
 
-        //                 if(tile.type == SWITCH_ROOM) {
-        //                     // log_print("collision", "Player is on a tile with type SWITCH_ROOM, switching to room %d", tile.room_target_id);
-        //                     current_room = rooms[tile.room_target_id];
+                    // log_print("collision", "Colliding \n        (player_quad: x0:%f, y0:%f, x1:%f, y1:%f)
+                    //                                   \n        (block:       x0:%f, y0:%f, x1:%f, y1:%f)",
+                    //           player_quad.x0, player_quad.y0, player_quad.x1, player_quad.y1,
+                    //              it->quad.x0,    it->quad.y0,    it->quad.x1,    it->quad.y1);
 
-        //                     player.position.x = tile.target_tile_coords.x + (player.position.x - tile.local_x);
-        //                     player.position.y = tile.target_tile_coords.y + (player.position.y - tile.local_y);
+                    if(it->action_type == TELEPORT) {
+                        TeleportCollisionAction * action  = (TeleportCollisionAction *) it->action;
+                        player.position = action->target;
 
-        //                     break;
-        //                 }
-        //             }
-        //         }
-        //     }
-        // }
+                        if(action->target_room_name) {
+                            if(strcmp(action->target_room_name, current_room->name) != 0) {
+                                Room * target_room = room_manager.table.find(action->target_room_name);
+
+                                if(target_room) {
+                                    log_print("collision", "Switching to room %s (pointer: %p)", action->target_room_name, target_room);
+
+                                    switch_to_room(target_room);
+
+                                } else {
+                                    log_print("collision", "Trying to switch to room %s, but it doesn't exist", action->target_room_name);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         // Clamp player position
         {
@@ -781,7 +798,7 @@ void buffer_entity(Entity entity) {
     screen_size.x = tile_size.x * entity.size;
     screen_size.y = tile_size.y * entity.size;
 
-    float z = entity.position.y * tile_size.y * RANGE_ENTITY_Z * (main_camera.size.height / current_room->dimensions.height) + MIN_ENTITY_Z;
+    float z = (entity.position.y + entity.size) * tile_size.y * RANGE_ENTITY_Z * (main_camera.size.height / current_room->dimensions.height) + MIN_ENTITY_Z;
 
     buffer_textured_quad(screen_pos.x, screen_pos.y, BOTTOM_LEFT, screen_size.x, screen_size.y, z, entity.texture);
 }
