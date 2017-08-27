@@ -108,6 +108,9 @@ void buffer_colored_quad(Quad quad, float depth, Color4f color);
 
 void convert_top_left_coords_to_centered(Vector3f * v1, Vector3f * v2, Vector3f * v3, Vector3f * v4);
 
+bool is_out_of_screen(float x, float y, float size);
+bool is_out_of_screen(float x, float y, float width, float height);
+
 // Constants
 const float DEBUG_OVERLAY_Z                = 0.9999999f;
 const float DEBUG_OVERLAY_BACKGROUND_Z     = 0.9999998f;
@@ -250,7 +253,7 @@ void init_game() {
             snprintf(name, 64, "tree%d", i);
             entities[i].name = name;
             entities[i].position.x = (int)(8.9*i)%(current_room->dimensions.width-2) + 5;
-            entities[i].position.y = (int)(2.3*i)%(current_room->dimensions.height-2) + 3;
+            entities[i].position.y = (int)(2.3*i)%(current_room->dimensions.height-2) + 1;
             entities[i].texture = "tree.png";
             entities[i].is_player = false;
             entities[i].size = 3;
@@ -685,15 +688,25 @@ void buffer_debug_overlay() {
     }
 }
 
+bool is_out_of_screen(float x, float y, float size) {
+    return is_out_of_screen(x, y, size, size);
+}
+
+bool is_out_of_screen(float x, float y, float width, float height) {
+    if (x + width  < main_camera.offset.x - main_camera.size.x * 0.5f) return true;
+    if (x          > main_camera.offset.x + main_camera.size.x * 0.5f) return true;
+    if (y + height < main_camera.offset.y - main_camera.size.y * 0.5f) return true;
+    if (y          > main_camera.offset.y + main_camera.size.y * 0.5f) return true;
+
+    return false;
+}
+
 void buffer_editor_blocks_overlay(Room * room) {
     for_array(room->collision_blocks.data, room->collision_blocks.count) {
         Quad quad = it->quad;
 
         // Don't buffer out of screen blocks
-        if (quad.x0 > main_camera.offset.x + main_camera.size.x * 0.5f) continue;
-        if (quad.x1 < main_camera.offset.x - main_camera.size.x * 0.5f) continue;
-        if (quad.y0 > main_camera.offset.y + main_camera.size.y * 0.5f) continue;
-        if (quad.y1 < main_camera.offset.y - main_camera.size.y * 0.5f) continue;
+        if(is_out_of_screen(quad.x0, quad.y0, quad.x1 - quad.x0, quad.y1 - quad.y0)) return;
 
         Color4f color = { 0.0f, 1.0f, 1.0f, 0.5f };
 
@@ -723,7 +736,6 @@ void buffer_editor_blocks_overlay(Room * room) {
             buffer_string(teleport_action->target_room_name, offset.x, offset.y, EDITOR_OVERLAY_Z , my_font);
         }
 
-
         quad.x0 += offset.x;
         quad.x1 += offset.x;
         quad.y0 += offset.y;
@@ -750,42 +762,38 @@ void buffer_player() {
 // @Refactor with buffer_tiles
 void buffer_entity(Entity entity) {
         // Don't buffer is the entity is out of screen
-        if (entity.position.x + entity.size < main_camera.offset.x - main_camera.size.x * 0.5f) return;
-        if (entity.position.x               > main_camera.offset.x + main_camera.size.x * 0.5f) return;
-        if (entity.position.y + entity.size < main_camera.offset.y - main_camera.size.y * 0.5f) return;
-        if (entity.position.y               > main_camera.offset.y + main_camera.size.y * 0.5f) return;
+	if (is_out_of_screen(entity.position.x, entity.position.y, entity.size)) {
+		return;
+	}
 
-        Vector2f tile_size;
+    Vector2f tile_size;
 
-        tile_size.x = 1.0f/main_camera.size.x;
-        tile_size.y = 1.0f/main_camera.size.y; // @Optimization, use multiplication here ?
+    tile_size.x = 1.0f/main_camera.size.x;
+    tile_size.y = 1.0f/main_camera.size.y; // @Optimization, use multiplication here ?
 
-        Vector2f screen_pos;
+    Vector2f screen_pos;
 
-        screen_pos.x = tile_size.x * (entity.position.x - main_camera.offset.x) + 0.5f;
-        screen_pos.y = 0.5f - tile_size.y * (entity.position.y + 1 - main_camera.offset.y);  // @Temporary see other one and also figure out why we needed a +1 here. :CoordsConversion
+    screen_pos.x = tile_size.x * (entity.position.x - main_camera.offset.x) + 0.5f;
+    screen_pos.y = 0.5f - tile_size.y * (entity.position.y + entity.size - main_camera.offset.y);  // @Temporary see other one :CoordsConversion
 
-        Vector2f screen_size;
+    Vector2f screen_size;
 
-        screen_size.x = tile_size.x * entity.size;
-        screen_size.y = tile_size.y * entity.size;
+    screen_size.x = tile_size.x * entity.size;
+    screen_size.y = tile_size.y * entity.size;
 
-        float z = entity.position.y * tile_size.y * RANGE_ENTITY_Z * (main_camera.size.height / current_room->dimensions.height) + MIN_ENTITY_Z;
+    float z = entity.position.y * tile_size.y * RANGE_ENTITY_Z * (main_camera.size.height / current_room->dimensions.height) + MIN_ENTITY_Z;
 
-        buffer_textured_quad(screen_pos.x, screen_pos.y, BOTTOM_LEFT, screen_size.x, screen_size.y, z, entity.texture);
+    buffer_textured_quad(screen_pos.x, screen_pos.y, BOTTOM_LEFT, screen_size.x, screen_size.y, z, entity.texture);
 }
 
 void buffer_tiles(Array<Tile> tiles) {
-    for(int tile_index = 0; tile_index < tiles.count; tile_index++) {
-        Tile * tile = &tiles.data[tile_index];
+    for_array(tiles.data, tiles.count) {
+		Tile * tile = it;
+
+		if(is_out_of_screen(tile->position.x, tile->position.y, 1)) continue; // Implicit conversion to float.
+
         int col = tile->position.x;
         int row = tile->position.y;
-
-        // Don't buffer out of screen tiles
-        if (col + 1 <= main_camera.offset.x - main_camera.size.x * 0.5f) continue;
-        if (col     >= main_camera.offset.x + main_camera.size.x * 0.5f) continue;
-        if (row + 1 <= main_camera.offset.y - main_camera.size.y * 0.5f) continue;
-        if (row     >= main_camera.offset.y + main_camera.size.y * 0.5f) continue;
 
         Vector2f tile_size;
 
@@ -795,12 +803,14 @@ void buffer_tiles(Array<Tile> tiles) {
         Vector2f tile_offset;
 
         tile_offset.x = tile_size.x * (col - main_camera.offset.x) + 0.5f;
-        tile_offset.y = 0.5f - tile_size.y * (row + 1 - main_camera.offset.y); // @Temporary see other one and also figure out why we needed a +1 here. :CoordsConversion
+        tile_offset.y = 0.5f - tile_size.y * (row + 1 - main_camera.offset.y); // @Temporary see other one. :CoordsConversion // @Constant +1 is for tile size, to convert form TOP to BOTTOM
 
         buffer_textured_quad(tile_offset.x, tile_offset.y, BOTTOM_LEFT, tile_size.x, tile_size.y, TILES_Z, tile->texture);
     }
 }
 
+
+// @Incomplete. Use is_out_of_screen
 float buffer_string(char * text, float x, float y, float z,  Font * font, Alignement alignement) { // Default : alignement = BOTTOM_LEFT
     float pixel_x = x * window_data.width;
     float pixel_y = y * window_data.height;
