@@ -143,8 +143,6 @@ static float last_time = 0.0f;
 static Entity player;
 static Entity entities[MAX_NUMBER_ENTITIES];
 
-static Room * rooms[2];
-
 static Room * current_room;
 
 static Camera main_camera;
@@ -171,37 +169,6 @@ static void init_shaders() {
     colored_shader  = shader_manager.table.find("colored.shader");
 }
 
-Room * generate_room(char * name, int width, int height) {
-    Room * room = (Room *) malloc(sizeof(Room));
-
-    // @Cleanup.
-    Room default;
-    *room = default;
-
-    room->name   = name;
-    room->dimensions.width  = width;
-    room->dimensions.height = height;
-
-    for(int i = 0; i < room->dimensions.width * room->dimensions.height; i++) {
-        Tile tile;
-
-        if((i % 7 == 0) || (i % 7 == 2)) {
-            tile.texture = "grass1.png";
-        } else if ((i % 7 == 1) || (i % 7 == 3) || (i % 7 == 6)) {
-            tile.texture = "grass2.png";
-        } else {
-            tile.texture = "grass3.png";
-        }
-
-        tile.position.x = i % room->dimensions.width;
-        tile.position.y = i / room->dimensions.width;
-
-        room->tiles.add(tile);
-    }
-
-    return room;
-}
-
 void init_game() {
 
     // Init camera
@@ -221,29 +188,9 @@ void init_game() {
         player.size = 1.0;
     }
 
-    // TEST Create test rooms
-    {
+	current_room = room_manager.table.find("main-room.room");
+	assert(current_room != NULL);
 
-        Room * room = generate_room("main_room", 50, 30);
-
-        room->tiles.data[5].texture = "dirt_road.png";
-        room->tiles.data[55].texture = "dirt_road_bottom.png";
-
-        rooms[0] = room;
-
-        // ----------------------------
-
-        room = generate_room("small_room", 28, 14);
-
-        room->tiles.data[369].texture = "dirt_road.png";
-        room->tiles.data[341].texture = "dirt_road_top.png";
-
-        rooms[1] = room;
-
-    }
-
-    // current_room = rooms[0];
-    current_room = room_manager.table.find("main-room.room");
     game_mode = GAME;
 
     // TEST Init trees
@@ -355,6 +302,9 @@ void handle_user_input() {
                                 player.position.x + player.size, player.position.y + player.size}; // x1, y1
 
             for_array(current_room->collision_blocks.data, current_room->collision_blocks.count) {
+
+                if(it->flags & COLLISION_DISABLED) for_array_continue;
+
                 bool colliding = check_collision(player_quad, it->quad);
 
                 if(colliding) {
@@ -725,12 +675,6 @@ void buffer_editor_blocks_overlay(Room * room) {
         // Don't buffer out of screen blocks
         if(is_out_of_screen(quad.x0, quad.y0, quad.x1 - quad.x0, quad.y1 - quad.y0)) return;
 
-        Color4f color = { 0.0f, 1.0f, 1.0f, 0.5f };
-
-        if(it->action_type == TELEPORT) {
-            color = { 1.0f, 0.0f, 1.0f, 0.5f };
-        }
-
         Vector2f tile_size;
 
         tile_size.x = 1.0f/main_camera.size.x;
@@ -746,19 +690,28 @@ void buffer_editor_blocks_overlay(Room * room) {
         offset.x = 0.5f - tile_size.x * main_camera.offset.x;
         offset.y = 0.5f + tile_size.y * main_camera.offset.y;
 
-
-        if(it->action_type == TELEPORT) {
-            TeleportCollisionAction * teleport_action = (TeleportCollisionAction *) it->action;
-
-            buffer_string(teleport_action->target_room_name, offset.x, offset.y, EDITOR_OVERLAY_Z , my_font);
-        }
-
         quad.x0 += offset.x;
         quad.x1 += offset.x;
         quad.y0 += offset.y;
         quad.y1 += offset.y;
 
         swap(quad.y0, quad.y1);
+
+        if(it->action_type == TELEPORT) {
+            TeleportCollisionAction * teleport_action = (TeleportCollisionAction *) it->action;
+
+            buffer_string(teleport_action->target_room_name, quad.x0, quad.y0 + 0.02f, EDITOR_OVERLAY_Z , my_font);
+        }
+
+        Color4f color;
+
+        if(it->flags & COLLISION_DISABLED) {
+            color = { 0.5f, 0.5f, 0.5f, 0.5f };
+        } else if(it->flags & COLLISION_PLAYER_ONLY) {
+            color = { 1.0f, 0.0f, 1.0f, 0.5f };
+        } else {
+            color = { 0.0f, 1.0f, 0.0f, 0.5f };
+        }
 
         // printf("Drawing at %f, %f, %f, %f\n", quad.x0, quad.x1, quad.y0, quad.y1);
 

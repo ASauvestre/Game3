@@ -68,6 +68,9 @@ _ScopeExit<F> _MakeScopeExit(F f) { return _ScopeExit<F>(f); };
             STRING_JOIN(__for_array_internal,__LINE__)++ > 0;       \
             STRING_JOIN(__for_array_internal,__LINE__) = 0)
 
+#define for_array_continue break
+#define for_array_break it_index = INT_MAX // @Hack
+
 #define swap(a, b)                                      \
     {                                                   \
         auto STRING_JOIN(__swap_internal,__LINE__) = a; \

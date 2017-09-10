@@ -1,6 +1,11 @@
 #include "asset_manager.h"
 #include "math_m.h"
 
+
+// Flags
+#define COLLISION_DISABLED        0x0000001
+#define COLLISION_PLAYER_ONLY     0x0000002
+
 enum CollisionActionType {
     UNSET,
     TELEPORT
@@ -17,6 +22,8 @@ struct TeleportCollisionAction : CollisionAction {
 
 struct CollisionBlock {
     Quad quad;
+
+    unsigned long flags = 0;
 
     CollisionActionType action_type = UNSET;
     CollisionAction * action = NULL;

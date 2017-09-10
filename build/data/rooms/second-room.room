@@ -130,5 +130,5 @@ end_tile
 
 begin_collision x_range 4.15 4.85 y_range 5.3 5.0
     teleport 4.0 0.0 main-room.room
-    restriction player_only
+    flags player_only
 end_collision

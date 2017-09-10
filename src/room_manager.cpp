@@ -460,6 +460,41 @@ void RoomManager::do_load_room(Room * room) {
             current_collision_block_index = new_collision_block_array.count - 1;
 
             // log_print("do_load_room", "Added block in room %s with coords (x0: %f, y0: %f, x1: %f, y1: %f)", room->name, x0 , y0, x1, y1);
+        } else if(field_name == "flags") {
+            if(current_collision_block_index == -1) {
+                log_print("do_load_room", "Got a \"flags\" outside of a collision block on line %d of file %s", line_number, room->name);
+
+                successfully_parsed_file = false;
+                continue;
+            }
+
+            CollisionBlock * current_block = &new_collision_block_array.data[current_collision_block_index];
+
+            while(line.count) {
+                String flag = cut_until_space(&line);
+
+				bool is_valid_flag = false;
+
+				if (flag == "disabled") {
+					current_block->flags |= COLLISION_DISABLED;
+					is_valid_flag = true;
+				}
+
+                if(flag == "player_only") {
+                    current_block->flags |= COLLISION_PLAYER_ONLY; // @Incomplete Currently ignored
+					is_valid_flag = true;
+                }
+
+
+				if(!is_valid_flag) {
+                    char * c_flag = to_c_string(flag);
+                    scope_exit(free(c_flag));
+
+                    log_print("do_load_room", "Unknown flag \"%s\" for \"flags\" on line %d of file %s. Ignoring.", c_flag, line_number, room->name);
+                    continue;
+                }
+
+            }
         } else if(field_name == "teleport") {
             if(current_collision_block_index == -1) {
                 log_print("do_load_room", "Got a \"teleport\" outside of a collision block on line %d of file %s", line_number, room->name);

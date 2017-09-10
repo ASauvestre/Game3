@@ -353,12 +353,20 @@ static void bind_srv_to_texture(Texture * texture) {
 }
 
 void parse_input_layout_from_file(char * file_name, String file_data, Shader * shader) {
+
     String line = bump_to_next_line(&file_data);
 
     int found = -1;
     int line_number = 0;
 
     while(line.count >= 0) {
+
+        if(!line.count) {
+            line_number += 1;
+            line = bump_to_next_line(&file_data);
+            continue;
+        }
+
         String left = cut_until_space(&line);
 
         char * c_left = to_c_string(left);
