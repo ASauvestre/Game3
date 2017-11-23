@@ -1,0 +1,31 @@
+[.room] file spec // VERSION <1>
+
+First line: "VERSION <X>" with X being the version number
+
+"name"         : followed by the name of the room.
+
+"dimension"    : followed by two integers, x and y, corresponding to the dimensions
+                 of the room.
+
+Tile:
+"begin_tile" : followed by two integers, x and y.
+
+        "texture" : sets the texture of the tile. (opt)
+
+"end_tile"   : to end the tile block.
+
+Collision blocks:
+"begin_collision" : followed by (one x/x_range and y/y_range)
+                "x"       : single float for the x coordinate.
+                "x_range" : two float corresponding to the range of x coordinates
+                            between the left ad right of the block.
+                "y"       : single float for the y coordinate.
+                "y_range" : two float corresponding to the range of y coordinates
+                            between the top and bottom of the block.
+
+        "restriction" :  who can collide against this ? {player_only}. (opt)
+
+        "teleport"    : followed by a two float that give the target coordinate and optionally
+                        the name of the target room if different from current. (opt)
+
+"end_collision"  : to end the collision block.

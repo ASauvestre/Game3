@@ -16,11 +16,11 @@ void RoomManager::create_placeholder(char * name, char * path) {
     // @Cleanup Those init shouldn't be here, either make a manual initializer or use new instead of malloc.
 
     // Init position vector
-	room->dimensions = { -1, -1 };
+    room->dimensions = { -1, -1 };
 
     // Init arrays
-	room->tiles            = {};
-	room->collision_blocks = {};
+    room->tiles            = {};
+    room->collision_blocks = {};
 
     this->table.add(name, room);
 }
@@ -47,7 +47,7 @@ void RoomManager::do_load_room(Room * room) {
     String file_data = os_specific_read_file(room->full_path);
     scope_exit(free(file_data.data));
 
-	if (!file_data.data) return; // Should have already errored.
+    if (!file_data.data) return; // Should have already errored.
 
     Room new_room = *room;
 
@@ -473,20 +473,20 @@ void RoomManager::do_load_room(Room * room) {
             while(line.count) {
                 String flag = cut_until_space(&line);
 
-				bool is_valid_flag = false;
+                bool is_valid_flag = false;
 
-				if (flag == "disabled") {
-					current_block->flags |= COLLISION_DISABLED;
-					is_valid_flag = true;
-				}
+                if (flag == "disabled") {
+                    current_block->flags |= COLLISION_DISABLED;
+                    is_valid_flag = true;
+                }
 
                 if(flag == "player_only") {
                     current_block->flags |= COLLISION_PLAYER_ONLY; // @Incomplete Currently ignored
-					is_valid_flag = true;
+                    is_valid_flag = true;
                 }
 
 
-				if(!is_valid_flag) {
+                if(!is_valid_flag) {
                     char * c_flag = to_c_string(flag);
                     scope_exit(free(c_flag));
 
@@ -589,14 +589,14 @@ void RoomManager::do_load_room(Room * room) {
 
 
     if(successfully_parsed_file) {
-		*room = new_room;
+        *room = new_room;
 
         // @Incomplete
         // Those resets are going to mess up things that have pointers to this tile, eg. Editor panel.
         // Should mostly be solved after we start using a vector hash table (but problem of duplicates will remain.)
-		for_array(room->tiles.data, room->tiles.count) {
-			free(it->texture);
-		}
+        for_array(room->tiles.data, room->tiles.count) {
+            free(it->texture);
+        }
 
         for_array(room->collision_blocks.data, room->collision_blocks.count) {
             if(it->action_type == TELEPORT) {
@@ -606,7 +606,7 @@ void RoomManager::do_load_room(Room * room) {
 
         }
 
-		room->tiles.reset(true);
+        room->tiles.reset(true);
         room->collision_blocks.reset(true);
 
         room->tiles            = new_tile_array;

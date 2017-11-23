@@ -21,7 +21,6 @@ struct Array {
     void reset           (bool free_memory = false);
 
     bool reserve         (int size, bool zero = false);
-
 };
 
 // ************************ //

@@ -69,7 +69,11 @@ _ScopeExit<F> _MakeScopeExit(F f) { return _ScopeExit<F>(f); };
             STRING_JOIN(__for_array_internal,__LINE__) = 0)
 
 #define for_array_continue break
-#define for_array_break it_index = INT_MAX // @Hack
+#define for_array_break                                                                                        \
+    {                                                                                                          \
+        it_index = INT_MAX; /* @Hack @Win32 INT_MAX is defined in limits.h, included by default by MSVC. */    \
+        break;                                                                                                 \
+    }
 
 #define swap(a, b)                                      \
     {                                                   \

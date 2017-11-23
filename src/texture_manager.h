@@ -26,6 +26,7 @@ struct TextureManager : AssetManager_Poly<Texture> {
 
     Texture * create_texture(char * name, unsigned char * data, int width, int height, int bytes_per_pixel = 4);
 
-private:
+
+private: // @Cleanup I don't like this. If it's private, don't make it part of the struct namespace, just use a local function.
     void do_load_texture(Texture * texture);
 };
