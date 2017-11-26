@@ -35,18 +35,22 @@ void FontManager::do_load_font(Font * font) {
     int result = stbtt_BakeFontBitmap(c_file_data, 0, 16.0f, bitmap, 512, 512, 32, 96, font->char_data); // @Robustness From stb_truetype.h : "no guarantee this fits!""
 
     if(result <= 0) {
-        log_print("load_font", "The font %s could not be loaded, it is too large to fit in a 512x512 bitmap", font->name);
+        char * c_name = to_c_string(font->name);
+        scope_exit(free(c_name));
+        log_print("load_font", "The font %s could not be loaded, it is too large to fit in a 512x512 bitmap", c_name);
         return;
     }
     if(tm) {
         font->texture = tm->create_texture(font->name, bitmap, 512, 512, 1);
         // log_print("load_font", "Loaded font %s", font->name);
     } else {
-        log_print("load_font", "Loaded font %s, but no TextureManager is assigned to the font manager, so the texture could not be registered", font->name);
+        char * c_name = to_c_string(font->name);
+        scope_exit(free(c_name));
+        log_print("load_font", "Loaded font %s, but no TextureManager is assigned to the font manager, so the texture could not be registered", c_name);
     }
 }
 
-void FontManager::create_placeholder(char * name, char * path) {
+void FontManager::create_placeholder(String name, String path) {
     Font * font = (Font *) malloc(sizeof(Font));
 
     font->name      = name;
@@ -56,17 +60,13 @@ void FontManager::create_placeholder(char * name, char * path) {
 }
 
 void FontManager::reload_or_create_asset(String full_path, String file_name) {
-    char * c_file_name = to_c_string(file_name);
-    char * c_full_path = to_c_string(full_path);
-
-    Asset * asset = this->table.find(c_file_name);
+    Asset * asset = this->table.find(file_name);
 
     if(!asset) {
-        create_placeholder(c_file_name, c_full_path);
-        asset = this->table.find(c_file_name);
+        create_placeholder(file_name, full_path);
+        asset = this->table.find(file_name);
     } else {
-        free(c_file_name);
-        free(c_full_path);
+        free(full_path.data);
     }
 
     do_load_font((Font *) asset);

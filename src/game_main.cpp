@@ -43,9 +43,9 @@ enum Alignement {
 
 struct Entity {
     Entity() {}
-    char * name;
+    String name;
 
-    char * texture;
+    String texture;
 
     Vector2f position;
     Vector2f velocity;
@@ -83,6 +83,7 @@ void handle_user_input();
 
 void buffer_editor_overlay();
 
+float buffer_string(String text, float x, float y, float z,  Font * font, Alignement alignement = BOTTOM_LEFT);
 float buffer_string(char * text, float x, float y, float z,  Font * font, Alignement alignement = BOTTOM_LEFT);
 
 void buffer_player();
@@ -100,7 +101,7 @@ void buffer_editor_blocks_overlay(Room * room);
 
 void get_objects_colliding_at(Vector2f position, Array<Object> * _objects); // @Cleanup name collision here.
 
-void buffer_textured_quad(float x, float y, Alignement alignement, float width, float height, float depth, char * texture);
+void buffer_textured_quad(float x, float y, Alignement alignement, float width, float height, float depth, String texture);
 
 void buffer_colored_quad(Vector2f position, Alignement alignement, float width, float height, float depth, Color4f color);
 void buffer_colored_quad(float x, float y, Alignement alignement, float width, float height, float depth, Color4f color);
@@ -164,9 +165,9 @@ static Array<AssetManager *> managers;
 static Font * my_font;
 
 static void init_shaders() {
-    font_shader     = shader_manager.table.find("font.shader");
-    textured_shader = shader_manager.table.find("textured.shader");
-    colored_shader  = shader_manager.table.find("colored.shader");
+    font_shader     = shader_manager.table.find(to_string("font.shader"));
+    textured_shader = shader_manager.table.find(to_string("textured.shader"));
+    colored_shader  = shader_manager.table.find(to_string("colored.shader"));
 }
 
 void init_game() {
@@ -180,15 +181,15 @@ void init_game() {
 
     // Init player
     {
-        player.name = "player";
+        player.name = to_string("player");
         player.position.x = 0;
         player.position.y = 0;
-        player.texture = "megaperson.png";
+        player.texture = to_string("megaperson.png");
         player.is_player = true;
         player.size = 1.0;
     }
 
-	current_room = room_manager.table.find("main-room.room");
+	current_room = room_manager.table.find(to_string("main-room.room"));
 	assert(current_room != NULL);
 
     game_mode = GAME;
@@ -198,17 +199,16 @@ void init_game() {
         for(int i = 0; i < array_size(entities); i++) {
             char name [64];
             snprintf(name, 64, "tree%d", i);
-            entities[i].name = name;
+            entities[i].name = to_string(name);
             entities[i].position.x = (int)(8.9*i)%(current_room->dimensions.width-2) + 5;
             entities[i].position.y = (int)(2.3*i)%(current_room->dimensions.height-2) + 1;
-            entities[i].texture = "tree.png";
+            entities[i].texture = to_string("tree.png");
             entities[i].is_player = false;
             entities[i].size = 3;
         }
     }
 }
 
-// :CoordConversion Small comment about why I needed +1s, I believe it is
 // because I now need to take into account the size of the entity/size.
 
 void game() {
@@ -318,17 +318,19 @@ void handle_user_input() {
                         TeleportCollisionAction * action  = (TeleportCollisionAction *) it->action;
                         player.position = action->target;
 
-                        if(action->target_room_name) {
-                            if(strcmp(action->target_room_name, current_room->name) != 0) {
+                        if(action->target_room_name.count) {
+                            if(!string_compare(action->target_room_name, current_room->name)) {
                                 Room * target_room = room_manager.table.find(action->target_room_name);
 
+                                char * c_name = to_c_string(action->target_room_name);
+                                scope_exit(free(c_name));
                                 if(target_room) {
-                                    log_print("collision", "Switching to room %s (pointer: %p)", action->target_room_name, target_room);
+                                    log_print("collision", "Switching to room %s (pointer: %p)", c_name, target_room);
 
                                     switch_to_room(target_room);
 
                                 } else {
-                                    log_print("collision", "Trying to switch to room %s, but it doesn't exist", action->target_room_name);
+                                    log_print("collision", "Trying to switch to room %s, but it doesn't exist", c_name);
                                 }
                             }
                         }
@@ -497,14 +499,14 @@ void buffer_editor_left_panel() {
             float y = 1.0f;
 
             // Texture display
-            {
+        {
                 float texture_display_size = 0.7f * EDITOR_LEFT_PANEL_WIDTH;
                 float texture_side_padding = 0.15f * EDITOR_LEFT_PANEL_WIDTH;
                 float texture_top_padding = texture_side_padding / 2.0f;
 
                 float aspect_ratio = window_data.aspect_ratio;
 
-                char * texture = editor_left_panel_displayed_object.tile->texture;
+                String texture = editor_left_panel_displayed_object.tile->texture;
 
                 y -= texture_top_padding;
 
@@ -642,8 +644,10 @@ void buffer_debug_overlay() {
     // Buffer Current world (text must always be buffered last if it has AA / transparency);
     {
         char buffer[64];
+        char * c_name = to_c_string(current_room->name);
+        scope_exit(free(c_name));
 
-        snprintf(buffer, sizeof(buffer), "%s", current_room->name);
+        snprintf(buffer, sizeof(buffer), "%s", c_name);
 
         buffer_string("Current World :", left_x, y, DEBUG_OVERLAY_Z, my_font, BOTTOM_LEFT);
 
@@ -780,7 +784,14 @@ void buffer_tiles(Array<Tile> tiles) {
 }
 
 
-// @Incomplete. Use is_out_of_screen
+float buffer_string(String text, float x, float y, float z,  Font * font, Alignement alignement) { // Default : alignement = BOTTOM_LEFT
+    char * c_text = to_c_string(text);
+    scope_exit(free(c_text));
+
+    return buffer_string(c_text, x, y, z, font, alignement);
+}
+
+// @Incomplete. Use is_out_of_screen     //// --17-11-16 @Outdated ? Say what now ?
 float buffer_string(char * text, float x, float y, float z,  Font * font, Alignement alignement) { // Default : alignement = BOTTOM_LEFT
     float pixel_x = x * window_data.width;
     float pixel_y = y * window_data.height;
@@ -864,7 +875,7 @@ float buffer_string(char * text, float x, float y, float z,  Font * font, Aligne
 
 
 // Incomplete, handle uv coordinates and consider using texture pointer instead of name as an argument
-void buffer_textured_quad(float x, float y, Alignement alignement, float width, float height, float depth, char * texture_name) {
+void buffer_textured_quad(float x, float y, Alignement alignement, float width, float height, float depth, String texture_name) {
     float x0 = x;
     float y0 = y;
     float x1 = x + width;
@@ -878,7 +889,9 @@ void buffer_textured_quad(float x, float y, Alignement alignement, float width, 
     Texture * texture = texture_manager.table.find(texture_name);
 
     if(!texture) {
-      log_print("Drawing", "Could not find texture %s", texture_name);
+        char * c_name = to_c_string(texture_name);
+        scope_exit(free(c_name));
+        log_print("Drawing", "Could not find texture %s", c_name);
     }
 
     set_shader(textured_shader);
@@ -999,7 +1012,7 @@ void main() {
 
     init_game();
 
-    my_font = font_manager.table.find("Inconsolata.ttf");
+    my_font = font_manager.table.find(to_string("Inconsolata.ttf"));
 
     log_print("perf_counter", "Startup time : %.3f seconds", os_specific_get_time());
 

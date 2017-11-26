@@ -14,7 +14,7 @@ struct Table {
 
     Array<bool> mask;
 
-    inline unsigned int get_hash(K key) { return murmur_hash_2(key, strlen(key), 0); } //@Incomplete, assumes char *.
+    inline unsigned int get_hash(K key) { return murmur_hash_2(key.data, key.count, 0); }
 
     bool add     (K key, V value);
 
@@ -77,7 +77,8 @@ bool Table<K, V>::add(K key, V value) {
 
     while(this->mask.data[index]) {
         if(hash == this->hashes.data[index]) {
-            if(strcmp(key, this->keys.data[index])) { // @Incomplete, assuming char * keys
+
+            if(string_compare(key, this->keys.data[index])) { // @Incomplete, assuming Strings
                 // We already have this key, so we can't add it again.
                 return false;
             }
@@ -119,7 +120,7 @@ bool Table<K, V>::remove(K key) {
 
     while(this->mask.data[index]) {
         if(hash == this->hashes.data[index]) {
-            if(strcmp(key, this->keys.data[index]) == 0) { // @Incomplete, assuming char * keys
+            if(string_compare(key, this->keys.data[index])) { // @Incomplete, assuming Strings
                 this->mask.data[index] = false;
                 return true;
             }
@@ -152,7 +153,7 @@ V Table<K, V>::find(K key) {
 
     while(this->mask.data[index]) {
         if(hash == this->hashes.data[index]) {
-            if(strcmp(key, this->keys.data[index]) == 0) { // @Incomplete, assuming char * keys
+            if(string_compare(key, this->keys.data[index])) { // @Incomplete, assuming Strings
                 return this->values.data[index];
             }
         }

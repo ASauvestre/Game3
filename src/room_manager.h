@@ -17,7 +17,7 @@ struct CollisionAction {
 
 struct TeleportCollisionAction : CollisionAction {
     Vector2f target = {};
-    char * target_room_name = NULL;
+    String target_room_name;
 };
 
 struct CollisionBlock {
@@ -30,7 +30,7 @@ struct CollisionBlock {
 };
 
 struct Tile {
-    char * texture = NULL;
+    String texture;
     Vector2 position;
 
     int room_target_id;         // Used if type is SWITCH_ROOM
@@ -47,7 +47,7 @@ struct RoomManager : AssetManager_Poly<Room> {
     void init();
 
     void reload_or_create_asset(String file_path, String file_name);
-    void create_placeholder(char * name, char * path);
+    void create_placeholder(String name, String path);
 
 private:
     void do_load_room(Room * room);

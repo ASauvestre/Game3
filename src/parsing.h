@@ -5,7 +5,7 @@
 struct Vector2;
 struct Vector2f;
 
-struct String {
+struct String { // @ Cleanup, move out of here.
     char * data  = NULL;
     int    count = 0;
 
@@ -43,6 +43,8 @@ struct String {
 
 };
 
+bool string_compare(String s1, String s2);
+
 String cut_until_char(char c, String * string);
 String cut_until_space(String * string);
 
@@ -60,6 +62,7 @@ bool string_to_v2 (String string, Vector2 * result);
 bool string_to_v2f(String string, Vector2f * result);
 
 char * to_c_string(String string);
+String to_string(char * c_string);
 
 String find_char_from_right(char c, String string);
 String find_char_from_left (char c, String string);

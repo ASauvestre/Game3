@@ -16,8 +16,7 @@ struct Directory {
 };
 
 struct AssetChange {
-    String file_name; // Subset of full_path
-    String full_path; // On the heap
+    Asset asset; // @Cleanup see if we can remove this, are we gonna want other fields in the future ?
 };
 
 // Private functions
@@ -27,7 +26,7 @@ static bool handle_notifications();
 
 static FILE_NOTIFY_INFORMATION * bump_ptr_to_next_notification(FILE_NOTIFY_INFORMATION * notification);
 
-static void dispatch_file_to_managers(String full_path);
+static void dispatch_file_to_managers(Asset asset);
 // Const
 const int NOTIFICATION_BUFFER_LENGTH = 10000; // @Temporary figure out how much space is actually reasonably required
 
@@ -39,7 +38,7 @@ static Array<AssetChange> asset_changes;
 static Array<AssetManager *> managers;
 
 void release(AssetChange * ac) {
-    free(ac->full_path.data);
+    free(ac->asset.full_path.data);
 }
 
 void init_hotloader() {
@@ -85,21 +84,19 @@ void check_hotloader_modifications() {
     }
 
     for_array(asset_changes.data, asset_changes.count) {
-        dispatch_file_to_managers(it->full_path);
+        dispatch_file_to_managers(it->asset);
     }
 
     asset_changes.reset(true);
 }
 
-static void dispatch_file_to_managers(String full_path) {
-    String extension = find_char_from_left('.', full_path);
-
+static void dispatch_file_to_managers(Asset asset) {
     // Look for a manager who's interested in changes of files with this extension
     for_array(managers.data, managers.count) {
         AssetManager * am = *it;
         for(int j = 0; j < am->extensions.count; j++) { // @Cleanup This should be another for_array, but I can't nest them without redeclaring it and it_index, which is no good. We should be able to name it manually
-            if(extension == am->extensions.data[j]) {
-                am->assets_to_reload.add(full_path);
+            if(string_compare(asset.extension, to_string(am->extensions.data[j]))) {
+                am->assets_to_reload.add(asset);
             }
         }
     }
@@ -159,25 +156,25 @@ static bool handle_notifications() {
 
         notification = bump_ptr_to_next_notification(notification); // We'll bump it now to allow easy early-outs later
 
-        change.full_path.data = (char *) malloc(path_length);
-        memcpy(change.full_path.data, name_buffer, path_length);
+        change.asset.full_path.data = (char *) malloc(path_length);
+        memcpy(change.asset.full_path.data, name_buffer, path_length);
 
-        change.full_path.count = path_length;
+        change.asset.full_path.count = path_length;
 
         // Replace Windows' \ by /
         for (int i = 0; i < path_length; i++) {
-            if (change.full_path[i] == '\\') change.full_path[i] = '/';
+            if (change.asset.full_path[i] == '\\') change.asset.full_path[i] = '/';
         }
 
         // Isolate file name from the path
-        String file_name = find_char_from_right('/', change.full_path);
+        String file_name = find_char_from_right('/', change.asset.full_path);
         if (file_name.count) {
-            change.file_name = file_name;
+            change.asset.name = file_name;
         } else {
-			change.file_name = change.full_path;
+			change.asset.name = change.asset.full_path;
 		}
 
-		String extension = find_char_from_left('.', change.file_name);
+		String extension = find_char_from_left('.', change.asset.name);
 
 		if (extension.count) { // Check that we have an extension
 			if (extension == "tmp") continue; // PS tmp file. We skip those.
@@ -185,10 +182,12 @@ static bool handle_notifications() {
 			continue; // Directory change, we ignore that.
 		}
 
+        change.asset.extension = extension;
+
         // Check uniqueness @Meh
         bool success = true;
         for_array(asset_changes.data, asset_changes.count) {
-			if (it->full_path == change.full_path) {
+			if (it->asset.full_path == change.asset.full_path) {
                 success = false;
 
                 it_index = asset_changes.count; // Break
@@ -209,11 +208,40 @@ static bool handle_notifications() {
 void hotloader_register_loose_files() {
     Array<char *> files = os_specific_list_all_files_in_directory("data");
 
+	
+
     for_array(files.data, files.count) {
-        String path;
-        path.data  = *it;
-        path.count = strlen(*it);
-        dispatch_file_to_managers(path);
+        Asset asset;
+        asset.full_path.data  = *it;
+        asset.full_path.count = strlen(*it);
+
+		// @Cutnpaste @Refactor
+		// Replace Windows' \ by /
+		for (int i = 0; i < asset.full_path.count; i++) {
+			if (asset.full_path[i] == '\\') asset.full_path[i] = '/';
+		}
+
+		// Isolate file name from the path
+		String file_name = find_char_from_right('/', asset.full_path);
+		if (file_name.count) {
+			asset.name = file_name;
+		}
+		else {
+			asset.name = asset.full_path;
+		}
+
+		String extension = find_char_from_left('.', asset.name);
+
+		if (extension.count) { // Check that we have an extension
+			if (extension == "tmp") continue; // PS tmp file. We skip those.
+		}
+		else {
+			continue; // Directory change, we ignore that.
+		}
+
+		asset.extension = extension;
+
+        dispatch_file_to_managers(asset);
     }
 }
 

@@ -10,8 +10,13 @@ void TextureManager::init() {
     this->extensions.add("png");
 }
 
-Texture * TextureManager::create_texture(char * name, unsigned char * data, int width, int height, int bytes_per_pixel) { // Default : bytes_per_pixel = 4
-    create_placeholder(name, "");
+Texture * TextureManager::create_texture(String name, unsigned char * data, int width, int height, int bytes_per_pixel) { // Default : bytes_per_pixel = 4
+
+    String empty_string;
+    empty_string.data = "";
+    empty_string.count = 0;
+
+    create_placeholder(name, empty_string);
     Texture * texture = this->table.find(name);
 
     texture->bitmap          = data;
@@ -24,7 +29,7 @@ Texture * TextureManager::create_texture(char * name, unsigned char * data, int 
     return texture;
 }
 
-void TextureManager::create_placeholder(char * name, char * path) {
+void TextureManager::create_placeholder(String name, String path) {
     Texture * texture = (Texture * ) malloc(sizeof(Texture));
 
     texture->name          = name;
@@ -37,17 +42,13 @@ void TextureManager::create_placeholder(char * name, char * path) {
 
 // @Think, make this part of AssetManager_Poly ?
 void TextureManager::reload_or_create_asset(String full_path, String file_name) {
-    char * c_file_name = to_c_string(file_name);
-    char * c_full_path = to_c_string(full_path);
-
-    Asset * asset = this->table.find(c_file_name);
+    Asset * asset = this->table.find(file_name);
 
     if(!asset) {
-        create_placeholder(c_file_name, c_full_path);
-        asset = this->table.find(c_file_name);
+        create_placeholder(file_name, full_path);
+        asset = this->table.find(file_name);
     } else {
-        free(c_file_name);
-        free(c_full_path);
+        free(full_path.data);
     }
 
     do_load_texture((Texture *) asset);
@@ -62,7 +63,9 @@ void TextureManager::do_load_texture(Texture * texture) {
     unsigned char * bitmap = stbi_load_from_memory((unsigned char *) file_data.data, file_data.count, &width, &height, &bytes_per_pixel, 4);
 
     if(bitmap == NULL) {
-        log_print("do_load_texture", "Failed to load texture \"%s\"", texture->name);
+        char * c_name = to_c_string(texture->name);
+        scope_exit(free(c_name));
+        log_print("do_load_texture", "Failed to load texture \"%s\"", c_name);
         return;
     }
 
@@ -73,7 +76,9 @@ void TextureManager::do_load_texture(Texture * texture) {
     texture->bitmap = bitmap;
 
     if(bytes_per_pixel != 4) {
-        log_print("do_load_texture", "Loaded texture \"%s\", it has %d bit depth, please convert to 32 bit depth", texture->name, bytes_per_pixel * 8);
+        char * c_name = to_c_string(texture->name);
+        scope_exit(free(c_name));
+        log_print("do_load_texture", "Loaded texture \"%s\", it has %d bit depth, please convert to 32 bit depth", c_name, bytes_per_pixel * 8);
         bytes_per_pixel = 4;
     } else {
         // log_print("do_load_texture", "Loaded texture \"%s\"", texture->name);

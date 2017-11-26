@@ -8,14 +8,15 @@
 #include "parsing.h" // For String
 
 struct Asset {
-    char * name;
-    char * full_path;
+    String name;
+    String full_path;
+    String extension;
 };
 
 struct AssetManager {
     Array<char *> extensions;
 
-    Array<String> assets_to_reload;
+    Array<Asset> assets_to_reload;
 
     // ------ Functions ------
     virtual void create_placeholder(char * name, char * path);
@@ -26,5 +27,5 @@ struct AssetManager {
 
 template <typename T>
 struct AssetManager_Poly : AssetManager{
-    Table<char *, T *> table;
+    Table<String, T *> table;
 };

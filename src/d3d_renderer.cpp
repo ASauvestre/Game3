@@ -24,7 +24,7 @@ struct InputLayout {
 // Private functions
 static void bind_srv_to_texture(Texture * texture);
 
-static bool create_shader(char * filename, Shader * shader);
+static bool create_shader(String filename, Shader * shader);
 
 static void switch_to_shader(Shader * shader);
 
@@ -219,8 +219,10 @@ void init_platform_renderer(Vector2f rendering_resolution, void * handle) {
 
     // Dummy shader
     dummy_shader = (Shader *) malloc(sizeof(Shader));
-
-    create_shader("dummy", dummy_shader);
+    String dummy_string;
+    dummy_string.data = "dummy";
+    dummy_string.count = 5;
+    create_shader(dummy_string, dummy_shader);
 }
 
 void init_frame() {
@@ -352,9 +354,12 @@ static void bind_srv_to_texture(Texture * texture) {
     d3d_texture->Release(); // @Robustness Am I allowed to do that ? It seems to work fine.
 }
 
-void parse_input_layout_from_file(char * file_name, String file_data, Shader * shader) {
+void parse_input_layout_from_file(String file_name, String file_data, Shader * shader) {
 
     String line = bump_to_next_line(&file_data);
+
+    char * c_file_name = to_c_string(file_name);
+    scope_exit(free(c_file_name));
 
     int found = -1;
     int line_number = 0;
@@ -387,14 +392,14 @@ void parse_input_layout_from_file(char * file_name, String file_data, Shader * s
             cut_until_char('(', &line);
 
             if(line.count == 0) {
-                log_print("compile_shader", "Found vertex shader function on line %d of %s, but we could not find the arguments block, make sure that it is on the same line.", line_number + 1, file_name);
+                log_print("compile_shader", "Found vertex shader function on line %d of %s, but we could not find the arguments block, make sure that it is on the same line.", line_number + 1, c_file_name);
                 continue;
             }
 
             String args = cut_until_char(')', &line);
 
             if(line.count == 0) { // No ')' was found, so we have no guarantee that all he arguments were on the same line.
-                log_print("compile_shader", "Found vertex shader function on line %d of %s, but we could not find the end of the arguments block, make sure that it is on the same line.", line_number + 1, file_name);
+                log_print("compile_shader", "Found vertex shader function on line %d of %s, but we could not find the end of the arguments block, make sure that it is on the same line.", line_number + 1, c_file_name);
                 continue;
             }
 
@@ -427,7 +432,7 @@ void parse_input_layout_from_file(char * file_name, String file_data, Shader * s
     }
 
     if(found == -1) {
-        log_print("compile_shader", "Could not find the vertex shader function while parsing %s, did you remember to prefix it with \"VS_FUNC\" ?", file_name);
+        log_print("compile_shader", "Could not find the vertex shader function while parsing %s, did you remember to prefix it with \"VS_FUNC\" ?", c_file_name);
         return;
     }
 
@@ -503,6 +508,9 @@ bool compile_shader(Shader * shader) {
 
     String file_data = os_specific_read_file(shader->full_path);
 
+    char * c_name = to_c_string(shader->name);
+    scope_exit(free(c_name));
+
     if(!file_data.data) {
         return false; // we already reported an error.
     }
@@ -511,7 +519,7 @@ bool compile_shader(Shader * shader) {
                        "VS", "vs_5_0", 0, 0, &VS_bytecode, &error);
 
     if(error) {
-        log_print("compile_shader", "Vertex shader in %s failed to compile, error given is : \n---------\n%s---------", shader->name, (char *)error->GetBufferPointer());
+        log_print("compile_shader", "Vertex shader in %s failed to compile, error given is : \n---------\n%s---------", c_name, (char *)error->GetBufferPointer());
 
         error->Release();
 
@@ -521,7 +529,7 @@ bool compile_shader(Shader * shader) {
     if (error_code > S_FALSE) {
         log_print("compile_shader",
                   "An error occured while compiling the file \"%s\", could not compile the shaders. Error code is 0x%x",
-                  shader->name, error_code);
+                  c_name, error_code);
 
         return false;
     }
@@ -530,7 +538,7 @@ bool compile_shader(Shader * shader) {
                        "PS", "ps_5_0", 0, 0, &PS_bytecode, &error);
 
     if(error) {
-        log_print("compile_shader", "Pixel shader in %s failed to compile, error given is : \n---------\n%s---------", shader->name, (char *)error->GetBufferPointer());
+        log_print("compile_shader", "Pixel shader in %s failed to compile, error given is : \n---------\n%s---------", c_name, (char *)error->GetBufferPointer());
 
         error->Release();
         VS_bytecode->Release();
@@ -559,14 +567,18 @@ bool compile_shader(Shader * shader) {
     return true;
 }
 
-static bool create_shader(char * filename, Shader * shader){
+static bool create_shader(String filename, Shader * shader) {
     shader->name = filename;
 
-    char path[512];
-    int path_length = snprintf(path, 512, "data/shaders/%s", shader->name);
+    char * c_name = to_c_string(filename);
+    scope_exit(free(c_name));
 
-    shader->full_path = (char *) malloc(path_length + 1);
-    memcpy(shader->full_path, path, path_length + 1);
+    char path[512];
+    int path_length = snprintf(path, 512, "data/shaders/%s", c_name);
+
+    shader->full_path.data = (char *) malloc(path_length);
+    shader->full_path.count = path_length;
+    memcpy(shader->full_path.data, path, path_length);
 
     return compile_shader(shader);
 }

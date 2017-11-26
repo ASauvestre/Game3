@@ -22,9 +22,9 @@ struct TextureManager : AssetManager_Poly<Texture> {
     void init();
 
     void reload_or_create_asset(String file_path, String file_name);
-    void create_placeholder(char * name, char * path);
+    void create_placeholder(String name, String path);
 
-    Texture * create_texture(char * name, unsigned char * data, int width, int height, int bytes_per_pixel = 4);
+    Texture * create_texture(String name, unsigned char * data, int width, int height, int bytes_per_pixel = 4);
 
 
 private: // @Cleanup I don't like this. If it's private, don't make it part of the struct namespace, just use a local function.

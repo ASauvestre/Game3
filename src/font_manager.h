@@ -14,7 +14,7 @@ struct FontManager : AssetManager_Poly<Font> {
     void init(TextureManager * texture_manager);
 
     void reload_or_create_asset(String file_path, String file_name);
-    void create_placeholder(char * name, char * path);
+    void create_placeholder(String name, String path);
 
 private:
     void do_load_font(Font * font);

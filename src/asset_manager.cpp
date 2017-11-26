@@ -16,19 +16,8 @@ void AssetManager::reload_or_create_asset(String file_path, String file_name) {
 
 void AssetManager::perform_reloads() {
     for_array(this->assets_to_reload.data, this->assets_to_reload.count) {
-        String file_path = *it;
-        scope_exit(free(file_path.data));
-
-        // @Redundant, this is already computed in hotloader.cpp, we could simply have another array with file names to reload.
-        String file_name = find_char_from_right('/', file_path);
-
-        if(!file_name.count) {
-            file_name = file_path;
-            push(&file_name); // Gets rid of '/'
-        }
-        // End @Redundant
-
-        reload_or_create_asset(file_path, file_name);
+        //scope_exit(free(it->full_path.data));
+        reload_or_create_asset(it->full_path, it->name);
     }
 
     this->assets_to_reload.reset(true);

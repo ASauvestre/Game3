@@ -5,6 +5,12 @@
 #include "macros.h"
 #include "math_m.h" // Vector parsing
 
+bool string_compare(String s1, String s2) {
+    if(s1.count != s2.count) return false;
+
+    return (memcmp(s1.data, s2.data, s1.count) == 0);
+}
+
 // @Cleanup, this didn't end up being used, maybe remove it ?
 void skip_empty_lines(String * string) {
     String line;
@@ -117,6 +123,13 @@ char * to_c_string(String string) { // @Incomplete take pointer here ?
     c[string.count] = 0;
 
     return c;
+}
+
+String to_string(char * c_string) {
+    String string;
+    string.data = c_string;
+    string.count = strlen(c_string); // @Think, should we copy here ?
+    return string;
 }
 
 void push(String * string, int amount) { // @Default amount = 1
