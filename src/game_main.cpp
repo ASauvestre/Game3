@@ -244,12 +244,14 @@ float EDITOR_CLICK_MENU_ROW_HEIGHT; // @Temporary Value assigned in buffer_edito
 
 enum EditorLeftPanelMode {
     MAIN,
+    CLICK_SELECTION,
     TILE_INFO,
 };
 
 float EDITOR_LEFT_PANEL_WIDTH = 0.18f;
 float EDITOR_LEFT_PANEL_PADDING = 0.004f;
 float EDITOR_LEFT_PANEL_ROW_HEIGHT; // @Temporary Value assigned in buffer_editor_left_panel
+float EDITOR_LEFT_PANEL_BIG_ROW_HEIGHT;  // @Temporary Value assigned in buffer_editor_left_panel
 
 EditorLeftPanelMode editor_left_panel_mode = TILE_INFO;
 
@@ -405,12 +407,15 @@ void handle_user_input() {
     }
 
     // Editor controls
+
+
+    //@Cleanup click menu, we don't use it anymore
     {
         if(game_mode == EDITOR) {
             if(!keyboard.mouse_left && previous_keyboard.mouse_left) { // Mouse left up
-                if(editor_click_menu_was_open) { // This mouse click should close the menu.
+               /* if(editor_click_menu_was_open) { // This mouse click should close the menu.
                     editor_click_menu_was_open = false;
-                } else {
+                } else {*/
                     // log_print("mouse_testing", "Mouse left pressed at (%0.6f, %0.6f) and released at (%0.6f, %0.6f)", keyboard.mouse_left_pressed_position.x, keyboard.mouse_left_pressed_position.y, keyboard.mouse_position.x, keyboard.mouse_position.y);
                     Vector2f game_space_position;
                     game_space_position.x = main_camera.size.x * (keyboard.mouse_left_pressed_position.x - 0.5f) + main_camera.offset.x;
@@ -419,47 +424,96 @@ void handle_user_input() {
 
                     get_objects_colliding_at(game_space_position, &objects);
 
-                    editor_click_menu_position = keyboard.mouse_position;
+                   // editor_click_menu_position = keyboard.mouse_position;
 
-                    editor_click_menu_open = true;
+                   // editor_click_menu_open = true;
+                    if(objects.count > 0) {
+                        editor_left_panel_mode = CLICK_SELECTION;
+                   // }
                 }
             }
 
-            if(keyboard.mouse_left && !previous_keyboard.mouse_left) { // Mouse left down
-                Vector2f position = keyboard.mouse_position;
+			if (keyboard.mouse_left && !previous_keyboard.mouse_left) { // Mouse left down
+				Vector2f position = keyboard.mouse_position;
 
-                if(editor_click_menu_open) {
+
+                // @Cleanup
+                // @Cleanup
+				// if(editor_click_menu_open) {
+				//     if((position.x <= editor_click_menu_position.x + EDITOR_CLICK_MENU_WIDTH)
+				//     && (position.x >= editor_click_menu_position.x)
+				//     && (position.y >= editor_click_menu_position.y - EDITOR_CLICK_MENU_ROW_HEIGHT * objects.count)
+				//     && (position.y <= editor_click_menu_position.y)) {
+
+				//         int element_number = 0;
+				//         float element_y = editor_click_menu_position.y - position.y;
+
+				//         while(true) {
+				//             element_y -= EDITOR_CLICK_MENU_ROW_HEIGHT;
+
+				//             if(element_y < 0) break;
+
+				//             element_number++;
+				//         }
+
+				//         // log_print("editor_click_menu", "The element no. %d of the click menu was clicked", element_number);
+
+				//         // if(strcmp(objects[element_number].tile->texture, "grass.png") == 0) {
+				//         //     objects[element_number].tile->texture = "dirt_road.png"; // = m_texture_manager->find_texture("dirt_road.png");
+				//         // } else {
+				//         //     objects[element_number].tile->texture = "grass.png"; // = m_texture_manager->find_texture("dirt_road.png");
+				//         // }
+
+				//         editor_left_panel_displayed_object = objects.data[element_number];
+				//     }
+
+				//     objects.reset();
+				//     editor_click_menu_open     = false;
+				//     editor_click_menu_was_open = true;
+				// }
+
+				if (editor_left_panel_mode == CLICK_SELECTION) {
+					Vector2f click_position = keyboard.mouse_position;
+
+					if ((click_position.x <= EDITOR_LEFT_PANEL_WIDTH)
+						&& (click_position.x >= 0.0f)
+						&& (click_position.y >= 0.0f)
+						&& (click_position.y <= 1.0f)) {
+
+						int element_number = 0;
+						float element_y = click_position.y;
+
+						while (true) {
+							element_y += EDITOR_LEFT_PANEL_BIG_ROW_HEIGHT;
+
+							if (element_y > 1.0f) break;
+
+							element_number++;
+						}
+
+						if (element_number < objects.count) {
+                            editor_left_panel_displayed_object = objects.data[element_number];
+                            editor_left_panel_mode = TILE_INFO;
+						}
+					}
+
+                    objects.reset();
+				}
+
+
+                // @Cleanup
+                // @Cleanup
+                // @Cleanup
+
+				/*if (editor_click_menu_open) {
                     if((position.x <= editor_click_menu_position.x + EDITOR_CLICK_MENU_WIDTH)
                     && (position.x >= editor_click_menu_position.x)
                     && (position.y >= editor_click_menu_position.y - EDITOR_CLICK_MENU_ROW_HEIGHT * objects.count)
                     && (position.y <= editor_click_menu_position.y)) {
-
-                        int element_number = 0;
-                        float element_y = editor_click_menu_position.y - position.y;
-
-                        while(true) {
-                            element_y -= EDITOR_CLICK_MENU_ROW_HEIGHT;
-
-                            if(element_y < 0) break;
-
-                            element_number++;
-                        }
-
-                        // log_print("editor_click_menu", "The element no. %d of the click menu was clicked", element_number);
-
-                        // if(strcmp(objects[element_number].tile->texture, "grass.png") == 0) {
-                        //     objects[element_number].tile->texture = "dirt_road.png"; // = m_texture_manager->find_texture("dirt_road.png");
-                        // } else {
-                        //     objects[element_number].tile->texture = "grass.png"; // = m_texture_manager->find_texture("dirt_road.png");
-                        // }
-
-                        editor_left_panel_displayed_object = objects.data[element_number];
+    					editor_click_menu_open = false;
+    					editor_click_menu_was_open = true;
                     }
-
-                    objects.reset();
-                    editor_click_menu_open     = false;
-                    editor_click_menu_was_open = true;
-                }
+				}*/
             }
         }
     }
@@ -486,6 +540,7 @@ void get_objects_colliding_at(Vector2f point, Array<Object> * _objects) {
 void buffer_editor_left_panel() {
 
     EDITOR_LEFT_PANEL_ROW_HEIGHT = EDITOR_LEFT_PANEL_PADDING * 2 * window_data.aspect_ratio + 14.0f / window_data.height; // @Temporary Current distance from baseline to top of capital letter is 12px
+    EDITOR_LEFT_PANEL_BIG_ROW_HEIGHT = 2.0f * EDITOR_LEFT_PANEL_ROW_HEIGHT;
 
     // Background
     {
@@ -493,7 +548,44 @@ void buffer_editor_left_panel() {
         buffer_colored_quad(0.0f, 0.0f, BOTTOM_LEFT, EDITOR_LEFT_PANEL_WIDTH, 1.0f, EDITOR_LEFT_PANEL_BACKGROUND_Z, color);
     }
 
-    if(editor_left_panel_mode == TILE_INFO) {
+    if(editor_left_panel_mode == CLICK_SELECTION) {
+
+        float x = 0.0f;
+        float y = 1.0f - EDITOR_LEFT_PANEL_BIG_ROW_HEIGHT;
+
+        for(int i = 0; i < objects.count; i++) {
+            // Buffer menu background
+            {
+                Color4f color;
+                if(i % 2 == 0) {
+                    color = { 0.4f, 0.4f, 0.4f, 0.8f };
+                } else {
+                    color = { 0.6f, 0.6f, 0.7f, 0.7f };
+                }
+
+                buffer_colored_quad(x, y, BOTTOM_LEFT, EDITOR_LEFT_PANEL_WIDTH, EDITOR_LEFT_PANEL_BIG_ROW_HEIGHT, EDITOR_LEFT_PANEL_CONTENT_Z, color);
+
+                // log_print("buffer_editor_left_panel", "Buffering row at %f, %f", x, y);
+            }
+
+            // Buffer strings
+            {
+                if(objects.data[i].type == TILE) {
+                    // log_print("editor_mouse_collision", "Colliding with object of type TILE at (%d, %d)", objects[i].tile->local_x, objects[i].tile->local_y);
+                    char tile_name[64];
+
+                    Vector2 tile_position = objects.data[i].tile->position;
+
+                    snprintf(tile_name, 64, "Tile%d_%d", tile_position.x, tile_position.y);
+
+                    buffer_string(tile_name, x + EDITOR_MENU_PADDING, y + EDITOR_MENU_PADDING * window_data.aspect_ratio, 1.0f, my_font, BOTTOM_LEFT);
+                }
+            }
+
+            y -= EDITOR_LEFT_PANEL_BIG_ROW_HEIGHT;
+    }
+
+    } else if(editor_left_panel_mode == TILE_INFO) {
         if(editor_left_panel_displayed_object.tile != NULL) {
 
             float y = 1.0f;
@@ -529,11 +621,11 @@ void buffer_editor_left_panel() {
 
 }
 
-void buffer_editor_click_menu() {
-    EDITOR_CLICK_MENU_ROW_HEIGHT = EDITOR_MENU_PADDING * 2 * window_data.aspect_ratio + 14.0f / window_data.height; // @Temporary Current distance from baseline to top of capital letter is 12px
+/*void buffer_editor_click_menu() {
+    EDITOR_CLICK_MENU_ROW_HEIGHT = EDITOR_MENU_PADDING * 2 * window_data.aspect_ratio + 14.0f / window_data.height; // @Temporary Current distance from baseline to top of capital letter is 14px
 
     float x = editor_click_menu_position.x;
-    float y = editor_click_menu_position.y - EDITOR_CLICK_MENU_ROW_HEIGHT;
+    float y = editor_click_menu_position.y - EDITOR_CLICK_MENU_ROW_HEIGHT; // @Think whyyyyyyy ? Figure out what your coordinate system and corner standard is again. As of right now, I'm just very confused about this.
 
     for(int i = 0; i < objects.count; i++) {
         // Buffer menu background
@@ -564,16 +656,16 @@ void buffer_editor_click_menu() {
 
         y -= EDITOR_CLICK_MENU_ROW_HEIGHT;
     }
-}
+}*/
 
 void buffer_editor_overlay() {
 
     buffer_editor_blocks_overlay(current_room);
     buffer_editor_left_panel();
 
-    if(editor_click_menu_open) {
+   /* if(editor_click_menu_open) {
         buffer_editor_click_menu();
-    }
+    }*/
 }
 
 int frame_time_print_counter = 0;
