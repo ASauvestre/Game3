@@ -568,7 +568,14 @@ void buffer_editor_left_panel() {
                 // log_print("buffer_editor_left_panel", "Buffering row at %f, %f", x, y);
             }
 
-            // Buffer strings
+            // Buffer texture
+            {
+                if(objects.data[i].type == TILE) {
+                    buffer_textured_quad(0.1f * EDITOR_LEFT_PANEL_BIG_ROW_HEIGHT,  y + 0.1f * EDITOR_LEFT_PANEL_BIG_ROW_HEIGHT, BOTTOM_LEFT, 0.8f * EDITOR_LEFT_PANEL_BIG_ROW_HEIGHT / window_data.aspect_ratio, 0.8f * EDITOR_LEFT_PANEL_BIG_ROW_HEIGHT, 1.0f, objects.data[i].tile->texture); // @Cleanup fix depth
+                }
+            }
+
+            // Buffer string
             {
                 if(objects.data[i].type == TILE) {
                     // log_print("editor_mouse_collision", "Colliding with object of type TILE at (%d, %d)", objects[i].tile->local_x, objects[i].tile->local_y);
@@ -578,7 +585,9 @@ void buffer_editor_left_panel() {
 
                     snprintf(tile_name, 64, "Tile%d_%d", tile_position.x, tile_position.y);
 
-                    buffer_string(tile_name, x + EDITOR_MENU_PADDING, y + EDITOR_MENU_PADDING * window_data.aspect_ratio, 1.0f, my_font, BOTTOM_LEFT);
+                    float y_padding = (EDITOR_LEFT_PANEL_BIG_ROW_HEIGHT - (16.0f / window_data.height)) / 2.0f;
+
+                    buffer_string(tile_name, x + EDITOR_LEFT_PANEL_BIG_ROW_HEIGHT / window_data.aspect_ratio, y + y_padding * window_data.aspect_ratio, 1.0f, my_font, BOTTOM_LEFT); // @Cleanup fix depth
                 }
             }
 

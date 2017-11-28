@@ -168,7 +168,7 @@ LRESULT CALLBACK WndProc(HWND window_handle, UINT message, WPARAM w_param, LPARA
             SetCapture(window_handle);
 
 
-            // Store the position at which the button was pressed @Pasted // @Cleanup, according to the MSDN, those coordinates are relative to the upper left corner
+            // Store the position at which the button was pressed @Pasted // @Cleanup, according to the MSDN, those coordinates are relative to the upper left cornerz
             if(window_width == 0) {
                 local_keyboard.mouse_left_pressed_position.x = 0.0f;
             } else {
