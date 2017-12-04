@@ -69,7 +69,7 @@ void TextureManager::do_load_texture(Texture * texture) {
         return;
     }
 
-    if(texture->dirty) {
+    if(texture->dirty) { // @Cleanup, why is that the condition ? We should free the bitmap as long as it exists.
         free(texture->bitmap);
     }
 

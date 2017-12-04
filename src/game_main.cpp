@@ -1,3 +1,10 @@
+// Currently, when trying to buffer a square (which we do very often) we have to take into account the aspect ratio for
+// both the size and the padding. This is really annoying, either we should have stricter standards about what gets
+// size relative to the y or x axis (for constants that is) or we should have an easy way to convert our sizes. I dont
+// want to force aspect ratio conversion for all drawing though, since it maight cause problems in the future.
+//                                                                         -ASauvestre 2017-11-28
+
+
 #include <assert.h>
 
 #include "game_main.h"
@@ -83,8 +90,8 @@ void handle_user_input();
 
 void buffer_editor_overlay();
 
-float buffer_string(String text, float x, float y, float z,  Font * font, Alignement alignement = BOTTOM_LEFT);
-float buffer_string(char * text, float x, float y, float z,  Font * font, Alignement alignement = BOTTOM_LEFT);
+float buffer_string(String text, float x, float y, float z,  SpecificFont * font, Alignement alignement = BOTTOM_LEFT);
+float buffer_string(char * text, float x, float y, float z,  SpecificFont * font, Alignement alignement = BOTTOM_LEFT);
 
 void buffer_player();
 
@@ -132,7 +139,6 @@ const int MAX_NUMBER_ENTITIES = 1;
 static Shader * font_shader;
 static Shader * textured_shader;
 static Shader * colored_shader;
-
 
 static WindowData window_data;
 
@@ -189,8 +195,8 @@ void init_game() {
         player.size = 1.0;
     }
 
-	current_room = room_manager.table.find(to_string("main-room.room"));
-	assert(current_room != NULL);
+    current_room = room_manager.table.find(to_string("main-room.room"));
+    assert(current_room != NULL);
 
     game_mode = GAME;
 
@@ -433,87 +439,87 @@ void handle_user_input() {
                 }
             }
 
-			if (keyboard.mouse_left && !previous_keyboard.mouse_left) { // Mouse left down
-				Vector2f position = keyboard.mouse_position;
+            if (keyboard.mouse_left && !previous_keyboard.mouse_left) { // Mouse left down
+                Vector2f position = keyboard.mouse_position;
 
 
                 // @Cleanup
                 // @Cleanup
-				// if(editor_click_menu_open) {
-				//     if((position.x <= editor_click_menu_position.x + EDITOR_CLICK_MENU_WIDTH)
-				//     && (position.x >= editor_click_menu_position.x)
-				//     && (position.y >= editor_click_menu_position.y - EDITOR_CLICK_MENU_ROW_HEIGHT * objects.count)
-				//     && (position.y <= editor_click_menu_position.y)) {
+                // if(editor_click_menu_open) {
+                //     if((position.x <= editor_click_menu_position.x + EDITOR_CLICK_MENU_WIDTH)
+                //     && (position.x >= editor_click_menu_position.x)
+                //     && (position.y >= editor_click_menu_position.y - EDITOR_CLICK_MENU_ROW_HEIGHT * objects.count)
+                //     && (position.y <= editor_click_menu_position.y)) {
 
-				//         int element_number = 0;
-				//         float element_y = editor_click_menu_position.y - position.y;
+                //         int element_number = 0;
+                //         float element_y = editor_click_menu_position.y - position.y;
 
-				//         while(true) {
-				//             element_y -= EDITOR_CLICK_MENU_ROW_HEIGHT;
+                //         while(true) {
+                //             element_y -= EDITOR_CLICK_MENU_ROW_HEIGHT;
 
-				//             if(element_y < 0) break;
+                //             if(element_y < 0) break;
 
-				//             element_number++;
-				//         }
+                //             element_number++;
+                //         }
 
-				//         // log_print("editor_click_menu", "The element no. %d of the click menu was clicked", element_number);
+                //         // log_print("editor_click_menu", "The element no. %d of the click menu was clicked", element_number);
 
-				//         // if(strcmp(objects[element_number].tile->texture, "grass.png") == 0) {
-				//         //     objects[element_number].tile->texture = "dirt_road.png"; // = m_texture_manager->find_texture("dirt_road.png");
-				//         // } else {
-				//         //     objects[element_number].tile->texture = "grass.png"; // = m_texture_manager->find_texture("dirt_road.png");
-				//         // }
+                //         // if(strcmp(objects[element_number].tile->texture, "grass.png") == 0) {
+                //         //     objects[element_number].tile->texture = "dirt_road.png"; // = m_texture_manager->find_texture("dirt_road.png");
+                //         // } else {
+                //         //     objects[element_number].tile->texture = "grass.png"; // = m_texture_manager->find_texture("dirt_road.png");
+                //         // }
 
-				//         editor_left_panel_displayed_object = objects.data[element_number];
-				//     }
+                //         editor_left_panel_displayed_object = objects.data[element_number];
+                //     }
 
-				//     objects.reset();
-				//     editor_click_menu_open     = false;
-				//     editor_click_menu_was_open = true;
-				// }
+                //     objects.reset();
+                //     editor_click_menu_open     = false;
+                //     editor_click_menu_was_open = true;
+                // }
 
-				if (editor_left_panel_mode == CLICK_SELECTION) {
-					Vector2f click_position = keyboard.mouse_position;
+                if (editor_left_panel_mode == CLICK_SELECTION) {
+                    Vector2f click_position = keyboard.mouse_position;
 
-					if ((click_position.x <= EDITOR_LEFT_PANEL_WIDTH)
-						&& (click_position.x >= 0.0f)
-						&& (click_position.y >= 0.0f)
-						&& (click_position.y <= 1.0f)) {
+                    if ((click_position.x <= EDITOR_LEFT_PANEL_WIDTH)
+                        && (click_position.x >= 0.0f)
+                        && (click_position.y >= 0.0f)
+                        && (click_position.y <= 1.0f)) {
 
-						int element_number = 0;
-						float element_y = click_position.y;
+                        int element_number = 0;
+                        float element_y = click_position.y;
 
-						while (true) {
-							element_y += EDITOR_LEFT_PANEL_BIG_ROW_HEIGHT;
+                        while (true) {
+                            element_y += EDITOR_LEFT_PANEL_BIG_ROW_HEIGHT;
 
-							if (element_y > 1.0f) break;
+                            if (element_y > 1.0f) break;
 
-							element_number++;
-						}
+                            element_number++;
+                        }
 
-						if (element_number < objects.count) {
+                        if (element_number < objects.count) {
                             editor_left_panel_displayed_object = objects.data[element_number];
                             editor_left_panel_mode = TILE_INFO;
-						}
-					}
+                        }
+                    }
 
                     objects.reset();
-				}
+                }
 
 
                 // @Cleanup
                 // @Cleanup
                 // @Cleanup
 
-				/*if (editor_click_menu_open) {
+                /*if (editor_click_menu_open) {
                     if((position.x <= editor_click_menu_position.x + EDITOR_CLICK_MENU_WIDTH)
                     && (position.x >= editor_click_menu_position.x)
                     && (position.y >= editor_click_menu_position.y - EDITOR_CLICK_MENU_ROW_HEIGHT * objects.count)
                     && (position.y <= editor_click_menu_position.y)) {
-    					editor_click_menu_open = false;
-    					editor_click_menu_was_open = true;
+                        editor_click_menu_open = false;
+                        editor_click_menu_was_open = true;
                     }
-				}*/
+                }*/
             }
         }
     }
@@ -539,7 +545,10 @@ void get_objects_colliding_at(Vector2f point, Array<Object> * _objects) {
 
 void buffer_editor_left_panel() {
 
-    EDITOR_LEFT_PANEL_ROW_HEIGHT = EDITOR_LEFT_PANEL_PADDING * 2 * window_data.aspect_ratio + 14.0f / window_data.height; // @Temporary Current distance from baseline to top of capital letter is 12px
+    SpecificFont * normal_font = font_manager.get_font_at_size(my_font, 16.0f);
+    SpecificFont * small_font = font_manager.get_font_at_size(my_font, 10.0f);
+
+    EDITOR_LEFT_PANEL_ROW_HEIGHT = EDITOR_LEFT_PANEL_PADDING * 2 * window_data.aspect_ratio + 16.0f / window_data.height; // @Temporary Current distance from baseline to top of capital letter is 12px
     EDITOR_LEFT_PANEL_BIG_ROW_HEIGHT = 2.0f * EDITOR_LEFT_PANEL_ROW_HEIGHT;
 
     // Background
@@ -568,10 +577,19 @@ void buffer_editor_left_panel() {
                 // log_print("buffer_editor_left_panel", "Buffering row at %f, %f", x, y);
             }
 
+            float padding_x = 0.1f * EDITOR_LEFT_PANEL_BIG_ROW_HEIGHT / window_data.aspect_ratio;
+            float padding_y = 0.1f * EDITOR_LEFT_PANEL_BIG_ROW_HEIGHT;
+
             // Buffer texture
             {
                 if(objects.data[i].type == TILE) {
-                    buffer_textured_quad(0.1f * EDITOR_LEFT_PANEL_BIG_ROW_HEIGHT,  y + 0.1f * EDITOR_LEFT_PANEL_BIG_ROW_HEIGHT, BOTTOM_LEFT, 0.8f * EDITOR_LEFT_PANEL_BIG_ROW_HEIGHT / window_data.aspect_ratio, 0.8f * EDITOR_LEFT_PANEL_BIG_ROW_HEIGHT, 1.0f, objects.data[i].tile->texture); // @Cleanup fix depth
+
+                    float texture_x = x + padding_x;
+                    float texture_y = y + padding_y;
+
+                    float texture_width = EDITOR_LEFT_PANEL_BIG_ROW_HEIGHT / window_data.aspect_ratio - 2 * padding_x;
+                    float texture_height = EDITOR_LEFT_PANEL_BIG_ROW_HEIGHT - 2 * padding_y;
+                    buffer_textured_quad(texture_x, texture_y, BOTTOM_LEFT, texture_width, texture_height, 1.0f, objects.data[i].tile->texture); // @Cleanup fix depth
                 }
             }
 
@@ -579,28 +597,34 @@ void buffer_editor_left_panel() {
             {
                 if(objects.data[i].type == TILE) {
                     // log_print("editor_mouse_collision", "Colliding with object of type TILE at (%d, %d)", objects[i].tile->local_x, objects[i].tile->local_y);
-                    char tile_name[64];
-
                     Vector2 tile_position = objects.data[i].tile->position;
 
-                    snprintf(tile_name, 64, "Tile%d_%d", tile_position.x, tile_position.y);
+                    char coord_text[64];
+                    snprintf(coord_text, 64, "(%d,%d)", tile_position.x, tile_position.y);
 
-                    float y_padding = (EDITOR_LEFT_PANEL_BIG_ROW_HEIGHT - (16.0f / window_data.height)) / 2.0f;
+                    float main_text_x = x + EDITOR_LEFT_PANEL_BIG_ROW_HEIGHT / window_data.aspect_ratio;
+                    float main_text_y = y + ((EDITOR_LEFT_PANEL_BIG_ROW_HEIGHT - (16.0f / window_data.height)) / 2.0f) * window_data.aspect_ratio;
 
-                    buffer_string(tile_name, x + EDITOR_LEFT_PANEL_BIG_ROW_HEIGHT / window_data.aspect_ratio, y + y_padding * window_data.aspect_ratio, 1.0f, my_font, BOTTOM_LEFT); // @Cleanup fix depth
+
+
+                    buffer_string("Tile", main_text_x, main_text_y, 1.0f, normal_font, BOTTOM_LEFT); // @Cleanup fix depth
+
+                    float coord_text_x = x + EDITOR_LEFT_PANEL_WIDTH - padding_x;
+                    float coord_text_y = y + ((EDITOR_LEFT_PANEL_BIG_ROW_HEIGHT - (16.0f / window_data.height)) / 2.0f) * window_data.aspect_ratio;
+
+                    buffer_string(coord_text, coord_text_x, coord_text_y, 1.0f, small_font, BOTTOM_RIGHT);
                 }
             }
 
             y -= EDITOR_LEFT_PANEL_BIG_ROW_HEIGHT;
-    }
-
+        }
     } else if(editor_left_panel_mode == TILE_INFO) {
         if(editor_left_panel_displayed_object.tile != NULL) {
 
             float y = 1.0f;
 
             // Texture display
-        {
+            {
                 float texture_display_size = 0.7f * EDITOR_LEFT_PANEL_WIDTH;
                 float texture_side_padding = 0.15f * EDITOR_LEFT_PANEL_WIDTH;
                 float texture_top_padding = texture_side_padding / 2.0f;
@@ -616,19 +640,23 @@ void buffer_editor_left_panel() {
                 y -= texture_display_size * aspect_ratio + texture_top_padding;
             }
 
-            buffer_string("Texture :", EDITOR_LEFT_PANEL_PADDING, y, EDITOR_LEFT_PANEL_CONTENT_Z, my_font, TOP_LEFT);
+            buffer_string("Texture :", EDITOR_LEFT_PANEL_PADDING, y, EDITOR_LEFT_PANEL_CONTENT_Z, normal_font, TOP_LEFT);
 
             y -= EDITOR_LEFT_PANEL_ROW_HEIGHT;
 
             buffer_string(editor_left_panel_displayed_object.tile->texture,
                           EDITOR_LEFT_PANEL_WIDTH - EDITOR_LEFT_PANEL_PADDING, y,
-                          EDITOR_LEFT_PANEL_CONTENT_Z, my_font, BOTTOM_RIGHT);
+                          EDITOR_LEFT_PANEL_CONTENT_Z, normal_font, BOTTOM_RIGHT);
 
 //            y -= EDITOR_LEFT_PANEL_ROW_HEIGHT;
         }
     }
 
 }
+
+
+
+// Keeping this code for now, might be useful for dropdowns later on.
 
 /*void buffer_editor_click_menu() {
     EDITOR_CLICK_MENU_ROW_HEIGHT = EDITOR_MENU_PADDING * 2 * window_data.aspect_ratio + 14.0f / window_data.height; // @Temporary Current distance from baseline to top of capital letter is 14px
@@ -685,6 +713,9 @@ float displayed_frame_time = 0.0f;
 float summed_frame_rate = 0.0f;
 
 void buffer_debug_overlay() {
+
+    SpecificFont * normal_font = font_manager.get_font_at_size(my_font, 16.0f);
+
     float DEBUG_OVERLAY_PADDING = 0.004f;
 
     float DEBUG_OVERLAY_WIDTH = 0.15f;
@@ -735,10 +766,10 @@ void buffer_debug_overlay() {
 
         snprintf(buffer, sizeof(buffer), "%.3f", displayed_frame_time * 1000);
 
-        buffer_string("Frame Time (ms):", left_x, y, DEBUG_OVERLAY_Z, my_font, BOTTOM_LEFT);
+        buffer_string("Frame Time (ms):", left_x, y, DEBUG_OVERLAY_Z, normal_font, BOTTOM_LEFT);
         y -= DEBUG_OVERLAY_ROW_HEIGHT;
 
-        buffer_string(buffer, right_x, y, DEBUG_OVERLAY_Z, my_font, BOTTOM_RIGHT);
+        buffer_string(buffer, right_x, y, DEBUG_OVERLAY_Z, normal_font, BOTTOM_RIGHT);
         y -= DEBUG_OVERLAY_ROW_HEIGHT;
     }
 
@@ -750,11 +781,11 @@ void buffer_debug_overlay() {
 
         snprintf(buffer, sizeof(buffer), "%s", c_name);
 
-        buffer_string("Current World :", left_x, y, DEBUG_OVERLAY_Z, my_font, BOTTOM_LEFT);
+        buffer_string("Current World :", left_x, y, DEBUG_OVERLAY_Z, normal_font, BOTTOM_LEFT);
 
         y -= DEBUG_OVERLAY_ROW_HEIGHT;
 
-        buffer_string(buffer, right_x, y, DEBUG_OVERLAY_Z, my_font, BOTTOM_RIGHT);
+        buffer_string(buffer, right_x, y, DEBUG_OVERLAY_Z, normal_font, BOTTOM_RIGHT);
 
         y -= DEBUG_OVERLAY_ROW_HEIGHT;
     }
@@ -805,7 +836,7 @@ void buffer_editor_blocks_overlay(Room * room) {
         if(it->action_type == TELEPORT) {
             TeleportCollisionAction * teleport_action = (TeleportCollisionAction *) it->action;
 
-            buffer_string(teleport_action->target_room_name, quad.x0, quad.y0 + 0.02f, EDITOR_OVERLAY_Z , my_font);
+            buffer_string(teleport_action->target_room_name, quad.x0, quad.y0 + 0.02f, EDITOR_OVERLAY_Z , font_manager.get_font_at_size(my_font, 16.0f));
         }
 
         Color4f color;
@@ -837,9 +868,9 @@ void buffer_player() {
 // @Refactor with buffer_tiles
 void buffer_entity(Entity entity) {
         // Don't buffer is the entity is out of screen
-	if (is_out_of_screen(entity.position.x, entity.position.y, entity.size)) {
-		return;
-	}
+    if (is_out_of_screen(entity.position.x, entity.position.y, entity.size)) {
+        return;
+    }
 
     Vector2f tile_size;
 
@@ -863,9 +894,9 @@ void buffer_entity(Entity entity) {
 
 void buffer_tiles(Array<Tile> tiles) {
     for_array(tiles.data, tiles.count) {
-		Tile * tile = it;
+        Tile * tile = it;
 
-		if(is_out_of_screen(tile->position.x, tile->position.y, 1)) continue; // Implicit conversion to float.
+        if(is_out_of_screen(tile->position.x, tile->position.y, 1)) continue; // Implicit conversion to float.
 
         int col = tile->position.x;
         int row = tile->position.y;
@@ -885,15 +916,18 @@ void buffer_tiles(Array<Tile> tiles) {
 }
 
 
-float buffer_string(String text, float x, float y, float z,  Font * font, Alignement alignement) { // Default : alignement = BOTTOM_LEFT
+float buffer_string(String text, float x, float y, float z,  SpecificFont * font, Alignement alignement) { // Default : alignement = BOTTOM_LEFT
     char * c_text = to_c_string(text);
     scope_exit(free(c_text));
 
     return buffer_string(c_text, x, y, z, font, alignement);
 }
 
-// @Incomplete. Use is_out_of_screen     //// --17-11-16 @Outdated ? Say what now ?
-float buffer_string(char * text, float x, float y, float z,  Font * font, Alignement alignement) { // Default : alignement = BOTTOM_LEFT
+// @Incomplete. Use is_out_of_screen once the width and height are computed.
+float buffer_string(char * text, float x, float y, float z,  SpecificFont * font, Alignement alignement) { // Default : alignement = BOTTOM_LEFT
+
+
+
     float pixel_x = x * window_data.width;
     float pixel_y = y * window_data.height;
 
