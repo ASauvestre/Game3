@@ -25,7 +25,7 @@ PS_FUNC float4 PS(VS_OUTPUT input) : SV_TARGET
 {
     float alpha =  m_texture.Sample( m_sampler_state, input.tex_coord).a;
 
-    input.color.a = alpha;
+    input.color.a *= alpha;
 
     return input.color;
 }
