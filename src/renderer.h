@@ -17,6 +17,7 @@ void start_buffer();
 
 void add_vertex(float x, float y, float z, float u, float v);
 void add_vertex(float x, float y, float z, Color4f color);
+void add_vertex(float x, float y, float z, float u, float v, Color4f color);
 
 
 void end_buffer();

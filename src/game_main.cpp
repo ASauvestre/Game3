@@ -90,8 +90,8 @@ void handle_user_input();
 
 void buffer_editor_overlay();
 
-float buffer_string(String text, float x, float y, float z,  SpecificFont * font, Alignement alignement = BOTTOM_LEFT);
-float buffer_string(char * text, float x, float y, float z,  SpecificFont * font, Alignement alignement = BOTTOM_LEFT);
+float buffer_string(String text, float x, float y, float z,  SpecificFont * font, Alignement alignement = BOTTOM_LEFT, Color4f color = {1.0f, 1.0f, 1.0f, 1.0f});
+float buffer_string(char * text, float x, float y, float z,  SpecificFont * font, Alignement alignement = BOTTOM_LEFT, Color4f color = {1.0f, 1.0f, 1.0f, 1.0f});
 
 void buffer_player();
 
@@ -546,7 +546,7 @@ void get_objects_colliding_at(Vector2f point, Array<Object> * _objects) {
 void buffer_editor_left_panel() {
 
     SpecificFont * normal_font = font_manager.get_font_at_size(my_font, 16.0f);
-    SpecificFont * small_font = font_manager.get_font_at_size(my_font, 10.0f);
+    SpecificFont * small_font = font_manager.get_font_at_size(my_font, 12.0f);
 
     EDITOR_LEFT_PANEL_ROW_HEIGHT = EDITOR_LEFT_PANEL_PADDING * 2 * window_data.aspect_ratio + 16.0f / window_data.height; // @Temporary Current distance from baseline to top of capital letter is 12px
     EDITOR_LEFT_PANEL_BIG_ROW_HEIGHT = 2.0f * EDITOR_LEFT_PANEL_ROW_HEIGHT;
@@ -612,7 +612,8 @@ void buffer_editor_left_panel() {
                     float coord_text_x = x + EDITOR_LEFT_PANEL_WIDTH - padding_x;
                     float coord_text_y = y + ((EDITOR_LEFT_PANEL_BIG_ROW_HEIGHT - (16.0f / window_data.height)) / 2.0f) * window_data.aspect_ratio;
 
-                    buffer_string(coord_text, coord_text_x, coord_text_y, 1.0f, small_font, BOTTOM_RIGHT);
+                    Color4f small_text_color = {0.8f, 0.8f, 0.8f, 1.0f};
+                    buffer_string(coord_text, coord_text_x, coord_text_y, 1.0f, small_font, BOTTOM_RIGHT, small_text_color);
                 }
             }
 
@@ -916,7 +917,7 @@ void buffer_tiles(Array<Tile> tiles) {
 }
 
 
-float buffer_string(String text, float x, float y, float z,  SpecificFont * font, Alignement alignement) { // Default : alignement = BOTTOM_LEFT
+float buffer_string(String text, float x, float y, float z,  SpecificFont * font, Alignement alignement, Color4f color) { // Default : alignement = BOTTOM_LEFT, color = {1.0f, 1.0f, 1.0f, 1.0f}
     char * c_text = to_c_string(text);
     scope_exit(free(c_text));
 
@@ -924,9 +925,7 @@ float buffer_string(String text, float x, float y, float z,  SpecificFont * font
 }
 
 // @Incomplete. Use is_out_of_screen once the width and height are computed.
-float buffer_string(char * text, float x, float y, float z,  SpecificFont * font, Alignement alignement) { // Default : alignement = BOTTOM_LEFT
-
-
+float buffer_string(char * text, float x, float y, float z,  SpecificFont * font, Alignement alignement, Color4f color) { // Default : alignement = BOTTOM_LEFT, color = {1.0f, 1.0f, 1.0f, 1.0f}
 
     float pixel_x = x * window_data.width;
     float pixel_y = y * window_data.height;
@@ -995,10 +994,10 @@ float buffer_string(char * text, float x, float y, float z,  SpecificFont * font
                 x1 -= text_width;
             }
 
-            add_vertex(x0, y0, z, q.s0, q.t1);
-            add_vertex(x0, y1, z, q.s0, q.t0);
-            add_vertex(x1, y0, z, q.s1, q.t1);
-            add_vertex(x1, y1, z, q.s1, q.t0);
+            add_vertex(x0, y0, z, q.s0, q.t1, color);
+            add_vertex(x0, y1, z, q.s0, q.t0, color);
+            add_vertex(x1, y0, z, q.s1, q.t1, color);
+            add_vertex(x1, y1, z, q.s1, q.t0, color);
         }
         ++text;
     }

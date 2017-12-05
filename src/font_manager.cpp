@@ -80,7 +80,7 @@ SpecificFont * FontManager::load_font_at_specific_size(Font * font, int size) {
         log_print("load_font", "Tried creating font %s with size %d, but no TextureManager is assigned to the font manager, so the texture could not be registered", c_name, size);
     }
 
-    return NULL;
+	return NULL;
 }
 
 void FontManager::do_load_font(Font * font) {
@@ -96,6 +96,8 @@ void FontManager::create_placeholder(String name, String path) {
 
     font->name      = name;
     font->full_path = path;
+
+	font->specific_fonts.reset();
 
     this->table.add(name, font);
 }

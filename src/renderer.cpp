@@ -169,6 +169,17 @@ void start_buffer() {
     buffering = true;
 }
 
+void add_vertex(float x, float y, float z, float u, float v, Color4f color) {
+    assert(buffering == true);
+
+    Vector3f pos = {x, y, z};
+    Vector2f uv  = {u, v};
+
+    current_batch->positions.add(pos);
+    current_batch->texture_uvs.add(uv);
+    current_batch->colors.add(color);
+}
+
 void add_vertex(float x, float y, float z, float u, float v) {
     assert(buffering == true);
 
