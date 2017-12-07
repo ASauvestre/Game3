@@ -36,6 +36,7 @@ void TextureManager::create_placeholder(String name, String path) {
     texture->full_path     = path;
     texture->dirty         = false;
     texture->platform_info = NULL;
+    texture->bitmap        = NULL;
 
     this->table.add(name, texture);
 }
@@ -69,7 +70,7 @@ void TextureManager::do_load_texture(Texture * texture) {
         return;
     }
 
-    if(texture->dirty) { // @Cleanup, why is that the condition ? We should free the bitmap as long as it exists.
+    if(texture->bitmap) {
         free(texture->bitmap);
     }
 

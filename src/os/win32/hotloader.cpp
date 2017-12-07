@@ -208,8 +208,6 @@ static bool handle_notifications() {
 void hotloader_register_loose_files() {
     Array<char *> files = os_specific_list_all_files_in_directory("data");
 
-	
-
     for_array(files.data, files.count) {
         Asset asset;
         asset.full_path.data  = *it;

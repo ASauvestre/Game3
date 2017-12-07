@@ -157,10 +157,6 @@ static Camera main_camera;
 static GameMode game_mode;
 static bool debug_overlay_enabled = false;
 
-static bool editor_click_menu_open = false;
-static bool editor_click_menu_was_open = false;
-static Vector2f editor_click_menu_position;
-
 static TextureManager texture_manager;
 static FontManager font_manager;
 static ShaderManager shader_manager;
@@ -413,26 +409,15 @@ void handle_user_input() {
     }
 
     // Editor controls
-
-
-    //@Cleanup click menu, we don't use it anymore
     {
         if(game_mode == EDITOR) {
             if(!keyboard.mouse_left && previous_keyboard.mouse_left) { // Mouse left up
-               /* if(editor_click_menu_was_open) { // This mouse click should close the menu.
-                    editor_click_menu_was_open = false;
-                } else {*/
-                    // log_print("mouse_testing", "Mouse left pressed at (%0.6f, %0.6f) and released at (%0.6f, %0.6f)", keyboard.mouse_left_pressed_position.x, keyboard.mouse_left_pressed_position.y, keyboard.mouse_position.x, keyboard.mouse_position.y);
                     Vector2f game_space_position;
                     game_space_position.x = main_camera.size.x * (keyboard.mouse_left_pressed_position.x - 0.5f) + main_camera.offset.x;
                     game_space_position.y = main_camera.size.y * (keyboard.mouse_left_pressed_position.y - 0.5f) + main_camera.offset.y;
 
-
                     get_objects_colliding_at(game_space_position, &objects);
 
-                   // editor_click_menu_position = keyboard.mouse_position;
-
-                   // editor_click_menu_open = true;
                     if(objects.count > 0) {
                         editor_left_panel_mode = CLICK_SELECTION;
                    // }
@@ -441,42 +426,6 @@ void handle_user_input() {
 
             if (keyboard.mouse_left && !previous_keyboard.mouse_left) { // Mouse left down
                 Vector2f position = keyboard.mouse_position;
-
-
-                // @Cleanup
-                // @Cleanup
-                // if(editor_click_menu_open) {
-                //     if((position.x <= editor_click_menu_position.x + EDITOR_CLICK_MENU_WIDTH)
-                //     && (position.x >= editor_click_menu_position.x)
-                //     && (position.y >= editor_click_menu_position.y - EDITOR_CLICK_MENU_ROW_HEIGHT * objects.count)
-                //     && (position.y <= editor_click_menu_position.y)) {
-
-                //         int element_number = 0;
-                //         float element_y = editor_click_menu_position.y - position.y;
-
-                //         while(true) {
-                //             element_y -= EDITOR_CLICK_MENU_ROW_HEIGHT;
-
-                //             if(element_y < 0) break;
-
-                //             element_number++;
-                //         }
-
-                //         // log_print("editor_click_menu", "The element no. %d of the click menu was clicked", element_number);
-
-                //         // if(strcmp(objects[element_number].tile->texture, "grass.png") == 0) {
-                //         //     objects[element_number].tile->texture = "dirt_road.png"; // = m_texture_manager->find_texture("dirt_road.png");
-                //         // } else {
-                //         //     objects[element_number].tile->texture = "grass.png"; // = m_texture_manager->find_texture("dirt_road.png");
-                //         // }
-
-                //         editor_left_panel_displayed_object = objects.data[element_number];
-                //     }
-
-                //     objects.reset();
-                //     editor_click_menu_open     = false;
-                //     editor_click_menu_was_open = true;
-                // }
 
                 if (editor_left_panel_mode == CLICK_SELECTION) {
                     Vector2f click_position = keyboard.mouse_position;
@@ -505,21 +454,6 @@ void handle_user_input() {
 
                     objects.reset();
                 }
-
-
-                // @Cleanup
-                // @Cleanup
-                // @Cleanup
-
-                /*if (editor_click_menu_open) {
-                    if((position.x <= editor_click_menu_position.x + EDITOR_CLICK_MENU_WIDTH)
-                    && (position.x >= editor_click_menu_position.x)
-                    && (position.y >= editor_click_menu_position.y - EDITOR_CLICK_MENU_ROW_HEIGHT * objects.count)
-                    && (position.y <= editor_click_menu_position.y)) {
-                        editor_click_menu_open = false;
-                        editor_click_menu_was_open = true;
-                    }
-                }*/
             }
         }
     }
@@ -697,13 +631,8 @@ void buffer_editor_left_panel() {
 }*/
 
 void buffer_editor_overlay() {
-
     buffer_editor_blocks_overlay(current_room);
     buffer_editor_left_panel();
-
-   /* if(editor_click_menu_open) {
-        buffer_editor_click_menu();
-    }*/
 }
 
 int frame_time_print_counter = 0;
@@ -984,10 +913,10 @@ float buffer_string(char * text, float x, float y, float z,  SpecificFont * font
             float inverted_y_top   = (int)((pixel_y - height_below_bl) + 0.5f);
             float inverted_y_below = (int)((pixel_y - height_above_bl) + 0.5f);
 
-            float x0 = q.x0            /window_data.width;
-            float y0 = inverted_y_below/window_data.height;
-            float x1 = q.x1            /window_data.width;
-            float y1 = inverted_y_top  /window_data.height;
+            float x0 = q.x0            / window_data.width;
+            float y0 = inverted_y_below/ window_data.height;
+            float x1 = q.x1            / window_data.width;
+            float y1 = inverted_y_top  / window_data.height;
 
             if((alignement == TOP_RIGHT) || (alignement == BOTTOM_RIGHT)) {
                 x0 -= text_width;

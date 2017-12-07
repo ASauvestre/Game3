@@ -50,6 +50,10 @@ static bool frame_initted = false;
 static void load_graphics_dll() {
     void * graphics_library_dll = os_specific_load_dll("d3d_renderer.dll"); //@Robustness Handle failed loading (maybe try another dll or at least die gracefully)
 
+	if (!graphics_library_dll) {
+		log_print("Startup", "Could not load graphics dll, PANIC.");
+	}
+
     init_platform_renderer = (INIT_PLATFORM_RENDERER_FUNC) os_specific_get_address_from_dll(graphics_library_dll, "init_platform_renderer");
     compile_shader         = (COMPILE_SHADER_FUNC)         os_specific_get_address_from_dll(graphics_library_dll, "compile_shader");
     init_frame             = (INIT_FRAME)                  os_specific_get_address_from_dll(graphics_library_dll, "init_frame");

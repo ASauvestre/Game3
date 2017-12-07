@@ -97,7 +97,7 @@ void FontManager::create_placeholder(String name, String path) {
     font->name      = name;
     font->full_path = path;
 
-	font->specific_fonts.reset();
+	font->specific_fonts = {};
 
     this->table.add(name, font);
 }
