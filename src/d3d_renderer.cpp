@@ -375,7 +375,6 @@ void parse_input_layout_from_file(String file_name, String file_data, Shader * s
             continue;
         }
 
-
         String left = cut_until_space(&line);
 
         char * c_left = to_c_string(left);

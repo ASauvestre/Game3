@@ -50,69 +50,13 @@ void RoomManager::do_load_room(Room * room) {
 
     Array<String> lines = strip_comments_from_file(file_data);
 
+    int version = get_file_version_number(lines, c_name);
+
     Room new_room = *room;
 
     Array<Tile> new_tile_array;
     Array<CollisionBlock> new_collision_block_array;
 
-    // Parse version number @Refactor
-    {
-        if(lines.count <= 0) {
-            log_print("do_load_room", "Failed to parse %s. It's empty.", c_name);
-        }
-
-        String line = lines.data[0];
-
-        String token = cut_until_space(&line);
-
-        if(token != "VERSION") {
-            log_print("do_load_room", "Failed to parse the \"VERSION\" token at the beginning of the file %s. Please make sure it is there.", c_name);
-            return;
-        }
-
-        String version_token = cut_until_space(&line);
-
-
-        if(!version_token.count) {
-            log_print("do_load_room", "We parsed the \"VERSION\" token at the beginning of the file %s, but no version number was provided after it. Please make sure to put it on the same line.", c_name);
-            return;
-        }
-
-        if(line.count) {
-            char * c_line = to_c_string(line);
-            scope_exit(free(c_line));
-
-            log_print("do_load_room", "There is garbage left on the first line of file %s after the version number: %s", c_name, c_line);
-
-            return;
-        }
-
-
-        if(version_token.data[0] != '<' || version_token.data[version_token.count - 1] != '>') {
-            char * c_version_token = to_c_string(version_token);
-            scope_exit(free(c_version_token));
-
-            log_print("do_load_room", "The version number after \"VERSION\" in file %s needs to be surrounded with '<' and '>', instead, we got this : %s", c_name, c_version_token);
-
-            return;
-        }
-
-        // Isolating version number
-        push(&version_token);
-        version_token.count -= 1;
-
-        int version;
-        bool success = string_to_int(version_token, &version);
-
-        if(!success) {
-            char * c_version_token = to_c_string(version_token);
-            scope_exit(free(c_version_token));
-
-            log_print("do_load_room", "We expected a version number after \"VERSION\" in file %s, but instead we got this: %s.", c_name, c_version_token);
-
-            return;
-        }
-    }
 
     int line_number = 1;
     bool successfully_parsed_file = true;

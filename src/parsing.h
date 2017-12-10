@@ -52,6 +52,8 @@ String cut_until_space(String * string);
 int    cut_spaces(String * string);
 int    cut_trailing_spaces(String * string);
 
+int get_file_version_number(Array<String> lines, char * file_name);
+
 Array<String> strip_comments_from_file(String string, char * comment_marker = "//");
 
 void skip_empty_lines(String * string);

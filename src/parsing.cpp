@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "parsing.h"
@@ -10,6 +11,67 @@ bool string_compare(String s1, String s2) {
     if(s1.count != s2.count) return false;
 
     return (memcmp(s1.data, s2.data, s1.count) == 0);
+}
+
+int get_file_version_number(Array<String> lines, char * file_name) {
+    if(lines.count <= 0) {
+        log_print("get_file_version_number", "Failed to parse %s. It's empty.", file_name);
+    }
+
+    String line = lines.data[0];
+
+    String token = cut_until_space(&line);
+
+    if(token != "VERSION") {
+        log_print("get_file_version_number", "Failed to parse the \"VERSION\" token at the beginning of the file %s. Please make sure it is there.", file_name);
+
+        return -1;
+    }
+
+    String version_token = cut_until_space(&line);
+
+
+    if(!version_token.count) {
+        log_print("get_file_version_number", "We parsed the \"VERSION\" token at the beginning of the file %s, but no version number was provided after it. Please make sure to put it on the same line.", file_name);
+        return -1;
+    }
+
+    if(line.count) {
+        char * c_line = to_c_string(line);
+        scope_exit(free(c_line));
+
+        log_print("get_file_version_number", "There is garbage left on the first line of file %s after the version number: %s", file_name, c_line);
+
+        return -1;
+    }
+
+
+    if(version_token.data[0] != '<' || version_token.data[version_token.count - 1] != '>') {
+        char * c_version_token = to_c_string(version_token);
+        scope_exit(free(c_version_token));
+
+        log_print("get_file_version_number", "The version number after \"VERSION\" in file %s needs to be surrounded with '<' and '>', instead, we got this : %s", file_name, c_version_token);
+
+        return -1;
+    }
+
+    // Isolating version number
+    push(&version_token);
+    version_token.count -= 1;
+
+    int version;
+    bool success = string_to_int(version_token, &version);
+
+    if(!success) {
+        char * c_version_token = to_c_string(version_token);
+        scope_exit(free(c_version_token));
+
+        log_print("get_file_version_number", "We expected a version number after \"VERSION\" in file %s, but instead we got this: %s.", file_name, c_version_token);
+
+        return -1;
+    }
+
+    return version;
 }
 
 // @Cleanup, this didn't end up being used, maybe remove it ?
