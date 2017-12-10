@@ -160,6 +160,8 @@ bool string_to_int(String string, int * result) {
 
     char * c_string = to_c_string(string);
 
+	if (!c_string)  return false;
+
     *result = atoi(c_string);
 
     free(c_string);
