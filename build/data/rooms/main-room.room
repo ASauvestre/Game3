@@ -1,10 +1,12 @@
 VERSION <1>
 
+// We now handle comments !
+
 name main-room
 dimensions 14 5
 
 begin_tile 0 0
-    texture dirt_road.png
+    texture grass1.png
 end_tile
 begin_tile 1 0
     texture grass1.png

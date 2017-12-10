@@ -48,6 +48,8 @@ void RoomManager::do_load_room(Room * room) {
 
     if (!file_data.data) return; // Should have already errored.
 
+    Array<String> lines = strip_comments_from_file(file_data);
+
     Room new_room = *room;
 
     Array<Tile> new_tile_array;
@@ -55,10 +57,11 @@ void RoomManager::do_load_room(Room * room) {
 
     // Parse version number @Refactor
     {
-        String line = bump_to_next_line(&file_data);
-        if(line.count < 0) {
+        if(lines.count <= 0) {
             log_print("do_load_room", "Failed to parse %s. It's empty.", c_name);
         }
+
+        String line = lines.data[0];
 
         String token = cut_until_space(&line);
 
@@ -117,15 +120,17 @@ void RoomManager::do_load_room(Room * room) {
     int current_tile_index = -1;
     int current_collision_block_index = -1;
 
-    while(true) {
-        String line = bump_to_next_line(&file_data);
+    while(true) { // @Cleanup, for_array with offset ?
+
+        String line = lines.data[line_number];
         line_number += 1;
 
         if(line.count == -1) break; // EOF
 
+		cut_spaces(&line);
         if(line.count == 0) continue; // Empty line
 
-        String field_name = cut_until_space(&line);
+		String field_name = cut_until_space(&line);
 
         if(field_name == "name") {
             String arg = cut_until_space(&line);
@@ -599,6 +604,16 @@ void RoomManager::do_load_room(Room * room) {
         // @Incomplete
         // Those resets are going to mess up things that have pointers to this tile, eg. Editor panel.
         // Should mostly be solved after we start using a vector hash table (but problem of duplicates will remain.)
+
+
+        // See above. Instead of making a full on hash table, we could simply have a function that gives us f(x,y)->index.
+        // Instead of using a dynamic array, we have a fixed size x*y, which might be inefficient for some maps, but we probably
+        // don't care, since it's just an array of pointers that's only allocated once. We'd still have to be carefull about
+        // collisions, but do we expect to have multiple tiles on the same spot ? Should this be disallowed ? How would you even
+        // handle the draw order ? Should we move to 3D coords with f(x,y,z) -> index ? I'd say not for now, but keep in mind for
+        // the future.
+        //                                                                          -Adrien, 2017-12-09
+
         for_array(room->tiles.data, room->tiles.count) {
             free(it->texture.data);
         }

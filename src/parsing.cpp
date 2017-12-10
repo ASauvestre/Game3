@@ -3,6 +3,7 @@
 
 #include "parsing.h"
 #include "macros.h"
+#include "array.h"
 #include "math_m.h" // Vector parsing
 
 bool string_compare(String s1, String s2) {
@@ -49,6 +50,44 @@ String cut_until_space(String * string) {
     cut_spaces(string);
 
     return left;
+}
+
+Array<String> strip_comments_from_file(String string, char * comment_marker) { //@Default comment_marker = "//"
+
+	String orig_string = string;
+    Array<String> stripped_lines = {};
+
+    while(true) {
+        String line = bump_to_next_line(&string);
+
+        if(line.count == -1) {
+            stripped_lines.add(line);
+            break; // EOF
+        }
+
+        if(line.count == 0) {
+            stripped_lines.add(line);
+            continue; // Empty line
+        }
+
+        String full_line = line;
+        while(true) {
+            cut_spaces(&line);
+            String token = cut_until_space(&line);
+
+            if(token.count == 0) break; // End of line.
+
+            if(token == comment_marker) {
+                full_line.count = (token.data - full_line.data);
+				break;
+            }
+        }
+
+		stripped_lines.add(full_line);
+    }
+
+	string = orig_string;
+    return stripped_lines;
 }
 
 // @Speed we probably could make a faster version of this, but who cares?
@@ -151,11 +190,9 @@ int cut_trailing_spaces(String * string) {
 }
 
 String bump_to_next_line(String * string) {
-    cut_spaces(string);
-
     String line;
     line.data  = string->data;
-    line.count = 0;
+    line.count = cut_spaces(string);
 
     // Empty line / EOF check.
     {
@@ -198,7 +235,7 @@ String bump_to_next_line(String * string) {
         }
     }
 
-    cut_trailing_spaces(&line);
+    // cut_trailing_spaces(&line);
 
     return line;
 }

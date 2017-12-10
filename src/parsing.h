@@ -1,6 +1,7 @@
 #pragma once
 
 #include "string.h"
+#include "array.h"
 
 struct Vector2;
 struct Vector2f;
@@ -50,6 +51,8 @@ String cut_until_space(String * string);
 
 int    cut_spaces(String * string);
 int    cut_trailing_spaces(String * string);
+
+Array<String> strip_comments_from_file(String string, char * comment_marker = "//");
 
 void skip_empty_lines(String * string);
 String bump_to_next_line(String * string);
