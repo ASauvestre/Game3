@@ -6,7 +6,7 @@ void init_renderer(int width, int height, void * handle); // handle is an HWND u
 // Draw process
 void flush_buffers();
 
-void draw_frame();
+void draw_frame(int sync_interval);
 
 // Buffering process
 void set_shader(Shader * shader);

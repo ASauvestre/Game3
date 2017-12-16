@@ -16,7 +16,7 @@ extern "C" {
 
     DLLEXPORT void draw_batch(DrawBatch * batch);
 
-    DLLEXPORT void present_frame();
+    DLLEXPORT void present_frame(int sync_interval);
 
     // Shaders
     DLLEXPORT bool compile_shader(Shader * shader);

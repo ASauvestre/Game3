@@ -233,8 +233,8 @@ void init_frame() {
     d3d_dc->ClearDepthStencilView(depth_stencil_view, D3D11_CLEAR_DEPTH|D3D11_CLEAR_STENCIL, 1.0f, 0);
 }
 
-void present_frame() {
-    swap_chain->Present(0, 0);
+void present_frame(int sync_interval) {
+    swap_chain->Present(sync_interval, 0);
 }
 
 static void update_buffers(DrawBatch * batch) {

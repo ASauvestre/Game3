@@ -74,23 +74,6 @@ int get_file_version_number(Array<String> lines, char * file_name) {
     return version;
 }
 
-// @Cleanup, this didn't end up being used, maybe remove it ?
-void skip_empty_lines(String * string) {
-    String line;
-    String prev_string;
-
-    while(!line.count) {
-        prev_string = *string;
-        line = bump_to_next_line(string);
-
-        if(line.count < 0) return;
-    }
-
-    *string = prev_string;
-
-    return;
-}
-
 // Right-side inclusive
 String cut_until_char(char c, String * string) {
     String left;

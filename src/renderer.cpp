@@ -17,7 +17,7 @@ typedef void (*INIT_PLATFORM_RENDERER_FUNC) (Vector2f, void*);
 typedef bool (*COMPILE_SHADER_FUNC)         (Shader*);
 typedef bool (*INIT_FRAME)                  ();
 typedef bool (*DRAW_BATCH)                  (DrawBatch*);
-typedef bool (*PRESENT_FRAME)               ();
+typedef bool (*PRESENT_FRAME)               (int);
 
 INIT_PLATFORM_RENDERER_FUNC init_platform_renderer;
 COMPILE_SHADER_FUNC compile_shader;
@@ -71,10 +71,10 @@ void init_renderer(int width, int height, void * handle) {
     init_platform_renderer(rendering_resolution, handle);
 }
 
-void draw_frame() {
+void draw_frame(int sync_interval) {
     flush_buffers();
 
-    present_frame();
+    present_frame(sync_interval);
     frame_initted = false;
 }
 

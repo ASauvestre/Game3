@@ -131,8 +131,6 @@ const float TILES_Z                        = 0.0000001f;
 const float RANGE_ENTITY_Z                 = 0.9999900f;
 const float MIN_ENTITY_Z                   = 0.0000002f;
 
-const int TARGET_FPS = 60;
-
 const int MAX_NUMBER_ENTITIES = 1;
 
 // Globals
@@ -1008,14 +1006,14 @@ void update_time() {
     float current_dt = now - last_time;
 
     // @Incomplete, needs to sync up to GPU maybe. Or just use usual Vsync.
-    if (window_data.locked_fps) {
-        while (current_dt < 1.0f / TARGET_FPS) {
-            os_specific_sleep(0);
+    // if (window_data.locked_fps) {
+    //     while (current_dt < 1.0f / TARGET_FPS) {
+    //         os_specific_sleep(0);
 
-            now = os_specific_get_time();
-            current_dt = now - last_time;
-        }
-    }
+    //         now = os_specific_get_time();
+    //         current_dt = now - last_time;
+    //     }
+    // }
 
     window_data.current_dt = current_dt;
     window_data.current_time = now;
@@ -1090,7 +1088,7 @@ void main() {
 
         game();
 
-        draw_frame();
+        draw_frame(window_data.locked_fps);
 
         check_hotloader_modifications();
         texture_manager.perform_reloads();
