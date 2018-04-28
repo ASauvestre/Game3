@@ -1,7 +1,7 @@
 #include "math_m.h"
 
 // Structs
-struct Keyboard {
+struct Keyboard { //@Cleanup, should probably break up Keyboard and Mouse
     bool key_left  = false;
     bool key_right = false;
     bool key_up    = false;
@@ -13,6 +13,8 @@ struct Keyboard {
     bool key_F1 = false;
     bool key_F2 = false;
     bool key_F3 = false;
+
+    bool key_ESC = false;
 
     // Mouse input
     Vector2f mouse_position;

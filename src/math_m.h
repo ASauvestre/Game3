@@ -1,5 +1,7 @@
 #pragma once
 
+const double TAU = 6.283185307179586;
+
 struct Quad;
 struct Vector2;
 struct Vector2f;
@@ -39,3 +41,5 @@ struct Vector3f {
     float y;
     float z;
 };
+
+double lerp(double a, double b, double t);

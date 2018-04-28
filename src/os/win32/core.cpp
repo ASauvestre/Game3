@@ -87,6 +87,7 @@ LRESULT CALLBACK WndProc(HWND window_handle, UINT message, WPARAM w_param, LPARA
                     break;
                 }
                 case VK_ESCAPE : {
+                    local_keyboard.key_ESC = true;
                     break;
                 }
                 default : {
@@ -137,7 +138,7 @@ LRESULT CALLBACK WndProc(HWND window_handle, UINT message, WPARAM w_param, LPARA
                     break;
                 }
                 case VK_ESCAPE : {
-                    SendMessage(window_handle, WM_QUIT, NULL, NULL);
+                    local_keyboard.key_ESC = false;
                     break;
                 }
                 default : {
