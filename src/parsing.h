@@ -6,7 +6,7 @@
 struct Vector2;
 struct Vector2f;
 
-struct String { // @ Cleanup, move out of here.
+struct String { // @Cleanup, move out of here.
     char * data  = NULL;
     int    count = 0;
 

@@ -11,6 +11,7 @@
 
 #include "os/layer.h"
 #include "os/win32/hotloader.h" // @Temporary, I'd like to move the hotloader out of win32.
+#include "os/win32/sound_player.h" // @Temporary
 
 #include "macros.h"
 
@@ -38,6 +39,7 @@ struct WindowData {
 enum GameMode {
     TITLE_SCREEN,
     GAME,
+    MENU,
     EDITOR
 };
 
@@ -101,6 +103,8 @@ void buffer_entity(Entity entity);
 
 void buffer_tiles(Array<Tile> tile);
 
+void buffer_menu();
+
 void buffer_debug_overlay();
 
 void buffer_editor_blocks_overlay(Room * room);
@@ -126,6 +130,8 @@ const float DEBUG_OVERLAY_BACKGROUND_Z     = 0.9999998f;
 const float EDITOR_LEFT_PANEL_CONTENT_Z    = 0.9999989f;
 const float EDITOR_LEFT_PANEL_BACKGROUND_Z = 0.9999988f;
 const float EDITOR_OVERLAY_Z               = 0.9999987f;
+
+const float MENU_BACKGROUND_Z              = 0.9999979f;
 
 const float TILES_Z                        = 0.0000001f;
 const float RANGE_ENTITY_Z                 = 0.9999900f;
@@ -224,6 +230,10 @@ void game() {
 
     buffer_player();
 
+    if(game_mode == MENU) {
+        buffer_menu();
+    }
+
     // Editor overlays
     if(game_mode == EDITOR) {
         buffer_editor_overlay();
@@ -245,7 +255,8 @@ float EDITOR_CLICK_MENU_ROW_HEIGHT; // @Temporary Value assigned in buffer_edito
 enum EditorLeftPanelMode {
     MAIN,
     CLICK_SELECTION,
-    TILE_INFO,
+    TILE_INFO, //@Cleanup, deprecated once ENTITY_INFO works
+    ENTITY_INFO,
 };
 
 float EDITOR_LEFT_PANEL_WIDTH = 0.18f;
@@ -266,7 +277,18 @@ void switch_to_room(Room * room) {
     current_room = room;
 }
 
+GameMode previous_game_mode = TITLE_SCREEN;
+
 void handle_user_input() {
+
+    if(keyboard.key_ESC && !previous_keyboard.key_ESC) {
+        if(game_mode == MENU) game_mode = previous_game_mode;
+        else {
+            previous_game_mode = game_mode;
+            game_mode = MENU;
+        }
+    }
+
     if(keyboard.key_F1 && !previous_keyboard.key_F1) {
         if(game_mode == GAME) game_mode = EDITOR;
         else if(game_mode == EDITOR) game_mode = GAME;
@@ -410,15 +432,14 @@ void handle_user_input() {
     {
         if(game_mode == EDITOR) {
             if(!keyboard.mouse_left && previous_keyboard.mouse_left) { // Mouse left up
-                    Vector2f game_space_position;
-                    game_space_position.x = main_camera.size.x * (keyboard.mouse_left_pressed_position.x - 0.5f) + main_camera.offset.x;
-                    game_space_position.y = main_camera.size.y * (keyboard.mouse_left_pressed_position.y - 0.5f) + main_camera.offset.y;
+                Vector2f game_space_position;
+                game_space_position.x = main_camera.size.x * (keyboard.mouse_left_pressed_position.x - 0.5f) + main_camera.offset.x;
+                game_space_position.y = main_camera.size.y * (keyboard.mouse_left_pressed_position.y - 0.5f) + main_camera.offset.y;
 
-                    get_objects_colliding_at(game_space_position, &objects);
+                get_objects_colliding_at(game_space_position, &objects);
 
-                    if(objects.count > 0) {
-                        editor_left_panel_mode = CLICK_SELECTION;
-                   // }
+                if(objects.count > 0) {
+                    editor_left_panel_mode = CLICK_SELECTION;
                 }
             }
 
@@ -455,6 +476,12 @@ void handle_user_input() {
             }
         }
     }
+}
+
+void buffer_menu() {
+    // Buffer background
+    buffer_colored_quad(0.0f, 0.0f, BOTTOM_LEFT, 1.0f, 1.0f, MENU_BACKGROUND_Z, {1.0f, 1.0f, 0.0f, 0.9f});
+
 }
 
 void get_objects_colliding_at(Vector2f point, Array<Object> * _objects) {
@@ -709,7 +736,7 @@ void buffer_debug_overlay() {
 
         snprintf(buffer, sizeof(buffer), "%s", c_name);
 
-        buffer_string("Current World :", left_x, y, DEBUG_OVERLAY_Z, normal_font, BOTTOM_LEFT);
+        buffer_string("Current World:", left_x, y, DEBUG_OVERLAY_Z, normal_font, BOTTOM_LEFT);
 
         y -= DEBUG_OVERLAY_ROW_HEIGHT;
 
@@ -1057,6 +1084,8 @@ void main() {
         window_data.handle = os_specific_create_window(window_data.width, window_data.height, window_name);
     }
 
+    win32_init_sound_player(window_data.handle);
+
     init_renderer(window_data.width, window_data.height, window_data.handle); // Has to happen before we load the shaders
 
     init_managers();
@@ -1077,6 +1106,8 @@ void main() {
 
     log_print("perf_counter", "Startup time : %.3f seconds", os_specific_get_time());
 
+    win32_play_sound_wave(400);
+    bool test = false;
     bool should_quit = false;
     while(!should_quit) {
         update_time();
@@ -1089,6 +1120,10 @@ void main() {
         game();
 
         draw_frame(window_data.locked_fps);
+
+        //win32_play_sounds(window_data.current_dt);
+
+
 
         check_hotloader_modifications();
         texture_manager.perform_reloads();

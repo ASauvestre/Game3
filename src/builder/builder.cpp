@@ -41,17 +41,14 @@ int main(int argc, char * argv[]) {
 
     sprintf(flags, "%s %s /D %s /nologo /Zi /EHsc /I ../src", (is_min_build ? "/Gm":""), (is_release_build ? "/Ox /GL /Gw":"/Od"), PLATFORM);
 
-
     printf("\n=================== Game3 Build System ===================\n\n");
 
-    printf("Debug:       %s\n", B2S(!is_release_build));
-    printf("Incremental: %s\n", B2S(is_min_build));
-    printf("DLLs:        %s\n", B2S(do_dlls));
-    printf("Cleanup:     %s\n", B2S(do_cleanup));
+    printf("Debug::::::::%s\n", B2S(!is_release_build));
+    printf("Incremental::%s\n", B2S(is_min_build));
+    printf("DLLs:::::::::%s\n", B2S(do_dlls));
+    printf("Cleanup::::::%s\n", B2S(do_cleanup));
 
-     printf("\n\n");
-
-
+    printf("\n\n");
 
     if(do_dlls) {
         printf("--------------------- Compiling DLLs ---------------------\n");
@@ -80,7 +77,7 @@ int main(int argc, char * argv[]) {
         printf("------------------ Compiling Main files ------------------\n");
 
         char command[2048];
-        sprintf(command, "cl /LD %s /Fewin32_game ^ \
+        sprintf(command, "cl %s /Fewin32_game ^ \
         ../src/game_main.cpp             ^ \
         ../src/renderer.cpp              ^ \
         ../src/asset_manager.cpp         ^ \
