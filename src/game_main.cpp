@@ -47,7 +47,12 @@ enum Alignement {
     TOP_LEFT,
     TOP_RIGHT,
     BOTTOM_RIGHT,
-    BOTTOM_LEFT
+    BOTTOM_LEFT,
+    CENTER_LEFT,
+    CENTER_RIGHT,
+    TOP_CENTER,
+    BOTTOM_CENTER,
+    CENTER
 };
 
 struct Entity {
@@ -480,7 +485,10 @@ void handle_user_input() {
 
 void buffer_menu() {
     // Buffer background
-    buffer_colored_quad(0.0f, 0.0f, BOTTOM_LEFT, 1.0f, 1.0f, MENU_BACKGROUND_Z, {1.0f, 1.0f, 0.0f, 0.9f});
+    buffer_colored_quad(0.0f, 0.0f, BOTTOM_LEFT, 1.0f, 1.0f, MENU_BACKGROUND_Z, {0.0f, 1.0f, 0.0f, 0.6f});
+
+    SpecificFont * menu_title_font = font_manager.get_font_at_size(my_font, 40.0f);
+    buffer_string("Game3", 0.5f, 0.8f, 1.0f, menu_title_font, TOP_CENTER);
 
 }
 
@@ -924,7 +932,7 @@ float buffer_string(char * text, float x, float y, float z,  SpecificFont * font
     float text_height = 0.0f;
 
     // Compute height
-    if(alignement == TOP_RIGHT || alignement == TOP_LEFT) {
+    if(alignement == TOP_RIGHT || alignement == TOP_LEFT || alignement == TOP_CENTER) {
         float zero_x = 0.0f;
         float zero_y = 0.0f;
 
@@ -934,6 +942,18 @@ float buffer_string(char * text, float x, float y, float z,  SpecificFont * font
         text_height = (float) ((int)(q.y0 + 0.5f)) / window_data.height;
 
         pixel_y += text_height * window_data.height;
+    }
+
+    if(alignement == CENTER_RIGHT || alignement == CENTER_LEFT || alignement == CENTER) { // Horizontal centering
+        float zero_x = 0.0f;
+        float zero_y = 0.0f;
+
+        stbtt_aligned_quad q;
+        stbtt_GetBakedQuad(font->char_data, font->texture->width, font->texture->height, 'A' - 32, &zero_x, &zero_y, &q, 1); // 'A' is used as a reference character
+
+        text_height = (float) ((int)(q.y0 + 0.5f)) / window_data.height;
+
+        pixel_y += text_height * window_data.height / 2;
     }
 
     // Compute width
@@ -979,9 +999,14 @@ float buffer_string(char * text, float x, float y, float z,  SpecificFont * font
             float x1 = q.x1            / window_data.width;
             float y1 = inverted_y_top  / window_data.height;
 
-            if((alignement == TOP_RIGHT) || (alignement == BOTTOM_RIGHT)) {
+            if((alignement == TOP_RIGHT) || (alignement == BOTTOM_RIGHT) || (alignement == CENTER_RIGHT)) {
                 x0 -= text_width;
                 x1 -= text_width;
+            }
+
+            if((alignement == TOP_CENTER) || (alignement == BOTTOM_CENTER) || (alignement == CENTER)) {
+                x0 -= text_width/2;
+                x1 -= text_width/2;
             }
 
             add_vertex(x0, y0, z, q.s0, q.t1, color);
