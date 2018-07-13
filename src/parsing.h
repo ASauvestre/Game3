@@ -68,6 +68,7 @@ bool string_to_v2f(String string, Vector2f * result);
 
 char * to_c_string(String string);
 String to_string(char * c_string);
+String to_string_copy(char * c_string);
 
 String find_char_from_right(char c, String string);
 String find_char_from_left (char c, String string);

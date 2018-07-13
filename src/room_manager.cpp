@@ -121,9 +121,9 @@ void RoomManager::do_load_room(Room * room) {
                 continue;
             }
 
-            Vector2 coords;
+            Vector2f coords;
 
-            bool success = string_to_v2(line, &coords);
+            bool success = string_to_v2f(line, &coords);
 
             if(!success) {
                 char * c_line = to_c_string(line);

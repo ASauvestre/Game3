@@ -152,7 +152,7 @@ static Keyboard previous_keyboard;
 static float last_time = 0.0f;
 
 static Entity player;
-static Entity entities[MAX_NUMBER_ENTITIES];
+static Entity entities[MAX_NUMBER_ENTITIES]; // @Cleanup, use Array instead?
 
 static Room * current_room;
 
@@ -205,7 +205,7 @@ void init_game() {
         for(int i = 0; i < array_size(entities); i++) {
             char name [64];
             snprintf(name, 64, "tree%d", i);
-            entities[i].name = to_string(name);
+            entities[i].name = to_string_copy(name);
             entities[i].position.x = (int)(8.9*i)%(current_room->dimensions.width-2) + 5;
             entities[i].position.y = (int)(2.3*i)%(current_room->dimensions.height-2) + 1;
             entities[i].texture = to_string("tree.png");
@@ -488,7 +488,7 @@ void get_objects_colliding_at(Vector2f point, Array<Object> * _objects) {
     // @Optimisation We can probably infer the tiles we collide with from the player's x and y coordinates and information about the room's size
     for(int i = 0; i < current_room->tiles.count; i++) {
         Tile * tile = &current_room->tiles.data[i];
-        Vector2 position = tile->position;
+        Vector2f position = tile->position;
 
         if((point.x <= position.x + 1) && (point.x >= position.x) &&
            (point.y <= position.y + 1) && (point.y >= position.y)) {
@@ -496,6 +496,20 @@ void get_objects_colliding_at(Vector2f point, Array<Object> * _objects) {
 
             obj.type = TILE;
             obj.tile = tile;
+
+            _objects->add(obj);
+        }
+    }
+
+    for(int i = 0; i < array_size(entities); i++) {
+        Entity * entity = &entities[i];
+        if((point.x <= entity->position.x + entity->size) && (point.x >= entity->position.x) &&
+           (point.y <= entity->position.y + entity->size) && (point.y >= entity->position.y)) {
+
+            Object obj;
+
+            obj.type = ENTITY;
+            obj.entity = entity;
 
             _objects->add(obj);
         }
@@ -541,39 +555,53 @@ void buffer_editor_left_panel() {
 
             // Buffer texture
             {
+                String texture;
                 if(objects.data[i].type == TILE) {
-
-                    float texture_x = x + padding_x;
-                    float texture_y = y + padding_y;
-
-                    float texture_width = EDITOR_LEFT_PANEL_BIG_ROW_HEIGHT / window_data.aspect_ratio - 2 * padding_x;
-                    float texture_height = EDITOR_LEFT_PANEL_BIG_ROW_HEIGHT - 2 * padding_y;
-                    buffer_textured_quad(texture_x, texture_y, BOTTOM_LEFT, texture_width, texture_height, 1.0f, objects.data[i].tile->texture); // @Cleanup fix depth
+                    texture = objects.data[i].tile->texture;
+                } else if(objects.data[i].type == ENTITY) {
+                    texture = objects.data[i].entity->texture;
                 }
+
+                float texture_x = x + padding_x;
+                float texture_y = y + padding_y;
+
+                float texture_width = EDITOR_LEFT_PANEL_BIG_ROW_HEIGHT / window_data.aspect_ratio - 2 * padding_x;
+                float texture_height = EDITOR_LEFT_PANEL_BIG_ROW_HEIGHT - 2 * padding_y;
+                buffer_textured_quad(texture_x, texture_y, BOTTOM_LEFT, texture_width, texture_height, 1.0f, texture); // @Cleanup fix depth
+
             }
 
             // Buffer string
             {
+                Vector2f object_position;
                 if(objects.data[i].type == TILE) {
                     // log_print("editor_mouse_collision", "Colliding with object of type TILE at (%d, %d)", objects[i].tile->local_x, objects[i].tile->local_y);
-                    Vector2 tile_position = objects.data[i].tile->position;
-
-                    char coord_text[64];
-                    snprintf(coord_text, 64, "(%d,%d)", tile_position.x, tile_position.y);
 
                     float main_text_x = x + EDITOR_LEFT_PANEL_BIG_ROW_HEIGHT / window_data.aspect_ratio;
                     float main_text_y = y + ((EDITOR_LEFT_PANEL_BIG_ROW_HEIGHT - (16.0f / window_data.height)) / 2.0f) * window_data.aspect_ratio;
 
-
-
                     buffer_string("Tile", main_text_x, main_text_y, 1.0f, normal_font, BOTTOM_LEFT); // @Cleanup fix depth
 
-                    float coord_text_x = x + EDITOR_LEFT_PANEL_WIDTH - padding_x;
-                    float coord_text_y = y + ((EDITOR_LEFT_PANEL_BIG_ROW_HEIGHT - (16.0f / window_data.height)) / 2.0f) * window_data.aspect_ratio;
+                    object_position = objects.data[i].tile->position;
 
-                    Color4f small_text_color = {0.8f, 0.8f, 0.8f, 1.0f};
-                    buffer_string(coord_text, coord_text_x, coord_text_y, 1.0f, small_font, BOTTOM_RIGHT, small_text_color);
+                } else if(objects.data[i].type == ENTITY) {
+                    float main_text_x = x + EDITOR_LEFT_PANEL_BIG_ROW_HEIGHT / window_data.aspect_ratio;
+                    float main_text_y = y + ((EDITOR_LEFT_PANEL_BIG_ROW_HEIGHT - (16.0f / window_data.height)) / 2.0f) * window_data.aspect_ratio;
+
+                    buffer_string(objects.data[i].entity->name, main_text_x, main_text_y, 1.0f, normal_font, BOTTOM_LEFT); // @Cleanup fix depth
+
+                    object_position = objects.data[i].entity->position;
                 }
+
+
+                char coord_text[64];
+                snprintf(coord_text, 64, "(%.1f,%.1f)", object_position.x, object_position.y);
+
+                float coord_text_x = x + EDITOR_LEFT_PANEL_WIDTH - padding_x;
+                float coord_text_y = y + ((EDITOR_LEFT_PANEL_BIG_ROW_HEIGHT - (16.0f / window_data.height)) / 2.0f) * window_data.aspect_ratio;
+
+                Color4f small_text_color = {0.8f, 0.8f, 0.8f, 1.0f};
+                buffer_string(coord_text, coord_text_x, coord_text_y, 1.0f, small_font, BOTTOM_RIGHT, small_text_color);
             }
 
             y -= EDITOR_LEFT_PANEL_BIG_ROW_HEIGHT;
@@ -583,6 +611,8 @@ void buffer_editor_left_panel() {
 
             float y = 1.0f;
 
+            String texture;
+
             // Texture display
             {
                 float texture_display_size = 0.7f * EDITOR_LEFT_PANEL_WIDTH;
@@ -591,7 +621,13 @@ void buffer_editor_left_panel() {
 
                 float aspect_ratio = window_data.aspect_ratio;
 
-                String texture = editor_left_panel_displayed_object.tile->texture;
+
+
+                if(editor_left_panel_displayed_object.type == TILE) {
+                    texture = editor_left_panel_displayed_object.tile->texture;
+                } else if(editor_left_panel_displayed_object.type == ENTITY) {
+                    texture = editor_left_panel_displayed_object.entity->texture;
+                }
 
                 y -= texture_top_padding;
 
@@ -604,7 +640,7 @@ void buffer_editor_left_panel() {
 
             y -= EDITOR_LEFT_PANEL_ROW_HEIGHT;
 
-            buffer_string(editor_left_panel_displayed_object.tile->texture,
+            buffer_string(texture,
                           EDITOR_LEFT_PANEL_WIDTH - EDITOR_LEFT_PANEL_PADDING, y,
                           EDITOR_LEFT_PANEL_CONTENT_Z, normal_font, BOTTOM_RIGHT);
 

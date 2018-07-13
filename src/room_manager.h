@@ -31,10 +31,10 @@ struct CollisionBlock {
 
 struct Tile {
     String texture;
-    Vector2 position;
+    Vector2f position;
 
     int room_target_id;         // Used if type is SWITCH_ROOM
-    Vector2 target_tile_coords; // Used if type is SWITCH_ROOM
+    Vector2f target_tile_coords; // Used if type is SWITCH_ROOM
 };
 
 struct Room : Asset{

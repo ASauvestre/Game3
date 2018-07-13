@@ -211,6 +211,17 @@ char * to_c_string(String string) { // @Incomplete take pointer here ?
     return c;
 }
 
+String to_string_copy(char * c_string) {
+    String string;
+
+    string.count = strlen(c_string); // @Think, should we copy here ?
+
+    string.data = (char *) malloc(string.count);
+    memcpy(string.data, c_string, string.count);
+
+    return string;
+}
+
 String to_string(char * c_string) {
     String string;
     string.data = c_string;
