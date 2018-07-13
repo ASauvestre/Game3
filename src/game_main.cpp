@@ -541,7 +541,7 @@ void buffer_editor_left_panel() {
     if(editor_left_panel_mode == CLICK_SELECTION) {
 
         float x = 0.0f;
-        float y = 1.0f - EDITOR_LEFT_PANEL_BIG_ROW_HEIGHT;
+        float y = 1.0f;
 
         for(int i = 0; i < objects.count; i++) {
             // Buffer menu background
@@ -553,7 +553,7 @@ void buffer_editor_left_panel() {
                     color = { 0.6f, 0.6f, 0.7f, 0.7f };
                 }
 
-                buffer_colored_quad(x, y, BOTTOM_LEFT, EDITOR_LEFT_PANEL_WIDTH, EDITOR_LEFT_PANEL_BIG_ROW_HEIGHT, EDITOR_LEFT_PANEL_CONTENT_Z, color);
+                buffer_colored_quad(x, y, TOP_LEFT, EDITOR_LEFT_PANEL_WIDTH, EDITOR_LEFT_PANEL_BIG_ROW_HEIGHT, EDITOR_LEFT_PANEL_CONTENT_Z, color);
 
                 // log_print("buffer_editor_left_panel", "Buffering row at %f, %f", x, y);
             }
@@ -571,11 +571,11 @@ void buffer_editor_left_panel() {
                 }
 
                 float texture_x = x + padding_x;
-                float texture_y = y + padding_y;
+                float texture_y = y - padding_y;
 
                 float texture_width = EDITOR_LEFT_PANEL_BIG_ROW_HEIGHT / window_data.aspect_ratio - 2 * padding_x;
                 float texture_height = EDITOR_LEFT_PANEL_BIG_ROW_HEIGHT - 2 * padding_y;
-                buffer_textured_quad(texture_x, texture_y, BOTTOM_LEFT, texture_width, texture_height, 1.0f, texture); // @Cleanup fix depth
+                buffer_textured_quad(texture_x, texture_y, TOP_LEFT, texture_width, texture_height, 1.0f, texture); // @Cleanup fix depth
 
             }
 
@@ -586,17 +586,17 @@ void buffer_editor_left_panel() {
                     // log_print("editor_mouse_collision", "Colliding with object of type TILE at (%d, %d)", objects[i].tile->local_x, objects[i].tile->local_y);
 
                     float main_text_x = x + EDITOR_LEFT_PANEL_BIG_ROW_HEIGHT / window_data.aspect_ratio;
-                    float main_text_y = y + ((EDITOR_LEFT_PANEL_BIG_ROW_HEIGHT - (16.0f / window_data.height)) / 2.0f) * window_data.aspect_ratio;
+                    float main_text_y = y - (EDITOR_LEFT_PANEL_BIG_ROW_HEIGHT / 2.0f);
 
-                    buffer_string("Tile", main_text_x, main_text_y, 1.0f, normal_font, BOTTOM_LEFT); // @Cleanup fix depth
+                    buffer_string("Tile", main_text_x, main_text_y, 1.0f, normal_font, CENTER_LEFT); // @Cleanup fix depth
 
                     object_position = objects.data[i].tile->position;
 
                 } else if(objects.data[i].type == ENTITY) {
                     float main_text_x = x + EDITOR_LEFT_PANEL_BIG_ROW_HEIGHT / window_data.aspect_ratio;
-                    float main_text_y = y + ((EDITOR_LEFT_PANEL_BIG_ROW_HEIGHT - (16.0f / window_data.height)) / 2.0f) * window_data.aspect_ratio;
+                    float main_text_y = y - (EDITOR_LEFT_PANEL_BIG_ROW_HEIGHT / 2.0f);
 
-                    buffer_string(objects.data[i].entity->name, main_text_x, main_text_y, 1.0f, normal_font, BOTTOM_LEFT); // @Cleanup fix depth
+                    buffer_string(objects.data[i].entity->name, main_text_x, main_text_y, 1.0f, normal_font, CENTER_LEFT); // @Cleanup fix depth
 
                     object_position = objects.data[i].entity->position;
                 }
@@ -606,10 +606,10 @@ void buffer_editor_left_panel() {
                 snprintf(coord_text, 64, "(%.1f,%.1f)", object_position.x, object_position.y);
 
                 float coord_text_x = x + EDITOR_LEFT_PANEL_WIDTH - padding_x;
-                float coord_text_y = y + ((EDITOR_LEFT_PANEL_BIG_ROW_HEIGHT - (16.0f / window_data.height)) / 2.0f) * window_data.aspect_ratio;
+                float coord_text_y = y - (EDITOR_LEFT_PANEL_BIG_ROW_HEIGHT / 2.0f);
 
                 Color4f small_text_color = {0.8f, 0.8f, 0.8f, 1.0f};
-                buffer_string(coord_text, coord_text_x, coord_text_y, 1.0f, small_font, BOTTOM_RIGHT, small_text_color);
+                buffer_string(coord_text, coord_text_x, coord_text_y, 1.0f, small_font, CENTER_RIGHT, small_text_color);
             }
 
             y -= EDITOR_LEFT_PANEL_BIG_ROW_HEIGHT;
@@ -644,13 +644,15 @@ void buffer_editor_left_panel() {
                 y -= texture_display_size * aspect_ratio + texture_top_padding;
             }
 
-            buffer_string("Texture :", EDITOR_LEFT_PANEL_PADDING, y, EDITOR_LEFT_PANEL_CONTENT_Z, normal_font, TOP_LEFT);
+            y -= EDITOR_LEFT_PANEL_ROW_HEIGHT / 2;
+
+            buffer_string("Texture :", EDITOR_LEFT_PANEL_PADDING, y, EDITOR_LEFT_PANEL_CONTENT_Z, normal_font, CENTER_LEFT);
 
             y -= EDITOR_LEFT_PANEL_ROW_HEIGHT;
 
             buffer_string(texture,
                           EDITOR_LEFT_PANEL_WIDTH - EDITOR_LEFT_PANEL_PADDING, y,
-                          EDITOR_LEFT_PANEL_CONTENT_Z, normal_font, BOTTOM_RIGHT);
+                          EDITOR_LEFT_PANEL_CONTENT_Z, normal_font, CENTER_RIGHT);
 
 //            y -= EDITOR_LEFT_PANEL_ROW_HEIGHT;
         }
@@ -758,17 +760,17 @@ void buffer_debug_overlay() {
 
     float left_x  = 1.0f - DEBUG_OVERLAY_WIDTH + DEBUG_OVERLAY_PADDING;
     float right_x = 1.0f - DEBUG_OVERLAY_PADDING;
-    float y       = 1.0f - DEBUG_OVERLAY_ROW_HEIGHT + DEBUG_OVERLAY_PADDING * window_data.aspect_ratio;
+    float y       = 1.0f - DEBUG_OVERLAY_ROW_HEIGHT / 2;
     // Buffer Frame time (text must always be buffered last if it has AA / transparency);
     {
         char buffer[64];
 
         snprintf(buffer, sizeof(buffer), "%.3f", displayed_frame_time * 1000);
 
-        buffer_string("Frame Time (ms):", left_x, y, DEBUG_OVERLAY_Z, normal_font, BOTTOM_LEFT);
+        buffer_string("Frame Time (ms):", left_x, y, DEBUG_OVERLAY_Z, normal_font, CENTER_LEFT);
         y -= DEBUG_OVERLAY_ROW_HEIGHT;
 
-        buffer_string(buffer, right_x, y, DEBUG_OVERLAY_Z, normal_font, BOTTOM_RIGHT);
+        buffer_string(buffer, right_x, y, DEBUG_OVERLAY_Z, normal_font, CENTER_RIGHT);
         y -= DEBUG_OVERLAY_ROW_HEIGHT;
     }
 
@@ -780,11 +782,11 @@ void buffer_debug_overlay() {
 
         snprintf(buffer, sizeof(buffer), "%s", c_name);
 
-        buffer_string("Current World:", left_x, y, DEBUG_OVERLAY_Z, normal_font, BOTTOM_LEFT);
+        buffer_string("Current World:", left_x, y, DEBUG_OVERLAY_Z, normal_font, CENTER_LEFT);
 
         y -= DEBUG_OVERLAY_ROW_HEIGHT;
 
-        buffer_string(buffer, right_x, y, DEBUG_OVERLAY_Z, normal_font, BOTTOM_RIGHT);
+        buffer_string(buffer, right_x, y, DEBUG_OVERLAY_Z, normal_font, CENTER_RIGHT);
 
         y -= DEBUG_OVERLAY_ROW_HEIGHT;
     }
@@ -832,12 +834,6 @@ void buffer_editor_blocks_overlay(Room * room) {
 
         swap(quad.y0, quad.y1);
 
-        if(it->action_type == TELEPORT) {
-            TeleportCollisionAction * teleport_action = (TeleportCollisionAction *) it->action;
-
-            buffer_string(teleport_action->target_room_name, quad.x0, quad.y0 + 0.02f, EDITOR_OVERLAY_Z , font_manager.get_font_at_size(my_font, 16.0f));
-        }
-
         Color4f color;
 
         if(it->flags & COLLISION_DISABLED) {
@@ -851,6 +847,12 @@ void buffer_editor_blocks_overlay(Room * room) {
         // printf("Drawing at %f, %f, %f, %f\n", quad.x0, quad.x1, quad.y0, quad.y1);
 
         buffer_colored_quad(quad, EDITOR_OVERLAY_Z, color);
+
+        if(it->action_type == TELEPORT) {
+            TeleportCollisionAction * teleport_action = (TeleportCollisionAction *) it->action;
+
+            buffer_string(teleport_action->target_room_name, quad.x0 + 0.5f/main_camera.size.x, quad.y0 + 0.02f, EDITOR_OVERLAY_Z, font_manager.get_font_at_size(my_font, 16.0f), BOTTOM_CENTER);
+        }
     }
 }
 
